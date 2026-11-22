@@ -1,0 +1,12 @@
+# Python / Blender 暫存
+__pycache__/
+*.py[cod]
+*.blend
+*.blend1
+*.tmp
+*.bak
+
+# 本地算圖輸出與巨型勘查參考圖（僅保留網頁配置圖彈窗所需之 refs/cges_115_map.jpg）
+renders/
+refs/*
+!refs/cges_115_map.jpg

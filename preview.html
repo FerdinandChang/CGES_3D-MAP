@@ -1,0 +1,170 @@
+<!doctype html>
+<html lang="zh-Hant">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>新北市板橋區重慶國小 115 學年度 3D 校園導覽系統</title>
+    <link rel="stylesheet" href="./tour_ui.css" />
+    <script type="importmap">
+      {
+        "imports": {
+          "three": "./vendor/three/build/three.module.js",
+          "three/addons/": "./vendor/three/examples/jsm/"
+        }
+      }
+    </script>
+  </head>
+  <body>
+    <div id="canvas-wrap"></div>
+    <div id="status">載入重慶國小 3D 實景模型中…</div>
+
+    <!-- Left 115 Academic Year Interactive Directory Sidebar -->
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar-header">
+        <div class="brand-block">
+          <div class="brand-top">
+            <h1 class="school-title">新北市板橋區重慶國小</h1>
+            <span class="year-pill">115 學年度</span>
+          </div>
+          <div class="school-sub">3D 實景校園空間與教室配置導覽</div>
+        </div>
+        <div class="header-actions">
+          <button class="icon-btn" id="btnOpenMapSide" title="查看官方 115 學年度班級配置圖">🗺</button>
+          <button class="icon-btn" id="btnCollapse" title="收合側欄">◀</button>
+        </div>
+      </div>
+
+      <!-- Search Bar (Clean SVG icon + clear button, zero text clipping) -->
+      <div class="search-wrap">
+        <div class="search-box">
+          <svg class="search-icon" viewBox="0 0 20 20" fill="none" aria-hidden="true">
+            <circle cx="9" cy="9" r="5.8" stroke="currentColor" stroke-width="1.8" />
+            <path d="M13.5 13.5L17 17" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" />
+          </svg>
+          <input
+            type="text"
+            id="roomSearch"
+            class="search-input"
+            autocomplete="off"
+            placeholder="搜尋房號、班級或處室（例：305、六6、圖書室）"
+          />
+          <button class="search-clear" id="btnClearSearch" title="清除搜尋" hidden>✕</button>
+        </div>
+
+        <!-- Category Quick Filter Pills -->
+        <div class="cat-filter-bar" id="catFilterBar" role="tablist" aria-label="空間分類篩選"></div>
+      </div>
+
+      <!-- Contextual Drill-down Bar (Zone Breadcrumb + Floor Tabs) -->
+      <div class="context-bar" id="contextBar" hidden></div>
+
+      <!-- Dynamic Directory Body -->
+      <div class="sidebar-body" id="zoneList"></div>
+
+      <!-- Legend & Footer -->
+      <div class="sidebar-footer">
+        <span class="footer-tip">左鍵旋轉・右鍵平移・滾輪縮放</span>
+        <button class="btn btn-sm" id="btnResetAll">全區總覽</button>
+      </div>
+    </aside>
+
+    <button class="btn sidebar-toggle" id="btnExpand">☰ 校園教室導覽</button>
+
+    <!-- Top Floating Action Toolbar -->
+    <div class="top-bar">
+      <div class="pill-group">
+        <button class="btn tour-btn" id="btnStartTour">▶ 自動導覽</button>
+        <button class="btn active" id="btnLabelMode" title="切換 3D 標牌顯示模式：智慧（棟別／選棟展開）→ 全校教室 → 隱藏">
+          🏷 標牌：智慧
+        </button>
+        <button class="btn" id="btnOpenMap" title="開啟 115 學年度官方教室配置圖對照">🗺 配置圖</button>
+        <button class="btn" id="btnXray" title="隱藏屋頂與太陽能板以透視校舍結構">👁 透視屋頂</button>
+        <button class="btn" id="btnRuler" title="點選場景任兩點量測實際公尺距離">📏 測距尺</button>
+      </div>
+      <div class="pill-group">
+        <button class="btn" data-sun="morning">☀ 上午</button>
+        <button class="btn active" data-sun="afternoon">🌤 午後</button>
+        <button class="btn" data-sun="sunset">🌇 黃昏</button>
+      </div>
+    </div>
+
+    <div class="ruler-banner" id="rulerBanner">
+      📏 測距模式已啟用：請在 3D 場景點擊兩個位置量測距離（<span id="rulerDist">等待第一點</span>）
+      <button class="btn btn-xs" id="btnClearRuler">清除</button>
+    </div>
+
+    <!-- Bottom Active Room Inspector Card -->
+    <div class="room-inspector" id="roomInspector" hidden>
+      <div class="ri-left">
+        <span class="ri-cat-bar" id="riCatBar"></span>
+        <div class="ri-info">
+          <div class="ri-meta" id="riMeta">廣和樓・3F・行政處室</div>
+          <div class="ri-title-row">
+            <span class="ri-code" id="riCode">305</span>
+            <span class="ri-name" id="riName">校長室</span>
+          </div>
+          <div class="ri-stairs" id="riStairs">動線：近 4梯・電梯</div>
+        </div>
+      </div>
+      <div class="ri-actions">
+        <button class="btn btn-sm" id="btnRoomPrev" title="同層上一間">◀</button>
+        <button class="btn btn-sm" id="btnRoomNext" title="同層下一間">▶</button>
+        <button class="btn btn-sm" id="btnRoomViewToggle" title="切換近距平視／棟別鳥瞰">🦅 鳥瞰</button>
+        <button class="icon-btn" id="btnCloseInspector" title="關閉定位">✕</button>
+      </div>
+    </div>
+
+    <!-- Bottom Guided Tour Narration Overlay -->
+    <div class="tour-card" id="tourCard">
+      <div class="tour-top">
+        <span class="tour-step-badge" id="tourStepBadge">導覽第 1 / 7 站</span>
+        <button class="icon-btn" id="btnCloseTour" title="結束導覽">✕</button>
+      </div>
+      <div class="tour-title" id="tourTitle">廣和街 31 號主校門</div>
+      <div class="tour-desc" id="tourDesc"></div>
+      <div class="tour-controls">
+        <div style="display: flex; gap: 6px">
+          <button class="btn btn-sm" id="btnTourPrev">◀ 上一站</button>
+          <button class="btn btn-sm active" id="btnTourPlayPause">⏸ 暫停輪播</button>
+          <button class="btn btn-sm" id="btnTourNext">下一站 ▶</button>
+        </div>
+        <span class="tour-hint">滑鼠拖曳可隨時自由檢視</span>
+      </div>
+    </div>
+
+    <!-- Official 115 Classroom Layout Reference Modal -->
+    <div class="map-modal" id="mapModal" hidden>
+      <div class="map-modal-backdrop" id="mapModalBackdrop"></div>
+      <div class="map-modal-dialog" role="dialog" aria-modal="true" aria-label="115 學年度班級配置圖">
+        <div class="map-modal-head">
+          <div>
+            <strong>新北市板橋區重慶國小 115 學年度班級配置圖</strong>
+            <span class="map-modal-sub">官方核對基準｜點圖片可放大／縮回</span>
+          </div>
+          <div style="display: flex; gap: 8px; align-items: center">
+            <a
+              class="btn btn-sm"
+              href="https://www.cges.ntpc.edu.tw/p/404-1000-7000.php"
+              target="_blank"
+              rel="noopener noreferrer"
+              style="text-decoration: none"
+            >
+              ↗ 學校官網原頁
+            </a>
+            <button class="icon-btn" id="btnCloseMapModal" title="關閉">✕</button>
+          </div>
+        </div>
+        <div class="map-modal-body" id="mapModalBody">
+          <img
+            src="./refs/cges_115_map.jpg"
+            alt="新北市板橋區重慶國民小學 115 學年度班級配置圖"
+            class="map-modal-img"
+            id="mapModalImg"
+          />
+        </div>
+      </div>
+    </div>
+
+    <script type="module" src="./tour_app.js"></script>
+  </body>
+</html>

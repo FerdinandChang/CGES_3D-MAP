@@ -1,0 +1,895 @@
+{
+  "cols": 8,
+  "rows": 16,
+  "entries": {
+    "Bldg_Guanghe:0": {
+      "col": 0,
+      "row": 0,
+      "cols": 8,
+      "rows": 16,
+      "label": "504 英語科辦公室"
+    },
+    "Bldg_Guanghe:1": {
+      "col": 1,
+      "row": 0,
+      "cols": 8,
+      "rows": 16,
+      "label": "505 視聽中心"
+    },
+    "Bldg_Guanghe:2": {
+      "col": 2,
+      "row": 0,
+      "cols": 8,
+      "rows": 16,
+      "label": "506 表演準備室"
+    },
+    "Bldg_Guanghe:3": {
+      "col": 3,
+      "row": 0,
+      "cols": 8,
+      "rows": 16,
+      "label": "404 小會議室"
+    },
+    "Bldg_Guanghe:4": {
+      "col": 4,
+      "row": 0,
+      "cols": 8,
+      "rows": 16,
+      "label": "405 教師大辦公室"
+    },
+    "Bldg_Guanghe:5": {
+      "col": 5,
+      "row": 0,
+      "cols": 8,
+      "rows": 16,
+      "label": "4F 男女廁所"
+    },
+    "Bldg_Guanghe:6": {
+      "col": 6,
+      "row": 0,
+      "cols": 8,
+      "rows": 16,
+      "label": "304-1 家長會辦公室"
+    },
+    "Bldg_Guanghe:7": {
+      "col": 7,
+      "row": 0,
+      "cols": 8,
+      "rows": 16,
+      "label": "304-2 總務處"
+    },
+    "Bldg_Guanghe:8": {
+      "col": 0,
+      "row": 1,
+      "cols": 8,
+      "rows": 16,
+      "label": "304-3 教務處"
+    },
+    "Bldg_Guanghe:9": {
+      "col": 1,
+      "row": 1,
+      "cols": 8,
+      "rows": 16,
+      "label": "305 校長室"
+    },
+    "Bldg_Guanghe:10": {
+      "col": 2,
+      "row": 1,
+      "cols": 8,
+      "rows": 16,
+      "label": "3F 男女廁所"
+    },
+    "Bldg_Guanghe:11": {
+      "col": 3,
+      "row": 1,
+      "cols": 8,
+      "rows": 16,
+      "label": "204-1 人事室"
+    },
+    "Bldg_Guanghe:12": {
+      "col": 4,
+      "row": 1,
+      "cols": 8,
+      "rows": 16,
+      "label": "204-2 主計室"
+    },
+    "Bldg_Guanghe:13": {
+      "col": 5,
+      "row": 1,
+      "cols": 8,
+      "rows": 16,
+      "label": "205 輔導室"
+    },
+    "Bldg_Guanghe:14": {
+      "col": 6,
+      "row": 1,
+      "cols": 8,
+      "rows": 16,
+      "label": "2F 男女廁所"
+    },
+    "Bldg_Guanghe:15": {
+      "col": 7,
+      "row": 1,
+      "cols": 8,
+      "rows": 16,
+      "label": "1F 學務處"
+    },
+    "Bldg_Guanghe:16": {
+      "col": 0,
+      "row": 2,
+      "cols": 8,
+      "rows": 16,
+      "label": "1F 廣和樓穿堂"
+    },
+    "Bldg_Guanghe:17": {
+      "col": 1,
+      "row": 2,
+      "cols": 8,
+      "rows": 16,
+      "label": "1F 健康中心"
+    },
+    "Bldg_Heping:0": {
+      "col": 2,
+      "row": 2,
+      "cols": 8,
+      "rows": 16,
+      "label": "519 多功能教室"
+    },
+    "Bldg_Heping:1": {
+      "col": 3,
+      "row": 2,
+      "cols": 8,
+      "rows": 16,
+      "label": "520 六年5班"
+    },
+    "Bldg_Heping:2": {
+      "col": 4,
+      "row": 2,
+      "cols": 8,
+      "rows": 16,
+      "label": "521 六年4班"
+    },
+    "Bldg_Heping:3": {
+      "col": 5,
+      "row": 2,
+      "cols": 8,
+      "rows": 16,
+      "label": "501 六年3班"
+    },
+    "Bldg_Heping:4": {
+      "col": 6,
+      "row": 2,
+      "cols": 8,
+      "rows": 16,
+      "label": "502 六年2班"
+    },
+    "Bldg_Heping:5": {
+      "col": 7,
+      "row": 2,
+      "cols": 8,
+      "rows": 16,
+      "label": "503 六年1班"
+    },
+    "Bldg_Heping:6": {
+      "col": 0,
+      "row": 3,
+      "cols": 8,
+      "rows": 16,
+      "label": "5F 男女廁所"
+    },
+    "Bldg_Heping:7": {
+      "col": 1,
+      "row": 3,
+      "cols": 8,
+      "rows": 16,
+      "label": "419 五年6班"
+    },
+    "Bldg_Heping:8": {
+      "col": 2,
+      "row": 3,
+      "cols": 8,
+      "rows": 16,
+      "label": "420 五年7班"
+    },
+    "Bldg_Heping:9": {
+      "col": 3,
+      "row": 3,
+      "cols": 8,
+      "rows": 16,
+      "label": "421 五年8班"
+    },
+    "Bldg_Heping:10": {
+      "col": 4,
+      "row": 3,
+      "cols": 8,
+      "rows": 16,
+      "label": "401 五年9班"
+    },
+    "Bldg_Heping:11": {
+      "col": 5,
+      "row": 3,
+      "cols": 8,
+      "rows": 16,
+      "label": "402 五年10班"
+    },
+    "Bldg_Heping:12": {
+      "col": 6,
+      "row": 3,
+      "cols": 8,
+      "rows": 16,
+      "label": "403 五年11班"
+    },
+    "Bldg_Heping:13": {
+      "col": 7,
+      "row": 3,
+      "cols": 8,
+      "rows": 16,
+      "label": "4F 男女廁所"
+    },
+    "Bldg_Heping:14": {
+      "col": 0,
+      "row": 4,
+      "cols": 8,
+      "rows": 16,
+      "label": "319 三年7班"
+    },
+    "Bldg_Heping:15": {
+      "col": 1,
+      "row": 4,
+      "cols": 8,
+      "rows": 16,
+      "label": "320 三年6班"
+    },
+    "Bldg_Heping:16": {
+      "col": 2,
+      "row": 4,
+      "cols": 8,
+      "rows": 16,
+      "label": "321 三年5班"
+    },
+    "Bldg_Heping:17": {
+      "col": 3,
+      "row": 4,
+      "cols": 8,
+      "rows": 16,
+      "label": "301 三年4班"
+    },
+    "Bldg_Heping:18": {
+      "col": 4,
+      "row": 4,
+      "cols": 8,
+      "rows": 16,
+      "label": "302 三年3班"
+    },
+    "Bldg_Heping:19": {
+      "col": 5,
+      "row": 4,
+      "cols": 8,
+      "rows": 16,
+      "label": "303 三年2班"
+    },
+    "Bldg_Heping:20": {
+      "col": 6,
+      "row": 4,
+      "cols": 8,
+      "rows": 16,
+      "label": "3F 無障礙廁所"
+    },
+    "Bldg_Heping:21": {
+      "col": 7,
+      "row": 4,
+      "cols": 8,
+      "rows": 16,
+      "label": "219/220 優學1"
+    },
+    "Bldg_Heping:22": {
+      "col": 0,
+      "row": 5,
+      "cols": 8,
+      "rows": 16,
+      "label": "221 優學2"
+    },
+    "Bldg_Heping:23": {
+      "col": 1,
+      "row": 5,
+      "cols": 8,
+      "rows": 16,
+      "label": "2F 往體育館天橋"
+    },
+    "Bldg_Heping:24": {
+      "col": 2,
+      "row": 5,
+      "cols": 8,
+      "rows": 16,
+      "label": "221 優學3"
+    },
+    "Bldg_Heping:25": {
+      "col": 3,
+      "row": 5,
+      "cols": 8,
+      "rows": 16,
+      "label": "202 一年6班"
+    },
+    "Bldg_Heping:26": {
+      "col": 4,
+      "row": 5,
+      "cols": 8,
+      "rows": 16,
+      "label": "203 一年5班"
+    },
+    "Bldg_Heping:27": {
+      "col": 5,
+      "row": 5,
+      "cols": 8,
+      "rows": 16,
+      "label": "2F 男女廁所"
+    },
+    "Bldg_Heping:28": {
+      "col": 6,
+      "row": 5,
+      "cols": 8,
+      "rows": 16,
+      "label": "119 廚房"
+    },
+    "Bldg_Heping:29": {
+      "col": 7,
+      "row": 5,
+      "cols": 8,
+      "rows": 16,
+      "label": "120 幼兒園星空班"
+    },
+    "Bldg_Heping:30": {
+      "col": 0,
+      "row": 6,
+      "cols": 8,
+      "rows": 16,
+      "label": "101 幼兒園陽光班"
+    },
+    "Bldg_Heping:31": {
+      "col": 1,
+      "row": 6,
+      "cols": 8,
+      "rows": 16,
+      "label": "102 幼兒園辦公室"
+    },
+    "Bldg_Heping:32": {
+      "col": 2,
+      "row": 6,
+      "cols": 8,
+      "rows": 16,
+      "label": "103 幼兒園雲朵班"
+    },
+    "Bldg_Heping:33": {
+      "col": 3,
+      "row": 6,
+      "cols": 8,
+      "rows": 16,
+      "label": "1F 無障礙廁所"
+    },
+    "Bldg_Wuquan:0": {
+      "col": 4,
+      "row": 6,
+      "cols": 8,
+      "rows": 16,
+      "label": "5F 無障礙廁所"
+    },
+    "Bldg_Wuquan:1": {
+      "col": 5,
+      "row": 6,
+      "cols": 8,
+      "rows": 16,
+      "label": "518 六年6班"
+    },
+    "Bldg_Wuquan:2": {
+      "col": 6,
+      "row": 6,
+      "cols": 8,
+      "rows": 16,
+      "label": "517 六年8班"
+    },
+    "Bldg_Wuquan:3": {
+      "col": 7,
+      "row": 6,
+      "cols": 8,
+      "rows": 16,
+      "label": "516 六年7班"
+    },
+    "Bldg_Wuquan:4": {
+      "col": 0,
+      "row": 7,
+      "cols": 8,
+      "rows": 16,
+      "label": "515 六年9班"
+    },
+    "Bldg_Wuquan:5": {
+      "col": 1,
+      "row": 7,
+      "cols": 8,
+      "rows": 16,
+      "label": "5F 男女廁所"
+    },
+    "Bldg_Wuquan:6": {
+      "col": 2,
+      "row": 7,
+      "cols": 8,
+      "rows": 16,
+      "label": "514 英語教室"
+    },
+    "Bldg_Wuquan:7": {
+      "col": 3,
+      "row": 7,
+      "cols": 8,
+      "rows": 16,
+      "label": "512 電腦教室"
+    },
+    "Bldg_Wuquan:8": {
+      "col": 4,
+      "row": 7,
+      "cols": 8,
+      "rows": 16,
+      "label": "4F 無障礙廁所"
+    },
+    "Bldg_Wuquan:9": {
+      "col": 5,
+      "row": 7,
+      "cols": 8,
+      "rows": 16,
+      "label": "418 多功能教室"
+    },
+    "Bldg_Wuquan:10": {
+      "col": 6,
+      "row": 7,
+      "cols": 8,
+      "rows": 16,
+      "label": "417 五年5班"
+    },
+    "Bldg_Wuquan:11": {
+      "col": 7,
+      "row": 7,
+      "cols": 8,
+      "rows": 16,
+      "label": "416 四年8班"
+    },
+    "Bldg_Wuquan:12": {
+      "col": 0,
+      "row": 8,
+      "cols": 8,
+      "rows": 16,
+      "label": "415 四年7班"
+    },
+    "Bldg_Wuquan:13": {
+      "col": 1,
+      "row": 8,
+      "cols": 8,
+      "rows": 16,
+      "label": "4F 男女廁所"
+    },
+    "Bldg_Wuquan:14": {
+      "col": 2,
+      "row": 8,
+      "cols": 8,
+      "rows": 16,
+      "label": "414 美勞教室"
+    },
+    "Bldg_Wuquan:15": {
+      "col": 3,
+      "row": 8,
+      "cols": 8,
+      "rows": 16,
+      "label": "412 電腦教室"
+    },
+    "Bldg_Wuquan:16": {
+      "col": 4,
+      "row": 8,
+      "cols": 8,
+      "rows": 16,
+      "label": "3F 男女廁所"
+    },
+    "Bldg_Wuquan:17": {
+      "col": 5,
+      "row": 8,
+      "cols": 8,
+      "rows": 16,
+      "label": "318 多功能教室"
+    },
+    "Bldg_Wuquan:18": {
+      "col": 6,
+      "row": 8,
+      "cols": 8,
+      "rows": 16,
+      "label": "317 三年8班"
+    },
+    "Bldg_Wuquan:19": {
+      "col": 7,
+      "row": 8,
+      "cols": 8,
+      "rows": 16,
+      "label": "316 五年2班"
+    },
+    "Bldg_Wuquan:20": {
+      "col": 0,
+      "row": 9,
+      "cols": 8,
+      "rows": 16,
+      "label": "315 五年3班"
+    },
+    "Bldg_Wuquan:21": {
+      "col": 1,
+      "row": 9,
+      "cols": 8,
+      "rows": 16,
+      "label": "3F 無障礙廁所"
+    },
+    "Bldg_Wuquan:22": {
+      "col": 2,
+      "row": 9,
+      "cols": 8,
+      "rows": 16,
+      "label": "314 五年4班"
+    },
+    "Bldg_Wuquan:23": {
+      "col": 3,
+      "row": 9,
+      "cols": 8,
+      "rows": 16,
+      "label": "313 四年1班"
+    },
+    "Bldg_Wuquan:24": {
+      "col": 4,
+      "row": 9,
+      "cols": 8,
+      "rows": 16,
+      "label": "312 美勞教室"
+    },
+    "Bldg_Wuquan:25": {
+      "col": 5,
+      "row": 9,
+      "cols": 8,
+      "rows": 16,
+      "label": "2F 無障礙廁所"
+    },
+    "Bldg_Wuquan:26": {
+      "col": 6,
+      "row": 9,
+      "cols": 8,
+      "rows": 16,
+      "label": "218 五年1班"
+    },
+    "Bldg_Wuquan:27": {
+      "col": 7,
+      "row": 9,
+      "cols": 8,
+      "rows": 16,
+      "label": "217 二年8班"
+    },
+    "Bldg_Wuquan:28": {
+      "col": 0,
+      "row": 10,
+      "cols": 8,
+      "rows": 16,
+      "label": "216 二年7班"
+    },
+    "Bldg_Wuquan:29": {
+      "col": 1,
+      "row": 10,
+      "cols": 8,
+      "rows": 16,
+      "label": "215 二年6班"
+    },
+    "Bldg_Wuquan:30": {
+      "col": 2,
+      "row": 10,
+      "cols": 8,
+      "rows": 16,
+      "label": "2F 男女廁所"
+    },
+    "Bldg_Wuquan:31": {
+      "col": 3,
+      "row": 10,
+      "cols": 8,
+      "rows": 16,
+      "label": "214 二年5班"
+    },
+    "Bldg_Wuquan:32": {
+      "col": 4,
+      "row": 10,
+      "cols": 8,
+      "rows": 16,
+      "label": "213 二年4班"
+    },
+    "Bldg_Wuquan:33": {
+      "col": 5,
+      "row": 10,
+      "cols": 8,
+      "rows": 16,
+      "label": "212 二年3班"
+    },
+    "Bldg_Wuquan:34": {
+      "col": 6,
+      "row": 10,
+      "cols": 8,
+      "rows": 16,
+      "label": "1F 幼兒園廁所"
+    },
+    "Bldg_Wuquan:35": {
+      "col": 7,
+      "row": 10,
+      "cols": 8,
+      "rows": 16,
+      "label": "118 體育器材室"
+    },
+    "Bldg_Wuquan:36": {
+      "col": 0,
+      "row": 11,
+      "cols": 8,
+      "rows": 16,
+      "label": "118-1 播音室"
+    },
+    "Bldg_Wuquan:37": {
+      "col": 1,
+      "row": 11,
+      "cols": 8,
+      "rows": 16,
+      "label": "1F 五權樓穿堂"
+    },
+    "Bldg_Wuquan:38": {
+      "col": 2,
+      "row": 11,
+      "cols": 8,
+      "rows": 16,
+      "label": "116 一年1班"
+    },
+    "Bldg_Wuquan:39": {
+      "col": 3,
+      "row": 11,
+      "cols": 8,
+      "rows": 16,
+      "label": "115 一年2班"
+    },
+    "Bldg_Wuquan:40": {
+      "col": 4,
+      "row": 11,
+      "cols": 8,
+      "rows": 16,
+      "label": "1F 無障礙廁所"
+    },
+    "Bldg_Wuquan:41": {
+      "col": 5,
+      "row": 11,
+      "cols": 8,
+      "rows": 16,
+      "label": "114 三年1班"
+    },
+    "Bldg_Wuquan:42": {
+      "col": 6,
+      "row": 11,
+      "cols": 8,
+      "rows": 16,
+      "label": "113 一年3班"
+    },
+    "Bldg_Wuquan:43": {
+      "col": 7,
+      "row": 11,
+      "cols": 8,
+      "rows": 16,
+      "label": "112 一年4班"
+    },
+    "Bldg_Chongqing:0": {
+      "col": 0,
+      "row": 12,
+      "cols": 8,
+      "rows": 16,
+      "label": "511 英語教室"
+    },
+    "Bldg_Chongqing:1": {
+      "col": 1,
+      "row": 12,
+      "cols": 8,
+      "rows": 16,
+      "label": "510 英語教室"
+    },
+    "Bldg_Chongqing:2": {
+      "col": 2,
+      "row": 12,
+      "cols": 8,
+      "rows": 16,
+      "label": "509 多功能教室"
+    },
+    "Bldg_Chongqing:3": {
+      "col": 3,
+      "row": 12,
+      "cols": 8,
+      "rows": 16,
+      "label": "5F 無障礙廁所"
+    },
+    "Bldg_Chongqing:4": {
+      "col": 4,
+      "row": 12,
+      "cols": 8,
+      "rows": 16,
+      "label": "508 音樂教室"
+    },
+    "Bldg_Chongqing:5": {
+      "col": 5,
+      "row": 12,
+      "cols": 8,
+      "rows": 16,
+      "label": "507 音樂教室"
+    },
+    "Bldg_Chongqing:6": {
+      "col": 6,
+      "row": 12,
+      "cols": 8,
+      "rows": 16,
+      "label": "411 四年6班"
+    },
+    "Bldg_Chongqing:7": {
+      "col": 7,
+      "row": 12,
+      "cols": 8,
+      "rows": 16,
+      "label": "410 四年5班"
+    },
+    "Bldg_Chongqing:8": {
+      "col": 0,
+      "row": 13,
+      "cols": 8,
+      "rows": 16,
+      "label": "409 自然教室"
+    },
+    "Bldg_Chongqing:9": {
+      "col": 1,
+      "row": 13,
+      "cols": 8,
+      "rows": 16,
+      "label": "4F 男女廁所"
+    },
+    "Bldg_Chongqing:10": {
+      "col": 2,
+      "row": 13,
+      "cols": 8,
+      "rows": 16,
+      "label": "408 自然教室"
+    },
+    "Bldg_Chongqing:11": {
+      "col": 3,
+      "row": 13,
+      "cols": 8,
+      "rows": 16,
+      "label": "4F 社會自然室"
+    },
+    "Bldg_Chongqing:12": {
+      "col": 4,
+      "row": 13,
+      "cols": 8,
+      "rows": 16,
+      "label": "407 自然教室"
+    },
+    "Bldg_Chongqing:13": {
+      "col": 5,
+      "row": 13,
+      "cols": 8,
+      "rows": 16,
+      "label": "311 四年2班"
+    },
+    "Bldg_Chongqing:14": {
+      "col": 6,
+      "row": 13,
+      "cols": 8,
+      "rows": 16,
+      "label": "310 四年3班"
+    },
+    "Bldg_Chongqing:15": {
+      "col": 7,
+      "row": 13,
+      "cols": 8,
+      "rows": 16,
+      "label": "309 四年4班"
+    },
+    "Bldg_Chongqing:16": {
+      "col": 0,
+      "row": 14,
+      "cols": 8,
+      "rows": 16,
+      "label": "3F 無障礙廁所"
+    },
+    "Bldg_Chongqing:17": {
+      "col": 1,
+      "row": 14,
+      "cols": 8,
+      "rows": 16,
+      "label": "308 自然教室"
+    },
+    "Bldg_Chongqing:18": {
+      "col": 2,
+      "row": 14,
+      "cols": 8,
+      "rows": 16,
+      "label": "307-1 教務處資料室"
+    },
+    "Bldg_Chongqing:19": {
+      "col": 3,
+      "row": 14,
+      "cols": 8,
+      "rows": 16,
+      "label": "307 自然教室"
+    },
+    "Bldg_Chongqing:20": {
+      "col": 4,
+      "row": 14,
+      "cols": 8,
+      "rows": 16,
+      "label": "211 二年2班"
+    },
+    "Bldg_Chongqing:21": {
+      "col": 5,
+      "row": 14,
+      "cols": 8,
+      "rows": 16,
+      "label": "210 二年1班"
+    },
+    "Bldg_Chongqing:22": {
+      "col": 6,
+      "row": 14,
+      "cols": 8,
+      "rows": 16,
+      "label": "209 親職教育教室"
+    },
+    "Bldg_Chongqing:23": {
+      "col": 7,
+      "row": 14,
+      "cols": 8,
+      "rows": 16,
+      "label": "2F 男女廁所"
+    },
+    "Bldg_Chongqing:24": {
+      "col": 0,
+      "row": 15,
+      "cols": 8,
+      "rows": 16,
+      "label": "2F 諮商室"
+    },
+    "Bldg_Chongqing:25": {
+      "col": 1,
+      "row": 15,
+      "cols": 8,
+      "rows": 16,
+      "label": "208 圖書室"
+    },
+    "Bldg_Chongqing:26": {
+      "col": 2,
+      "row": 15,
+      "cols": 8,
+      "rows": 16,
+      "label": "111 幼兒園活動教室"
+    },
+    "Bldg_Chongqing:27": {
+      "col": 3,
+      "row": 15,
+      "cols": 8,
+      "rows": 16,
+      "label": "1F 重慶樓穿堂"
+    },
+    "Bldg_Chongqing:28": {
+      "col": 4,
+      "row": 15,
+      "cols": 8,
+      "rows": 16,
+      "label": "1F 無障礙廁所"
+    },
+    "Bldg_Chongqing:29": {
+      "col": 5,
+      "row": 15,
+      "cols": 8,
+      "rows": 16,
+      "label": "108 唱遊教室"
+    },
+    "Bldg_Chongqing:30": {
+      "col": 6,
+      "row": 15,
+      "cols": 8,
+      "rows": 16,
+      "label": "107 唱遊教室"
+    }
+  }
+}
