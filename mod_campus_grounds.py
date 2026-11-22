@@ -1463,15 +1463,14 @@ def build_track_and_stage(spec: dict, palette: Dict[str, bpy.types.Material]) ->
     objs.append(su.create_mesh_object("Zone_Track_StagePlinth", bm_stage_plinth, palette["curb_concrete"], col, uv_scale=0.45))
     objs.append(su.create_mesh_object("Zone_Track_StageShrubs", bm_stage_shrub, palette["tree_foliage_b"], col, smooth=True))
 
-    # =========================================================================
-    # v12.4 11 & 9 五權街 EXACT EAST TRACK FITNESS & EXERCISE EQUIPMENT (1:1 step_12_shot_1.png & step_10_shot_1.png!)
-    # Aligned along Wuquan St east wall axis (EAST_ROT_Z = +3.2 deg) inside the east lawn strip:
-    #   0. Framed Light-Sand Safety Cushion Pads beneath Climbing Poles & Bar Frames (clean edge separation from grass)
-    #   1. SE Corner Dark-Frame Corrugated Metal Equipment Shelter Shed (y=-61.2..-55.0) + High-Jump Mats & Hurdles inside
-    #   2. 6-Pole Brushed-Stainless Climbing Poles Frame (y=-52.2..-45.8, top beam z=3.35m, 6 poles protruding 0.50m to 3.85m!)
-    #   3. 4-Bay 4-Rail Stainless Stretching/Rib-Bar Frame (y=-32.2..-23.2, 4 rails @ z=1.12/1.56/2.00/2.44m, posts to 2.70m!)
-    #   4. 4-Bay Stepped High-Mid-Low Stainless Pull-Up Bars (y=-21.8..-12.8, z=2.56 -> 2.24 -> 1.92 -> 1.62m!)
-    # =========================================================================
+    objs.extend(_build_east_track_fitness(palette, col))
+    objs.extend(_build_north_basketball_court(palette, col))
+    return objs
+
+
+def _build_east_track_fitness(palette: Dict[str, bpy.types.Material], col: str) -> List[bpy.types.Object]:
+    """建置 11 & 9 五權街操場東側體健與器材區（器材遮雨棚、6 支爬竿架、4 跨 4 層肋木伸展架、4 跨階梯式高低單槓與安全緩衝沙墊）。"""
+    objs: List[bpy.types.Object] = []
     bm_fit_steel = bmesh.new()
     bm_fit_dark = bmesh.new()
     bm_fit_base = bmesh.new()
@@ -1596,15 +1595,12 @@ def build_track_and_stage(spec: dict, palette: Dict[str, bpy.types.Material]) ->
     objs.append(su.create_mesh_object("Zone_Track_EastFitnessPads", bm_fit_pad, palette["fitness_sand_pad"], col, uv_scale=0.5))
     objs.append(su.create_mesh_object("Zone_Track_EastShedRoof", bm_shed_roof, palette["shed_roof_gray"], col))
     objs.append(su.create_mesh_object("Zone_Track_EastShedMats", bm_shed_mat_blue, palette["flag_blue"], col))
+    return objs
 
-    # =========================================================================
-    # v12.6 2 五權街 & 147 和平路 EXACT NORTH-EAST DUAL HALF-COURT BASKETBALL COURT + MINT APRON + NE SHADE PAVILION!
-    #   1. Light-Mint Coated Buffer Apron (x=28.80..35.80) separating 100m Sprint Extension & North Track Curve from Concrete Court
-    #   2. Dual Half-Court Weathered Concrete Basketball Court (x=35.80..60.80, y=33.80..46.60) w/ crisp white markings & north dashed strip
-    #   3. 2 Side-by-Side Single-Pole Basketball Hoops along SOUTH baseline facing NORTH (blue cylindrical pads, white black-bordered red-square backboards, orange rims & white nets!)
-    #   4. 12 Low Silver U-Shaped Divider Barriers along south court edge (y=33.82) separating court from track lawn & banyan trees
-    #   5. Bare Dark Soil Tree-Strip along Heping Rd green mesh fence (y=46.6..fence) + NE Corner Dark-Roof Shade Pavilion w/ benches & tall courtyard lamp!
-    # =========================================================================
+
+def _build_north_basketball_court(palette: Dict[str, bpy.types.Material], col: str) -> List[bpy.types.Object]:
+    """建置 2 五權街 & 147 和平路操場東北角雙半場露天水泥籃球場、淡草綠緩衝地坪、2 座藍防撞墊籃球架、12 座ㄇ字銀欄杆、泥土樹穴帶與東北角涼亭。"""
+    objs: List[bpy.types.Object] = []
     bm_nc_mint = bmesh.new()
     bm_nc_conc = bmesh.new()
     bm_nc_wline = bmesh.new()

@@ -681,384 +681,12 @@ def build_corridor_building(cfg: dict, palette: Dict[str, bpy.types.Material]) -
     objs.append(su.create_mesh_object(f"{prefix}_CorridorDado", bm_dado, palette["wall_guanghe"], col, uv_scale=0.5))
     objs.append(su.create_mesh_object(f"{prefix}_CorridorTerrazzo", bm_terrazzo, palette["terrazzo_corridor"], col, uv_scale=0.45))
 
-    # D-02: Iconic Library Corridor Train Mural on Chongqing Bldg 2F (campus_15.jpg & act_16.jpg!)
-    # + v11.2 56 廣和街 EXACT WEST GABLE FACADE (Recessed Cream-Tile Panels + Terracotta Structural Frame + 2F-4F Small Windows + Open North Corridor End!)
     if prefix == "Bldg_Chongqing":
-        bm_train = bmesh.new()
-        ty_m = core_y0 - 0.10
-        _add_plane_uv(bm_train, (-62.0, ty_m, 3.85), (-46.0, ty_m, 3.85), (-46.0, ty_m, 6.45), (-62.0, ty_m, 6.45))
-        objs.append(su.create_mesh_object(f"{prefix}_LibraryTrainMural", bm_train, palette["train_mural"], col, auto_uv=False))
+        objs.extend(_build_chongqing_west_gable(prefix, x0, y0, y1, core_y0, core_y1, floors, h1, hu, z_roof, palette, col))
 
-        bm_wg_frame = bmesh.new()   # Terracotta brick structural grid columns & beams (proud)
-        bm_wg_panel = bmesh.new()   # Cream-white square tile recessed infill panels
-        bm_wg_seam = bmesh.new()    # Fine vertical expansion joint lines inside panels
-        bm_wg_win = bmesh.new()
-        bm_wg_wfrm = bmesh.new()
-        bm_wg_steel = bmesh.new()   # Silver double-bar corridor end railings + canopy trim
-        bm_wg_green = bmesh.new()   # Dark-green corrugated metal sloped canopy roofs (right shed + left entrance!)
-        bm_wg_blue = bmesh.new()    # 3F open corridor painted blue ceiling accent (final_step_4.png!)
-        bm_wg_lantern = bmesh.new() # 1F north entrance twin warm-yellow hanging lanterns!
-
-        # Vertical structural columns spanning 1F -> top flat parapet (z=0..19.2m)
-        z_top_gable = z_roof + 2.0  # 19.2m flat parapet matching final_step_4.png!
-        # Left wide bay (north): y=-38.35..-32.50 (5.85m), Right narrow bay (south): y=-42.40..-38.95 (3.45m)
-        y_col_n_outer = y1 - 0.28       # -29.78 (north corridor outer corner column)
-        y_col_n_inner = core_y1 - 0.30  # -32.20 (main gable north column)
-        y_col_mid = -38.65              # central divider column
-        y_col_s_outer = y0 + 0.30       # -42.70 (south corner column)
-        for yc in (y_col_n_inner, y_col_mid, y_col_s_outer):
-            gp.bm_box(bm_wg_frame, (x0 - 0.03, yc, z_top_gable * 0.5), (0.28, 0.60, z_top_gable))
-        # North corridor corner pillar full height up to parapet
-        gp.bm_box(bm_wg_frame, (x0 - 0.03, y_col_n_outer, z_top_gable * 0.5), (0.28, 0.56, z_top_gable))
-
-        # Horizontal floor slab beams (1F-5F + top parapet coping) across entire west facade!
-        beam_zs = [0.20, h1, h1 + hu, h1 + 2 * hu, h1 + 3 * hu, z_roof, z_top_gable - 0.20]
-        for idx_b, bz in enumerate(beam_zs):
-            bh = 0.52 if idx_b not in (0, len(beam_zs) - 1) else 0.42
-            # Main solid gable portion (y0..core_y1)
-            gp.bm_box(bm_wg_frame, (x0 - 0.03, (y0 + core_y1) * 0.5, bz), (0.28, core_y1 - y0 + 0.02, bh))
-            # Open north corridor lintel beam (core_y1..y1) for 2F..parapet
-            if idx_b >= 1:
-                gp.bm_box(bm_wg_frame, (x0 - 0.03, (core_y1 + y1) * 0.5, bz), (0.28, y1 - core_y1, bh * 0.92))
-
-        # Recessed Cream-White Square-Tile Infill Panels (6 tiers: 1F..5F + flat parapet band!)
-        tier_ranges = [
-            (0.40, h1 - 0.26),                      # 1F
-            (h1 + 0.26, h1 + hu - 0.26),            # 2F
-            (h1 + hu + 0.26, h1 + 2 * hu - 0.26),   # 3F
-            (h1 + 2 * hu + 0.26, h1 + 3 * hu - 0.26), # 4F
-            (h1 + 3 * hu + 0.26, z_roof - 0.26),    # 5F
-            (z_roof + 0.26, z_top_gable - 0.40),    # Top flat parapet panel band
-        ]
-        y_wide_0, y_wide_1 = y_col_mid + 0.29, y_col_n_inner - 0.29
-        y_narr_0, y_narr_1 = y_col_s_outer + 0.29, y_col_mid - 0.29
-        for t_idx, (zt0, zt1) in enumerate(tier_ranges):
-            th = zt1 - zt0
-            tz = (zt0 + zt1) * 0.5
-            # Left wide recessed cream-tile panel + 2 fine vertical expansion joints (3 sub-panels!)
-            gp.bm_box(bm_wg_panel, (x0 + 0.02, (y_wide_0 + y_wide_1) * 0.5, tz), (0.14, y_wide_1 - y_wide_0, th))
-            for frac in (1.0 / 3.0, 2.0 / 3.0):
-                ys = y_wide_0 + (y_wide_1 - y_wide_0) * frac
-                gp.bm_box(bm_wg_seam, (x0 - 0.055, ys, tz), (0.015, 0.035, th - 0.04))
-            # Right narrow recessed cream-tile panel + 1 fine vertical expansion joint (2 sub-panels!)
-            gp.bm_box(bm_wg_panel, (x0 + 0.02, (y_narr_0 + y_narr_1) * 0.5, tz), (0.14, y_narr_1 - y_narr_0, th))
-            gp.bm_box(bm_wg_seam, (x0 - 0.055, (y_narr_0 + y_narr_1) * 0.5, tz), (0.015, 0.035, th - 0.04))
-            # EXACT 56 廣和街 DETAIL: 3 vertically aligned square dark-aluminum small windows ONLY on 2F, 3F, 4F bottom-left of right bay!
-            if t_idx in (1, 2, 3):
-                win_y = y_narr_1 - 0.80  # Left-aligned (north side) inside narrow right bay!
-                win_z = zt0 + 0.64       # Bottom-aligned inside cream tile panel!
-                _add_detailed_window(bm_wg_win, bm_wg_wfrm, (x0 - 0.08, win_y, win_z), 1.32, 1.12, axis="Y", cols=2, has_transom=False)
-
-        # Open North Corridor End-Bay Details (1F-5F, y=core_y1..y1 = -31.9..-29.5!)
-        corr_cy = (core_y1 + y1) * 0.5
-        corr_span = (y1 - core_y1) - 0.58
-        # Solid top parapet infill panel capping north corridor bay flush with main parapet (zero sky sliver!)
-        gp.bm_box(bm_wg_panel, (x0 + 0.02, corr_cy, (z_roof + 0.26 + z_top_gable - 0.40) * 0.5), (0.14, corr_span, (z_top_gable - 0.40) - (z_roof + 0.26)))
-        for fl_c in range(1, floors):
-            zfc = h1 + (fl_c - 1) * hu
-            # Cream square-tile low balcony parapet wall facing -X + twin silver horizontal guardrails!
-            gp.bm_box(bm_wg_panel, (x0 - 0.02, corr_cy, zfc + 0.52), (0.20, corr_span, 0.96))
-            gp.bm_box(bm_wg_steel, (x0 - 0.02, corr_cy, zfc + 1.12), (0.05, corr_span + 0.04, 0.05))
-            gp.bm_box(bm_wg_steel, (x0 - 0.02, corr_cy, zfc + 1.28), (0.05, corr_span + 0.04, 0.05))
-        # Iconic 3F blue-painted corridor ceiling visible from 56 廣和街 (final_step_4.png!)
-        gp.bm_box(bm_wg_blue, (x0 + 2.4, corr_cy, h1 + 2 * hu - 0.08), (4.6, corr_span + 0.3, 0.06))
-        # 1F North Entrance Sloped Dark-Green Corrugated Canopy + Twin Warm-Yellow Hanging Lanterns!
-        gp.bm_box(bm_wg_green, (x0 - 1.15, corr_cy + 0.1, 3.02), (2.25, 2.75, 0.12), rot_y=math.radians(-14.0))
-        gp.bm_box(bm_wg_steel, (x0 - 2.24, corr_cy + 0.1, 2.74), (0.06, 2.78, 0.12))
-        for ly_lan in (corr_cy - 0.55, corr_cy + 0.55):
-            gp.bm_cyl_axis(bm_wg_steel, (x0 - 1.45, ly_lan, 2.78), 0.015, 0.36, axis="Z", segments=6)
-            gp.bm_cyl_axis(bm_wg_lantern, (x0 - 1.45, ly_lan, 2.46), 0.22, 0.34, axis="Z", segments=12)
-
-        # 1F South-Right Attached Shed with Dark-Green Corrugated Metal Sloped Roof (exact final_step_4.png bottom-right!)
-        gp.bm_box(bm_wg_green, (x0 - 1.45, -40.2, 2.86), (2.95, 6.4, 0.14), rot_y=math.radians(-16.0))
-        gp.bm_box(bm_wg_steel, (x0 - 2.86, -40.2, 2.46), (0.07, 6.46, 0.14))
-        for sy_p in (-43.1, -40.2, -37.3):
-            gp.bm_cyl_axis(bm_wg_steel, (x0 - 2.65, sy_p, 1.24), 0.055, 2.48, axis="Z", segments=8)
-
-        objs.append(su.create_mesh_object(f"{prefix}_WestGableBrickGrid", bm_wg_frame, palette["wall_brick_red"], col, uv_scale=0.45))
-        objs.append(su.create_mesh_object(f"{prefix}_WestGableCreamPanels", bm_wg_panel, palette["wall_guanghe"], col, uv_scale=0.42))
-        objs.append(su.create_mesh_object(f"{prefix}_WestGablePanelSeams", bm_wg_seam, palette["metal_dark"], col))
-        objs.append(su.create_mesh_object(f"{prefix}_WestGableSmallWins", bm_wg_win, palette["window_glass"], col))
-        objs.append(su.create_mesh_object(f"{prefix}_WestGableWinFrames", bm_wg_wfrm, palette["window_frame"], col))
-        objs.append(su.create_mesh_object(f"{prefix}_WestGableSteelRails", bm_wg_steel, palette["steel_silver"], col))
-        objs.append(su.create_mesh_object(f"{prefix}_WestGableGreenCanopies", bm_wg_green, palette["side_gate_green"], col))
-        objs.append(su.create_mesh_object(f"{prefix}_WestGableBlueCeil", bm_wg_blue, palette["shelter_navy"], col))
-        objs.append(su.create_mesh_object(f"{prefix}_WestGableLanterns", bm_wg_lantern, palette["lamp_globe"], col, smooth=True))
-
-    # v11.3 Wuquan Bldg End Facades:
-    #   - South End Gable (y=y0=-67.0): Terracotta structural grid + recessed cream-tile panels
-    #   - North End Facade (y=y1=+39.5, 147 和平路 step_27/31!): 2F-5F Twin-Bay Windows + Terracotta Frame + Brick Diamond Lattice Bands above each window!
     if prefix == "Bldg_Wuquan":
-        bm_wq_f = bmesh.new()
-        bm_wq_p = bmesh.new()
-        bm_wq_s = bmesh.new()
-        bm_wq_w = bmesh.new()
-        bm_wq_wf = bmesh.new()
-        bm_wq_lat = bmesh.new()
-        z_top_wq = z_roof + parapet
-        x_w0, x_w1 = core_x0 + 0.10, core_x1 - 0.10
-        x_wm = (x_w0 + x_w1) * 0.5
-        # 1. South End Gable (y = y0 = -67.0)
-        gy, sgn = y0 - 0.02, -1.0
-        for xc in (x_w0, x_wm, x_w1):
-            gp.bm_box(bm_wq_f, (xc, gy + sgn * 0.04, z_top_wq * 0.5), (0.56, 0.24, z_top_wq))
-        for bz in (0.20, h1, h1 + hu, h1 + 2 * hu, h1 + 3 * hu, z_roof, z_top_wq - 0.18):
-            gp.bm_box(bm_wq_f, (x_wm, gy + sgn * 0.04, bz), (x_w1 - x_w0 + 0.56, 0.24, 0.46))
-        for zt0, zt1 in [
-            (0.42, h1 - 0.24), (h1 + 0.24, h1 + hu - 0.24), (h1 + hu + 0.24, h1 + 2 * hu - 0.24),
-            (h1 + 2 * hu + 0.24, h1 + 3 * hu - 0.24), (h1 + 3 * hu + 0.24, z_roof - 0.24), (z_roof + 0.24, z_top_wq - 0.36),
-        ]:
-            tz, th = 0.5 * (zt0 + zt1), zt1 - zt0
-            for px0, px1 in ((x_w0 + 0.28, x_wm - 0.28), (x_wm + 0.28, x_w1 - 0.28)):
-                gp.bm_box(bm_wq_p, (0.5 * (px0 + px1), gy - sgn * 0.02, tz), (px1 - px0, 0.14, th))
-                gp.bm_box(bm_wq_s, (0.5 * (px0 + px1), gy + sgn * 0.055, tz), (0.03, 0.015, th - 0.04))
-
-        # 2. North End Facade 2F-5F (y = y1 = 39.5, full building width x=-6.8..+6.4, leaving 1F cleanly for dual B1 roll-up shutters!)
-        gy_n = y1 + 0.04
-        for xc_n in (-6.65, -4.10, 0.55, 6.20):
-            gp.bm_box(bm_wq_f, (xc_n, gy_n + 0.06, (h1 + z_top_wq) * 0.5), (0.62, 0.28, z_top_wq - h1))
-        for bz_n in (h1 + 0.15, h1 + hu, h1 + 2 * hu, h1 + 3 * hu, z_roof, z_top_wq - 0.16):
-            gp.bm_box(bm_wq_f, (-0.22, gy_n + 0.06, bz_n), (13.45, 0.28, 0.42))
-        for fl_n in range(1, floors):
-            zfn = h1 + (fl_n - 1) * hu
-            for bx0_n, bx1_n in [(-3.75, 0.18), (0.92, 5.85)]:
-                bcx_n = 0.5 * (bx0_n + bx1_n)
-                bw_n = bx1_n - bx0_n
-                # Cream lower tile spandrel + wide aluminum window + iconic terracotta diamond lattice band above window (step_27!)
-                gp.bm_box(bm_wq_p, (bcx_n, gy_n - 0.01, zfn + 0.65), (bw_n, 0.16, 0.92))
-                _add_detailed_window(bm_wq_w, bm_wq_wf, (bcx_n, gy_n + 0.03, zfn + 1.82), bw_n - 0.14, 1.38, axis="X", cols=4, has_transom=False)
-                _add_plane_uv(bm_wq_lat, (bx1_n - 0.04, gy_n + 0.10, zfn + 2.56), (bx0_n + 0.04, gy_n + 0.10, zfn + 2.56), (bx0_n + 0.04, gy_n + 0.10, zfn + 3.16), (bx1_n - 0.04, gy_n + 0.10, zfn + 3.16))
-        objs.append(su.create_mesh_object(f"{prefix}_EndGablesBrickGrid", bm_wq_f, palette["wall_brick_red"], col, uv_scale=0.45))
-        objs.append(su.create_mesh_object(f"{prefix}_EndGablesCreamPanels", bm_wq_p, palette["wall_guanghe"], col, uv_scale=0.42))
-        objs.append(su.create_mesh_object(f"{prefix}_EndGablesPanelSeams", bm_wq_s, palette["metal_dark"], col))
-        objs.append(su.create_mesh_object(f"{prefix}_NorthGableWindows", bm_wq_w, palette["window_glass"], col))
-        objs.append(su.create_mesh_object(f"{prefix}_NorthGableWinFrames", bm_wq_wf, palette["window_frame"], col))
-        objs.append(su.create_mesh_object(f"{prefix}_NorthGableLattice", bm_wq_lat, palette["brick_lattice_band"], col, auto_uv=False))
-
-        # =========================================================================
-        # v12.5 9 & 2 五權街 EXACT 1:1 WUQUAN BLDG EAST FACADE REBUILD (step_6/10/14/16/18_shot_1.png!)
-        #   1. South Wing (b=0..4) Red-Brick Lattice Clerestory Bands above every east window
-        #   2. Full-Height 1F-5F Vertical Illustrated School Banner (b=4 north half, y=-30.55..-26.85) + 2F Deep-Blue Horizontal Signs
-        #   3. 1F Accessible Long Ramp Walkway (y=-34.2..-20.55) w/ sloped cream-tile wall, twin stainless handrails & recessed north plinth
-        #   4. 2F-5F Mid-North East Corridor Twin Silver Stainless Guardrails + Full-Height Exposed Rainwater Pipe at Stair 9
-        #   5. 1F Multi-Stair & Breezeway Ensemble:
-        #        - b=5 south gray roll-up shutter behind accessible ramp landing
-        #        - b=7..9 3-Bay Grand Wide Staircase (y=-4.2..+10.2, 7 steps, white sloped cheek walls) + Twin Gray Shutters flanking Open Center Breezeway
-        #        - b=9..10 1F Cream Classroom Facade w/ Wide Windows, Basement Vent Windows & Compact Roll-Up Shutter
-        #        - b=11 Stair 9 Service Facade: Twin Glass Doors + 3-Bay Frosted Blue High Windows + 3 Vertical Red-Brick Lattice Slots + White Wall Bench
-        #        - b=12 North Wide Staircase (y=+31.9..+39.0, 6 steps) + Open North Breezeway w/ Painted Sky & Hills Mural on North Inner Wall!
-        # =========================================================================
-        bm_e_cream = bmesh.new()
-        bm_e_slab = bmesh.new()
-        bm_e_trim = bmesh.new()
-        bm_e_dark = bmesh.new()
-        bm_e_steel = bmesh.new()
-        bm_e_lat = bmesh.new()
-        bm_e_shut = bmesh.new()
-        bm_e_fglass = bmesh.new()
-        bm_e_wglass = bmesh.new()
-        bm_e_wfrm = bmesh.new()
-        bm_e_vban = bmesh.new()
-        bm_e_bban = bmesh.new()
-        bm_e_mural = bmesh.new()
-
-        def _add_sloped_cheek_x(bm_c: bmesh.types.BMesh, y_s: float, y_n: float, xz_pts: List[Tuple[float, float]]) -> None:
-            vs0 = [bm_c.verts.new((px_v, y_s, pz_v)) for px_v, pz_v in xz_pts]
-            vs1 = [bm_c.verts.new((px_v, y_n, pz_v)) for px_v, pz_v in xz_pts]
-            f_new = [bm_c.faces.new(vs0), bm_c.faces.new(list(reversed(vs1)))]
-            nn = len(xz_pts)
-            for ii in range(nn):
-                jj = (ii + 1) % nn
-                f_new.append(bm_c.faces.new((vs0[ii], vs1[ii], vs1[jj], vs0[jj])))
-            bmesh.ops.recalc_face_normals(bm_c, faces=f_new)
-
-        def _add_sloped_wall_along_y(bm_c: bmesh.types.BMesh, x_in: float, x_out: float, yz_pts: List[Tuple[float, float]]) -> None:
-            vs0 = [bm_c.verts.new((x_in, py_v, pz_v)) for py_v, pz_v in yz_pts]
-            vs1 = [bm_c.verts.new((x_out, py_v, pz_v)) for py_v, pz_v in yz_pts]
-            f_new = [bm_c.faces.new(vs0), bm_c.faces.new(list(reversed(vs1)))]
-            nn = len(yz_pts)
-            for ii in range(nn):
-                jj = (ii + 1) % nn
-                f_new.append(bm_c.faces.new((vs0[ii], vs1[ii], vs1[jj], vs0[jj])))
-            bmesh.ops.recalc_face_normals(bm_c, faces=f_new)
-
-        # (1) South Wing (b=0..4) Red-Brick Lattice Clerestory Bands above every east window (exact 9 五權街 step_6_shot_1.png!)
-        for fl_l in range(floors):
-            zf_l = 0.0 if fl_l == 0 else (h1 + (fl_l - 1) * hu)
-            fh_l = h1 if fl_l == 0 else hu
-            zl0 = zf_l + fh_l * 0.48 + 0.72
-            zl1 = zf_l + fh_l - 0.44
-            if zl1 > zl0 + 0.14:
-                for b_l in range(5):
-                    by0_l = y0 + b_l * bay_len
-                    sub_cs = [by0_l + bay_len * 0.25] if b_l == 4 else [by0_l + bay_len * 0.25, by0_l + bay_len * 0.75]
-                    hw_l = bay_len * 0.195
-                    for sy_l in sub_cs:
-                        _add_plane_uv(
-                            bm_e_lat,
-                            (x1 - 0.08, sy_l - hw_l, zl0), (x1 - 0.08, sy_l + hw_l, zl0),
-                            (x1 - 0.08, sy_l + hw_l, zl1), (x1 - 0.08, sy_l - hw_l, zl1),
-                        )
-
-        # (2) Full-Height 1F-5F Vertical Illustrated School Banner (b=4 north half: y=-30.55..-26.85, z=0.88..17.06!)
-        vb_y0, vb_y1 = -30.55, -26.85
-        vb_z0, vb_z1 = 0.88, z_roof - 0.12
-        vb_x = x1 + 0.12
-        gp.bm_box(bm_e_cream, (x1 - 0.02, 0.5 * (vb_y0 + vb_y1), 0.5 * (vb_z0 + vb_z1)), (0.24, vb_y1 - vb_y0 + 0.08, vb_z1 - vb_z0 + 0.10))
-        _add_plane_uv(bm_e_vban, (vb_x, vb_y0, vb_z0), (vb_x, vb_y1, vb_z0), (vb_x, vb_y1, vb_z1), (vb_x, vb_y0, vb_z1))
-        # Top & bottom silver mounting battens
-        for bz_bar in (vb_z0 - 0.03, vb_z1 + 0.03):
-            gp.bm_box(bm_e_steel, (vb_x - 0.02, 0.5 * (vb_y0 + vb_y1), bz_bar), (0.08, vb_y1 - vb_y0 + 0.14, 0.07))
-
-        # Two Iconic 2F Deep-Blue White-Text Horizontal Plaques (step_18_shot_1.png right of banner & step_16_shot_1.png right of grand stairs!)
-        # Mounted cleanly proud of projecting planter boxes (x1+0.38 = 6.88 > planter outer 6.81!)
-        for by_s0, by_s1, bx_s in [(-25.45, -22.55, x1 + 0.38), (10.75, 13.75, x1 + 0.38)]:
-            gp.bm_box(bm_e_dark, (bx_s - 0.04, 0.5 * (by_s0 + by_s1), h1 + 0.52), (0.06, by_s1 - by_s0 + 0.06, 0.54))
-            _add_plane_uv(bm_e_bban, (bx_s, by_s0, h1 + 0.28), (bx_s, by_s1, h1 + 0.28), (bx_s, by_s1, h1 + 0.76), (bx_s, by_s0, h1 + 0.76))
-
-        # (3) 1F Accessible Long Ramp Walkway (9 五權街 step_18_shot_1.png: runs south->north from y=-34.2 up to y=-20.55 beside stage south stairs!)
-        rp_y0, rp_y_top, rp_y1 = -34.20, -23.00, -20.55
-        rp_x_in, rp_x_out = x1 - 0.04, x1 + 1.68
-        rp_z_lo, rp_z_hi = 0.04, 1.12
-        # Solid sloped concrete walking ramp deck + upper landing
-        _add_sloped_wall_along_y(bm_e_slab, rp_x_in, rp_x_out - 0.22, [
-            (rp_y0, 0.02), (rp_y_top, 0.02), (rp_y_top, rp_z_hi), (rp_y0, rp_z_lo + 0.04),
-        ])
-        gp.bm_box(bm_e_slab, (0.5 * (rp_x_in + rp_x_out - 0.22), 0.5 * (rp_y_top + rp_y1), rp_z_hi - 0.14), (rp_x_out - 0.22 - rp_x_in, rp_y1 - rp_y_top, 0.28))
-        # Iconic exposed recessed dark shadow niche under north landing (exact step_18_shot_1.png right of ramp!)
-        gp.bm_box(bm_e_dark, (rp_x_out - 0.55, 0.5 * (rp_y_top + rp_y1), 0.44), (0.85, rp_y1 - rp_y_top - 0.28, 0.84))
-        gp.bm_box(bm_e_trim, (rp_x_out - 0.16, 0.5 * (rp_y_top + rp_y1), 0.18), (0.32, rp_y1 - rp_y_top - 0.45, 0.30))
-        gp.bm_box(bm_e_cream, (rp_x_out - 0.12, rp_y1 - 0.12, rp_z_hi * 0.5), (0.24, 0.24, rp_z_hi))
-        # Outer white small-tile solid sloped parapet wall (sloped run + upper bridge parapet leaving recessed niche exposed below!)
-        _add_sloped_wall_along_y(bm_e_cream, rp_x_out - 0.24, rp_x_out, [
-            (rp_y0, 0.02), (rp_y_top, 0.02), (rp_y_top, rp_z_hi + 0.86), (rp_y0, rp_z_lo + 0.86),
-        ])
-        gp.bm_box(bm_e_cream, (rp_x_out - 0.12, 0.5 * (rp_y_top + rp_y1), rp_z_hi + 0.31), (0.24, rp_y1 - rp_y_top, 1.10))
-        # Continuous stainless-steel twin handrails atop ramp wall & along inner building wall
-        for hx_r, hz_off in ((rp_x_out - 0.12, 0.94), (rp_x_in + 0.14, 0.88)):
-            gp.bm_cyl_p2p(bm_e_steel, (hx_r, rp_y0, rp_z_lo + hz_off), (hx_r, rp_y_top, rp_z_hi + hz_off), 0.028, 0.028, segments=8)
-            gp.bm_cyl_p2p(bm_e_steel, (hx_r, rp_y_top, rp_z_hi + hz_off), (hx_r, rp_y1, rp_z_hi + hz_off), 0.028, 0.028, segments=8)
-            for k_rp in range(6):
-                ty_k = rp_y0 + (rp_y_top - rp_y0) * (k_rp / 5.0)
-                tz_k = rp_z_lo + (rp_z_hi - rp_z_lo) * (k_rp / 5.0)
-                gp.bm_cyl_p2p(bm_e_steel, (hx_r, ty_k, tz_k + (0.84 if hx_r > x1 + 1.0 else 0.02)), (hx_r, ty_k, tz_k + hz_off), 0.020, 0.020, segments=6)
-
-        # (4) 2F-5F Mid-North East Corridor Twin Silver Stainless Guardrails + Stair 9 Full-Height Vertical Rainwater Pipe
-        for fl_r in range(1, floors):
-            zf_r = h1 + (fl_r - 1) * hu
-            for b_r in range(5, bays):
-                if fl_r == 1 and b_r == 6:
-                    continue
-                by0_r = y0 + b_r * bay_len + 0.24
-                by1_r = y0 + (b_r + 1) * bay_len - 0.24
-                for rz_off in (1.06, 1.22):
-                    gp.bm_cyl_p2p(bm_e_steel, (x1 - 0.14, by0_r, zf_r + rz_off), (x1 - 0.14, by1_r, zf_r + rz_off), 0.024, 0.024, segments=8)
-                for p_frac in (0.12, 0.37, 0.63, 0.88):
-                    py_p = by0_r + (by1_r - by0_r) * p_frac
-                    gp.bm_cyl_p2p(bm_e_steel, (x1 - 0.14, py_p, zf_r + 0.92), (x1 - 0.14, py_p, zf_r + 1.24), 0.018, 0.018, segments=6)
-        # Exposed full-height vertical silver rainwater downpipe at Stair 9 divider (y=+27.38, exact step_14_shot_1.png!)
-        gp.bm_cyl_p2p(bm_e_steel, (x1 + 0.14, 27.38, 0.10), (x1 + 0.14, 27.38, z_roof + 0.15), 0.065, 0.065, segments=10)
-        for rz_c in (2.2, 5.4, 8.8, 12.2, 15.6):
-            gp.bm_box(bm_e_steel, (x1 + 0.06, 27.38, rz_c), (0.18, 0.16, 0.07))
-
-        # (5a) b=5 South 1F Gray Metal Roll-Up Shutter behind Accessible Ramp Landing (y=-25.5..-20.9)
-        gp.bm_box(bm_e_cream, (core_x1 + 0.08, -23.2, 1.80), (0.18, 4.95, 3.55))
-        _add_plane_uv(bm_e_shut, (core_x1 + 0.20, -25.10, 1.05), (core_x1 + 0.20, -21.20, 1.05), (core_x1 + 0.20, -21.20, 3.35), (core_x1 + 0.20, -25.10, 3.35))
-        gp.bm_box(bm_e_slab, (0.5 * (core_x1 + x1), -23.2, 0.52), (x1 - core_x1, 5.10, 1.04))
-
-        # (5b) 2 五權街 GRAND 3-BAY WIDE STAIRCASE + TWIN GRAY SHUTTERS + OPEN CENTER BREEZEWAY (y=-4.20..+10.20, exact step_16_shot_1.png!)
-        gs_y0, gs_y1 = -4.20, 10.20
-        gs_x0, gs_x1 = x1 - 0.05, x1 + 2.85
-        gs_h = 1.08
-        n_gs = 7
-        for si in range(n_gs):
-            sh = gs_h * (si + 1) / n_gs
-            sd = (gs_x1 - gs_x0) / n_gs
-            sx_c = gs_x1 - (si + 0.5) * sd
-            gp.bm_box(bm_e_slab, (sx_c, 0.5 * (gs_y0 + gs_y1), sh * 0.5), (sd + 0.04, gs_y1 - gs_y0 - 0.52, sh))
-        # Twin solid white-tile sloped cheek walls flanking the 14.4m grand staircase (NO center handrails, exact step_16_shot_1.png!)
-        xz_gs_cheek = [
-            (gs_x0, 0.02), (gs_x1 + 0.12, 0.02), (gs_x1 + 0.12, 0.72),
-            (gs_x0 + 0.35, gs_h + 0.88), (gs_x0, gs_h + 0.88),
-        ]
-        _add_sloped_cheek_x(bm_e_cream, gs_y0, gs_y0 + 0.28, xz_gs_cheek)
-        _add_sloped_cheek_x(bm_e_cream, gs_y1 - 0.28, gs_y1, xz_gs_cheek)
-        # Raised breezeway entry deck & flanking shutter bays (y=-4.2..+10.2)
-        gp.bm_box(bm_e_slab, (0.5 * (core_x1 + x1), 0.5 * (gs_y0 + gs_y1), gs_h * 0.5), (x1 - core_x1 + 0.10, gs_y1 - gs_y0, gs_h))
-        # Center open breezeway through-slab (b=8: y=-1.46..+6.73) so sightline penetrates cleanly to courtyard trees!
-        gp.bm_box(bm_e_slab, (cx, 2.63, 0.52), (wx - 0.2, 8.10, 1.04))
-        # Flanking South & North Recessed Gray Metal Roll-Up Shutters (exact step_16_shot_1.png!)
-        for sh_y0_g, sh_y1_g in [(-3.80, -1.65), (6.95, 9.75)]:
-            gp.bm_box(bm_e_cream, (core_x1 + 0.06, 0.5 * (sh_y0_g + sh_y1_g), 2.30), (0.16, sh_y1_g - sh_y0_g + 0.30, 2.60))
-            _add_plane_uv(bm_e_shut, (core_x1 + 0.18, sh_y0_g, gs_h), (core_x1 + 0.18, sh_y1_g, gs_h), (core_x1 + 0.18, sh_y1_g, 3.32), (core_x1 + 0.18, sh_y0_g, 3.32))
-
-        # (5c) Mid-North 1F Cream Classroom Facade (y=+10.20..+23.12: wide aluminum windows, basement vent windows & compact gray shutter!)
-        gp.bm_box(bm_e_cream, (x1 - 0.26, 0.5 * (10.20 + 23.12), 1.80), (0.28, 23.12 - 10.20, 3.56))
-        for wy_c, ww_c in [(12.25, 3.10), (15.55, 2.55), (21.15, 2.85)]:
-            _add_detailed_window(bm_e_wglass, bm_e_wfrm, (x1 - 0.08, wy_c, 2.48), ww_c, 1.48, axis="Y", cols=3)
-        # Iconic low basement vent windows at bottom of 1F cream facade (exact step_16_shot_1.png right!)
-        for vy_b in (12.15, 15.60):
-            _add_detailed_window(bm_e_wglass, bm_e_wfrm, (x1 - 0.08, vy_b, 0.48), 1.48, 0.44, axis="Y", cols=2, has_transom=False)
-        # Compact 1F gray roll-up shutter at y=+17.30..+19.35 (exact step_10_shot_1.png & step_14_shot_1.png left!)
-        _add_plane_uv(bm_e_shut, (x1 - 0.08, 17.35, 0.08), (x1 - 0.08, 19.35, 0.08), (x1 - 0.08, 19.35, 2.65), (x1 - 0.08, 17.35, 2.65))
-
-        # (5d) Stair 9 Special 1F Service Facade (y=+23.12..+31.31, exact step_14_shot_1.png center!)
-        gp.bm_box(bm_e_cream, (x1 - 0.26, 0.5 * (23.12 + 31.31), 1.80), (0.28, 31.31 - 23.12, 3.56))
-        # Twin flanking aluminum-framed glass doors (south y=23.75, north y=30.65)
-        for dy_9 in (23.75, 30.65):
-            _add_detailed_window(bm_e_wglass, bm_e_wfrm, (x1 - 0.08, dy_9, 1.06), 0.96, 2.02, axis="Y", cols=1, has_transom=False)
-        # 3-Bay Tall Frosted Light-Blue Reflective Glass High Windows (y=23.45..27.15, z=1.90..3.42!)
-        for fwi in range(3):
-            fwy = 24.05 + fwi * 1.22
-            gp.bm_box(bm_e_wfrm, (x1 - 0.10, fwy, 2.66), (0.09, 1.18, 1.54))
-            gp.bm_box(bm_e_fglass, (x1 - 0.06, fwy, 2.66), (0.05, 1.08, 1.42))
-        # 3 Iconic Vertical Red-Brick Lattice Ventilation Slots (y=27.75..30.95, z=1.95..3.42!) + Gray Nameplate below center slot
-        for lwi in range(3):
-            lwy = 28.25 + lwi * 1.10
-            gp.bm_box(bm_e_dark, (x1 - 0.12, lwy, 2.68), (0.08, 0.78, 1.48))
-            _add_plane_uv(bm_e_lat, (x1 - 0.06, lwy - 0.36, 1.96), (x1 - 0.06, lwy + 0.36, 1.96), (x1 - 0.06, lwy + 0.36, 3.40), (x1 - 0.06, lwy - 0.36, 3.40))
-        gp.bm_box(bm_e_trim, (x1 - 0.07, 28.85, 1.58), (0.06, 0.88, 0.42))
-        # Protruding horizontal white concrete bench/ledge running cleanly between the two glass doors (exact step_14_shot_1.png!)
-        gp.bm_box(bm_e_trim, (x1 + 0.16, 27.20, 0.50), (0.48, 5.55, 0.14))
-        for bleg_y in (25.10, 27.20, 29.30):
-            gp.bm_box(bm_e_dark, (x1 + 0.10, bleg_y, 0.22), (0.34, 0.22, 0.42))
-
-        # (5e) North End Wide Staircase + Open 1F Breezeway + Painted Sky & Hills Mural (y=+31.90..+39.00, exact step_14_shot_1.png far right!)
-        ns_y0, ns_y1 = 31.90, 39.00
-        ns_x0, ns_x1 = x1 - 0.05, x1 + 2.60
-        ns_h = 1.02
-        n_ns = 6
-        for si in range(n_ns):
-            sh = ns_h * (si + 1) / n_ns
-            sd = (ns_x1 - ns_x0) / n_ns
-            sx_c = ns_x1 - (si + 0.5) * sd
-            gp.bm_box(bm_e_slab, (sx_c, 0.5 * (ns_y0 + ns_y1), sh * 0.5), (sd + 0.04, ns_y1 - ns_y0 - 0.50, sh))
-        xz_ns_cheek = [
-            (ns_x0, 0.02), (ns_x1 + 0.10, 0.02), (ns_x1 + 0.10, 0.68),
-            (ns_x0 + 0.32, ns_h + 0.86), (ns_x0, ns_h + 0.86),
-        ]
-        _add_sloped_cheek_x(bm_e_cream, ns_y0, ns_y0 + 0.26, xz_ns_cheek)
-        _add_sloped_cheek_x(bm_e_cream, ns_y1 - 0.26, ns_y1, xz_ns_cheek)
-        # Subtle stainless handrails mounted atop north stair cheek walls (exact step_14_shot_1.png!)
-        for ry_ns in (ns_y0 + 0.13, ns_y1 - 0.13):
-            gp.bm_cyl_p2p(bm_e_steel, (ns_x1 + 0.05, ry_ns, 0.78), (ns_x0 + 0.32, ry_ns, ns_h + 0.96), 0.024, 0.024, segments=8)
-        # Raised open north breezeway floor + Painted Sky & Hills Mural on North Inner Wall (facing -Y toward playground!)
-        gp.bm_box(bm_e_slab, (cx, 35.45, 0.50), (wx - 0.2, 7.20, 1.00))
-        _add_plane_uv(bm_e_mural, (1.80, 39.02, 1.04), (6.15, 39.02, 1.04), (6.15, 39.02, 3.32), (1.80, 39.02, 3.32))
-
-        objs.append(su.create_mesh_object(f"{prefix}_East1FCreamWalls", bm_e_cream, palette["wall_guanghe"], col, uv_scale=0.38))
-        objs.append(su.create_mesh_object(f"{prefix}_EastStairsRamps", bm_e_slab, palette["concrete_floor"], col, uv_scale=0.36))
-        objs.append(su.create_mesh_object(f"{prefix}_EastTrimBench", bm_e_trim, palette["concrete_trim"], col, uv_scale=0.45))
-        objs.append(su.create_mesh_object(f"{prefix}_EastDarkRecess", bm_e_dark, palette["metal_dark"], col))
-        objs.append(su.create_mesh_object(f"{prefix}_EastSilverRailsPipes", bm_e_steel, palette["steel_silver"], col, smooth=True))
-        objs.append(su.create_mesh_object(f"{prefix}_EastBrickLattice", bm_e_lat, palette["brick_lattice_band"], col, auto_uv=False))
-        objs.append(su.create_mesh_object(f"{prefix}_EastGrayShutters", bm_e_shut, palette["wuquan_shutter_gray"], col, auto_uv=False))
-        objs.append(su.create_mesh_object(f"{prefix}_EastStair9FrostedGlass", bm_e_fglass, palette["glass_frosted_blue"], col))
-        objs.append(su.create_mesh_object(f"{prefix}_East1FWindows", bm_e_wglass, palette["window_glass"], col))
-        objs.append(su.create_mesh_object(f"{prefix}_East1FWinFrames", bm_e_wfrm, palette["window_frame"], col))
-        objs.append(su.create_mesh_object(f"{prefix}_EastVerticalBanner", bm_e_vban, palette["wuquan_vertical_banner"], col, auto_uv=False))
-        objs.append(su.create_mesh_object(f"{prefix}_EastBlueSigns", bm_e_bban, palette["wuquan_blue_banner"], col, auto_uv=False))
-        objs.append(su.create_mesh_object(f"{prefix}_EastNorthMural", bm_e_mural, palette["wuquan_north_mural"], col, auto_uv=False))
+        objs.extend(_build_wuquan_end_gables(prefix, y0, y1, core_x0, core_x1, floors, h1, hu, z_roof, parapet, palette, col))
+        objs.extend(_build_wuquan_east_facade(prefix, x1, y0, cx, wx, core_x1, bays, bay_len, floors, h1, hu, z_roof, palette, col))
 
     if len(bm_plant.verts) > 0:
         objs.append(su.create_mesh_object(f"{prefix}_CorridorPlanters", bm_plant, palette["tree_foliage_b"], col))
@@ -1082,6 +710,384 @@ def build_corridor_building(cfg: dict, palette: Dict[str, bpy.types.Material]) -
     if tank_pts:
         objs.extend(_build_roof_water_tanks(prefix, tank_pts, z_roof + 0.28, palette, col))
 
+    return objs
+
+
+def _build_chongqing_west_gable(
+    prefix: str,
+    x0: float,
+    y0: float,
+    y1: float,
+    core_y0: float,
+    core_y1: float,
+    floors: int,
+    h1: float,
+    hu: float,
+    z_roof: float,
+    palette: Dict[str, bpy.types.Material],
+    col: str,
+) -> List[bpy.types.Object]:
+    """建置重慶樓 2F 彩繪火車壁畫與 56 廣和街西山牆（雙開間米白方磚嵌板＋紅磚結構框＋2-4F 方窗＋開放北走廊＋綠鐵皮斜頂棚）。"""
+    objs: List[bpy.types.Object] = []
+    bm_train = bmesh.new()
+    ty_m = core_y0 - 0.10
+    _add_plane_uv(bm_train, (-62.0, ty_m, 3.85), (-46.0, ty_m, 3.85), (-46.0, ty_m, 6.45), (-62.0, ty_m, 6.45))
+    objs.append(su.create_mesh_object(f"{prefix}_LibraryTrainMural", bm_train, palette["train_mural"], col, auto_uv=False))
+
+    bm_wg_frame = bmesh.new()
+    bm_wg_panel = bmesh.new()
+    bm_wg_seam = bmesh.new()
+    bm_wg_win = bmesh.new()
+    bm_wg_wfrm = bmesh.new()
+    bm_wg_steel = bmesh.new()
+    bm_wg_green = bmesh.new()
+    bm_wg_blue = bmesh.new()
+    bm_wg_lantern = bmesh.new()
+
+    z_top_gable = z_roof + 2.0
+    y_col_n_outer = y1 - 0.28
+    y_col_n_inner = core_y1 - 0.30
+    y_col_mid = -38.65
+    y_col_s_outer = y0 + 0.30
+    for yc in (y_col_n_inner, y_col_mid, y_col_s_outer):
+        gp.bm_box(bm_wg_frame, (x0 - 0.03, yc, z_top_gable * 0.5), (0.28, 0.60, z_top_gable))
+    gp.bm_box(bm_wg_frame, (x0 - 0.03, y_col_n_outer, z_top_gable * 0.5), (0.28, 0.56, z_top_gable))
+
+    beam_zs = [0.20, h1, h1 + hu, h1 + 2 * hu, h1 + 3 * hu, z_roof, z_top_gable - 0.20]
+    for idx_b, bz in enumerate(beam_zs):
+        bh = 0.52 if idx_b not in (0, len(beam_zs) - 1) else 0.42
+        gp.bm_box(bm_wg_frame, (x0 - 0.03, (y0 + core_y1) * 0.5, bz), (0.28, core_y1 - y0 + 0.02, bh))
+        if idx_b >= 1:
+            gp.bm_box(bm_wg_frame, (x0 - 0.03, (core_y1 + y1) * 0.5, bz), (0.28, y1 - core_y1, bh * 0.92))
+
+    tier_ranges = [
+        (0.40, h1 - 0.26),
+        (h1 + 0.26, h1 + hu - 0.26),
+        (h1 + hu + 0.26, h1 + 2 * hu - 0.26),
+        (h1 + 2 * hu + 0.26, h1 + 3 * hu - 0.26),
+        (h1 + 3 * hu + 0.26, z_roof - 0.26),
+        (z_roof + 0.26, z_top_gable - 0.40),
+    ]
+    y_wide_0, y_wide_1 = y_col_mid + 0.29, y_col_n_inner - 0.29
+    y_narr_0, y_narr_1 = y_col_s_outer + 0.29, y_col_mid - 0.29
+    for t_idx, (zt0, zt1) in enumerate(tier_ranges):
+        th = zt1 - zt0
+        tz = (zt0 + zt1) * 0.5
+        gp.bm_box(bm_wg_panel, (x0 + 0.02, (y_wide_0 + y_wide_1) * 0.5, tz), (0.14, y_wide_1 - y_wide_0, th))
+        for frac in (1.0 / 3.0, 2.0 / 3.0):
+            ys = y_wide_0 + (y_wide_1 - y_wide_0) * frac
+            gp.bm_box(bm_wg_seam, (x0 - 0.055, ys, tz), (0.015, 0.035, th - 0.04))
+        gp.bm_box(bm_wg_panel, (x0 + 0.02, (y_narr_0 + y_narr_1) * 0.5, tz), (0.14, y_narr_1 - y_narr_0, th))
+        gp.bm_box(bm_wg_seam, (x0 - 0.055, (y_narr_0 + y_narr_1) * 0.5, tz), (0.015, 0.035, th - 0.04))
+        if t_idx in (1, 2, 3):
+            win_y = y_narr_1 - 0.80
+            win_z = zt0 + 0.64
+            _add_detailed_window(bm_wg_win, bm_wg_wfrm, (x0 - 0.08, win_y, win_z), 1.32, 1.12, axis="Y", cols=2, has_transom=False)
+
+    corr_cy = (core_y1 + y1) * 0.5
+    corr_span = (y1 - core_y1) - 0.58
+    gp.bm_box(bm_wg_panel, (x0 + 0.02, corr_cy, (z_roof + 0.26 + z_top_gable - 0.40) * 0.5), (0.14, corr_span, (z_top_gable - 0.40) - (z_roof + 0.26)))
+    for fl_c in range(1, floors):
+        zfc = h1 + (fl_c - 1) * hu
+        gp.bm_box(bm_wg_panel, (x0 - 0.02, corr_cy, zfc + 0.52), (0.20, corr_span, 0.96))
+        gp.bm_box(bm_wg_steel, (x0 - 0.02, corr_cy, zfc + 1.12), (0.05, corr_span + 0.04, 0.05))
+        gp.bm_box(bm_wg_steel, (x0 - 0.02, corr_cy, zfc + 1.28), (0.05, corr_span + 0.04, 0.05))
+    gp.bm_box(bm_wg_blue, (x0 + 2.4, corr_cy, h1 + 2 * hu - 0.08), (4.6, corr_span + 0.3, 0.06))
+    gp.bm_box(bm_wg_green, (x0 - 1.15, corr_cy + 0.1, 3.02), (2.25, 2.75, 0.12), rot_y=math.radians(-14.0))
+    gp.bm_box(bm_wg_steel, (x0 - 2.24, corr_cy + 0.1, 2.74), (0.06, 2.78, 0.12))
+    for ly_lan in (corr_cy - 0.55, corr_cy + 0.55):
+        gp.bm_cyl_axis(bm_wg_steel, (x0 - 1.45, ly_lan, 2.78), 0.015, 0.36, axis="Z", segments=6)
+        gp.bm_cyl_axis(bm_wg_lantern, (x0 - 1.45, ly_lan, 2.46), 0.22, 0.34, axis="Z", segments=12)
+
+    gp.bm_box(bm_wg_green, (x0 - 1.45, -40.2, 2.86), (2.95, 6.4, 0.14), rot_y=math.radians(-16.0))
+    gp.bm_box(bm_wg_steel, (x0 - 2.86, -40.2, 2.46), (0.07, 6.46, 0.14))
+    for sy_p in (-43.1, -40.2, -37.3):
+        gp.bm_cyl_axis(bm_wg_steel, (x0 - 2.65, sy_p, 1.24), 0.055, 2.48, axis="Z", segments=8)
+
+    objs.append(su.create_mesh_object(f"{prefix}_WestGableBrickGrid", bm_wg_frame, palette["wall_brick_red"], col, uv_scale=0.45))
+    objs.append(su.create_mesh_object(f"{prefix}_WestGableCreamPanels", bm_wg_panel, palette["wall_guanghe"], col, uv_scale=0.42))
+    objs.append(su.create_mesh_object(f"{prefix}_WestGablePanelSeams", bm_wg_seam, palette["metal_dark"], col))
+    objs.append(su.create_mesh_object(f"{prefix}_WestGableSmallWins", bm_wg_win, palette["window_glass"], col))
+    objs.append(su.create_mesh_object(f"{prefix}_WestGableWinFrames", bm_wg_wfrm, palette["window_frame"], col))
+    objs.append(su.create_mesh_object(f"{prefix}_WestGableSteelRails", bm_wg_steel, palette["steel_silver"], col))
+    objs.append(su.create_mesh_object(f"{prefix}_WestGableGreenCanopies", bm_wg_green, palette["side_gate_green"], col))
+    objs.append(su.create_mesh_object(f"{prefix}_WestGableBlueCeil", bm_wg_blue, palette["shelter_navy"], col))
+    objs.append(su.create_mesh_object(f"{prefix}_WestGableLanterns", bm_wg_lantern, palette["lamp_globe"], col, smooth=True))
+    return objs
+
+
+def _build_wuquan_end_gables(
+    prefix: str,
+    y0: float,
+    y1: float,
+    core_x0: float,
+    core_x1: float,
+    floors: int,
+    h1: float,
+    hu: float,
+    z_roof: float,
+    parapet: float,
+    palette: Dict[str, bpy.types.Material],
+    col: str,
+) -> List[bpy.types.Object]:
+    """建置五權樓南端山牆（y=-67.0）與北端和平路 2F–5F 雙開間紅磚花格窗面（y=+39.5）。"""
+    objs: List[bpy.types.Object] = []
+    bm_wq_f = bmesh.new()
+    bm_wq_p = bmesh.new()
+    bm_wq_s = bmesh.new()
+    bm_wq_w = bmesh.new()
+    bm_wq_wf = bmesh.new()
+    bm_wq_lat = bmesh.new()
+    z_top_wq = z_roof + parapet
+    x_w0, x_w1 = core_x0 + 0.10, core_x1 - 0.10
+    x_wm = (x_w0 + x_w1) * 0.5
+
+    gy, sgn = y0 - 0.02, -1.0
+    for xc in (x_w0, x_wm, x_w1):
+        gp.bm_box(bm_wq_f, (xc, gy + sgn * 0.04, z_top_wq * 0.5), (0.56, 0.24, z_top_wq))
+    for bz in (0.20, h1, h1 + hu, h1 + 2 * hu, h1 + 3 * hu, z_roof, z_top_wq - 0.18):
+        gp.bm_box(bm_wq_f, (x_wm, gy + sgn * 0.04, bz), (x_w1 - x_w0 + 0.56, 0.24, 0.46))
+    for zt0, zt1 in [
+        (0.42, h1 - 0.24), (h1 + 0.24, h1 + hu - 0.24), (h1 + hu + 0.24, h1 + 2 * hu - 0.24),
+        (h1 + 2 * hu + 0.24, h1 + 3 * hu - 0.24), (h1 + 3 * hu + 0.24, z_roof - 0.24), (z_roof + 0.24, z_top_wq - 0.36),
+    ]:
+        tz, th = 0.5 * (zt0 + zt1), zt1 - zt0
+        for px0, px1 in ((x_w0 + 0.28, x_wm - 0.28), (x_wm + 0.28, x_w1 - 0.28)):
+            gp.bm_box(bm_wq_p, (0.5 * (px0 + px1), gy - sgn * 0.02, tz), (px1 - px0, 0.14, th))
+            gp.bm_box(bm_wq_s, (0.5 * (px0 + px1), gy + sgn * 0.055, tz), (0.03, 0.015, th - 0.04))
+
+    gy_n = y1 + 0.04
+    for xc_n in (-6.65, -4.10, 0.55, 6.20):
+        gp.bm_box(bm_wq_f, (xc_n, gy_n + 0.06, (h1 + z_top_wq) * 0.5), (0.62, 0.28, z_top_wq - h1))
+    for bz_n in (h1 + 0.15, h1 + hu, h1 + 2 * hu, h1 + 3 * hu, z_roof, z_top_wq - 0.16):
+        gp.bm_box(bm_wq_f, (-0.22, gy_n + 0.06, bz_n), (13.45, 0.28, 0.42))
+    for fl_n in range(1, floors):
+        zfn = h1 + (fl_n - 1) * hu
+        for bx0_n, bx1_n in [(-3.75, 0.18), (0.92, 5.85)]:
+            bcx_n = 0.5 * (bx0_n + bx1_n)
+            bw_n = bx1_n - bx0_n
+            gp.bm_box(bm_wq_p, (bcx_n, gy_n - 0.01, zfn + 0.65), (bw_n, 0.16, 0.92))
+            _add_detailed_window(bm_wq_w, bm_wq_wf, (bcx_n, gy_n + 0.03, zfn + 1.82), bw_n - 0.14, 1.38, axis="X", cols=4, has_transom=False)
+            _add_plane_uv(bm_wq_lat, (bx1_n - 0.04, gy_n + 0.10, zfn + 2.56), (bx0_n + 0.04, gy_n + 0.10, zfn + 2.56), (bx0_n + 0.04, gy_n + 0.10, zfn + 3.16), (bx1_n - 0.04, gy_n + 0.10, zfn + 3.16))
+    objs.append(su.create_mesh_object(f"{prefix}_EndGablesBrickGrid", bm_wq_f, palette["wall_brick_red"], col, uv_scale=0.45))
+    objs.append(su.create_mesh_object(f"{prefix}_EndGablesCreamPanels", bm_wq_p, palette["wall_guanghe"], col, uv_scale=0.42))
+    objs.append(su.create_mesh_object(f"{prefix}_EndGablesPanelSeams", bm_wq_s, palette["metal_dark"], col))
+    objs.append(su.create_mesh_object(f"{prefix}_NorthGableWindows", bm_wq_w, palette["window_glass"], col))
+    objs.append(su.create_mesh_object(f"{prefix}_NorthGableWinFrames", bm_wq_wf, palette["window_frame"], col))
+    objs.append(su.create_mesh_object(f"{prefix}_NorthGableLattice", bm_wq_lat, palette["brick_lattice_band"], col, auto_uv=False))
+    return objs
+
+
+def _build_wuquan_east_facade(
+    prefix: str,
+    x1: float,
+    y0: float,
+    cx: float,
+    wx: float,
+    core_x1: float,
+    bays: int,
+    bay_len: float,
+    floors: int,
+    h1: float,
+    hu: float,
+    z_roof: float,
+    palette: Dict[str, bpy.types.Material],
+    col: str,
+) -> List[bpy.types.Object]:
+    """建置五權樓東立面 1:1 實景細節（南翼紅磚花格帶、1F–5F 直立彩繪宣傳布條、無障礙長斜坡、三開間大寬階梯、9 梯服務立面與北端彩繪寬階梯）。"""
+    objs: List[bpy.types.Object] = []
+    bm_e_cream = bmesh.new()
+    bm_e_slab = bmesh.new()
+    bm_e_trim = bmesh.new()
+    bm_e_dark = bmesh.new()
+    bm_e_steel = bmesh.new()
+    bm_e_lat = bmesh.new()
+    bm_e_shut = bmesh.new()
+    bm_e_fglass = bmesh.new()
+    bm_e_wglass = bmesh.new()
+    bm_e_wfrm = bmesh.new()
+    bm_e_vban = bmesh.new()
+    bm_e_bban = bmesh.new()
+    bm_e_mural = bmesh.new()
+
+    def _add_sloped_cheek_x(bm_c: bmesh.types.BMesh, y_s: float, y_n: float, xz_pts: List[Tuple[float, float]]) -> None:
+        vs0 = [bm_c.verts.new((px_v, y_s, pz_v)) for px_v, pz_v in xz_pts]
+        vs1 = [bm_c.verts.new((px_v, y_n, pz_v)) for px_v, pz_v in xz_pts]
+        f_new = [bm_c.faces.new(vs0), bm_c.faces.new(list(reversed(vs1)))]
+        nn = len(xz_pts)
+        for ii in range(nn):
+            jj = (ii + 1) % nn
+            f_new.append(bm_c.faces.new((vs0[ii], vs1[ii], vs1[jj], vs0[jj])))
+        bmesh.ops.recalc_face_normals(bm_c, faces=f_new)
+
+    def _add_sloped_wall_along_y(bm_c: bmesh.types.BMesh, x_in: float, x_out: float, yz_pts: List[Tuple[float, float]]) -> None:
+        vs0 = [bm_c.verts.new((x_in, py_v, pz_v)) for py_v, pz_v in yz_pts]
+        vs1 = [bm_c.verts.new((x_out, py_v, pz_v)) for py_v, pz_v in yz_pts]
+        f_new = [bm_c.faces.new(vs0), bm_c.faces.new(list(reversed(vs1)))]
+        nn = len(yz_pts)
+        for ii in range(nn):
+            jj = (ii + 1) % nn
+            f_new.append(bm_c.faces.new((vs0[ii], vs1[ii], vs1[jj], vs0[jj])))
+        bmesh.ops.recalc_face_normals(bm_c, faces=f_new)
+
+    # (1) South Wing (b=0..4) Red-Brick Lattice Clerestory Bands above every east window
+    for fl_l in range(floors):
+        zf_l = 0.0 if fl_l == 0 else (h1 + (fl_l - 1) * hu)
+        fh_l = h1 if fl_l == 0 else hu
+        zl0 = zf_l + fh_l * 0.48 + 0.72
+        zl1 = zf_l + fh_l - 0.44
+        if zl1 > zl0 + 0.14:
+            for b_l in range(5):
+                by0_l = y0 + b_l * bay_len
+                sub_cs = [by0_l + bay_len * 0.25] if b_l == 4 else [by0_l + bay_len * 0.25, by0_l + bay_len * 0.75]
+                hw_l = bay_len * 0.195
+                for sy_l in sub_cs:
+                    _add_plane_uv(
+                        bm_e_lat,
+                        (x1 - 0.08, sy_l - hw_l, zl0), (x1 - 0.08, sy_l + hw_l, zl0),
+                        (x1 - 0.08, sy_l + hw_l, zl1), (x1 - 0.08, sy_l - hw_l, zl1),
+                    )
+
+    # (2) Full-Height 1F-5F Vertical Illustrated School Banner (b=4 north half: y=-30.55..-26.85, z=0.88..17.06!)
+    vb_y0, vb_y1 = -30.55, -26.85
+    vb_z0, vb_z1 = 0.88, z_roof - 0.12
+    vb_x = x1 + 0.12
+    gp.bm_box(bm_e_cream, (x1 - 0.02, 0.5 * (vb_y0 + vb_y1), 0.5 * (vb_z0 + vb_z1)), (0.24, vb_y1 - vb_y0 + 0.08, vb_z1 - vb_z0 + 0.10))
+    _add_plane_uv(bm_e_vban, (vb_x, vb_y0, vb_z0), (vb_x, vb_y1, vb_z0), (vb_x, vb_y1, vb_z1), (vb_x, vb_y0, vb_z1))
+    for bz_bar in (vb_z0 - 0.03, vb_z1 + 0.03):
+        gp.bm_box(bm_e_steel, (vb_x - 0.02, 0.5 * (vb_y0 + vb_y1), bz_bar), (0.08, vb_y1 - vb_y0 + 0.14, 0.07))
+
+    # Two Iconic 2F Deep-Blue White-Text Horizontal Plaques
+    for by_s0, by_s1, bx_s in [(-25.45, -22.55, x1 + 0.38), (10.75, 13.75, x1 + 0.38)]:
+        gp.bm_box(bm_e_dark, (bx_s - 0.04, 0.5 * (by_s0 + by_s1), h1 + 0.52), (0.06, by_s1 - by_s0 + 0.06, 0.54))
+        _add_plane_uv(bm_e_bban, (bx_s, by_s0, h1 + 0.28), (bx_s, by_s1, h1 + 0.28), (bx_s, by_s1, h1 + 0.76), (bx_s, by_s0, h1 + 0.76))
+
+    # (3) 1F Accessible Long Ramp Walkway (y=-34.2..-20.55)
+    rp_y0, rp_y_top, rp_y1 = -34.20, -23.00, -20.55
+    rp_x_in, rp_x_out = x1 - 0.04, x1 + 1.68
+    rp_z_lo, rp_z_hi = 0.04, 1.12
+    _add_sloped_wall_along_y(bm_e_slab, rp_x_in, rp_x_out - 0.22, [
+        (rp_y0, 0.02), (rp_y_top, 0.02), (rp_y_top, rp_z_hi), (rp_y0, rp_z_lo + 0.04),
+    ])
+    gp.bm_box(bm_e_slab, (0.5 * (rp_x_in + rp_x_out - 0.22), 0.5 * (rp_y_top + rp_y1), rp_z_hi - 0.14), (rp_x_out - 0.22 - rp_x_in, rp_y1 - rp_y_top, 0.28))
+    gp.bm_box(bm_e_dark, (rp_x_out - 0.55, 0.5 * (rp_y_top + rp_y1), 0.44), (0.85, rp_y1 - rp_y_top - 0.28, 0.84))
+    gp.bm_box(bm_e_trim, (rp_x_out - 0.16, 0.5 * (rp_y_top + rp_y1), 0.18), (0.32, rp_y1 - rp_y_top - 0.45, 0.30))
+    gp.bm_box(bm_e_cream, (rp_x_out - 0.12, rp_y1 - 0.12, rp_z_hi * 0.5), (0.24, 0.24, rp_z_hi))
+    _add_sloped_wall_along_y(bm_e_cream, rp_x_out - 0.24, rp_x_out, [
+        (rp_y0, 0.02), (rp_y_top, 0.02), (rp_y_top, rp_z_hi + 0.86), (rp_y0, rp_z_lo + 0.86),
+    ])
+    gp.bm_box(bm_e_cream, (rp_x_out - 0.12, 0.5 * (rp_y_top + rp_y1), rp_z_hi + 0.31), (0.24, rp_y1 - rp_y_top, 1.10))
+    for hx_r, hz_off in ((rp_x_out - 0.12, 0.94), (rp_x_in + 0.14, 0.88)):
+        gp.bm_cyl_p2p(bm_e_steel, (hx_r, rp_y0, rp_z_lo + hz_off), (hx_r, rp_y_top, rp_z_hi + hz_off), 0.028, 0.028, segments=8)
+        gp.bm_cyl_p2p(bm_e_steel, (hx_r, rp_y_top, rp_z_hi + hz_off), (hx_r, rp_y1, rp_z_hi + hz_off), 0.028, 0.028, segments=8)
+        for k_rp in range(6):
+            ty_k = rp_y0 + (rp_y_top - rp_y0) * (k_rp / 5.0)
+            tz_k = rp_z_lo + (rp_z_hi - rp_z_lo) * (k_rp / 5.0)
+            gp.bm_cyl_p2p(bm_e_steel, (hx_r, ty_k, tz_k + (0.84 if hx_r > x1 + 1.0 else 0.02)), (hx_r, ty_k, tz_k + hz_off), 0.020, 0.020, segments=6)
+
+    # (4) 2F-5F Mid-North East Corridor Twin Silver Stainless Guardrails + Stair 9 Rainwater Pipe
+    for fl_r in range(1, floors):
+        zf_r = h1 + (fl_r - 1) * hu
+        for b_r in range(5, bays):
+            if fl_r == 1 and b_r == 6:
+                continue
+            by0_r = y0 + b_r * bay_len + 0.24
+            by1_r = y0 + (b_r + 1) * bay_len - 0.24
+            for rz_off in (1.06, 1.22):
+                gp.bm_cyl_p2p(bm_e_steel, (x1 - 0.14, by0_r, zf_r + rz_off), (x1 - 0.14, by1_r, zf_r + rz_off), 0.024, 0.024, segments=8)
+            for p_frac in (0.12, 0.37, 0.63, 0.88):
+                py_p = by0_r + (by1_r - by0_r) * p_frac
+                gp.bm_cyl_p2p(bm_e_steel, (x1 - 0.14, py_p, zf_r + 0.92), (x1 - 0.14, py_p, zf_r + 1.24), 0.018, 0.018, segments=6)
+    gp.bm_cyl_p2p(bm_e_steel, (x1 + 0.14, 27.38, 0.10), (x1 + 0.14, 27.38, z_roof + 0.15), 0.065, 0.065, segments=10)
+    for rz_c in (2.2, 5.4, 8.8, 12.2, 15.6):
+        gp.bm_box(bm_e_steel, (x1 + 0.06, 27.38, rz_c), (0.18, 0.16, 0.07))
+
+    # (5a) b=5 South 1F Gray Metal Roll-Up Shutter behind Accessible Ramp Landing
+    gp.bm_box(bm_e_cream, (core_x1 + 0.08, -23.2, 1.80), (0.18, 4.95, 3.55))
+    _add_plane_uv(bm_e_shut, (core_x1 + 0.20, -25.10, 1.05), (core_x1 + 0.20, -21.20, 1.05), (core_x1 + 0.20, -21.20, 3.35), (core_x1 + 0.20, -25.10, 3.35))
+    gp.bm_box(bm_e_slab, (0.5 * (core_x1 + x1), -23.2, 0.52), (x1 - core_x1, 5.10, 1.04))
+
+    # (5b) 2 五權街 GRAND 3-BAY WIDE STAIRCASE + TWIN GRAY SHUTTERS + OPEN CENTER BREEZEWAY
+    gs_y0, gs_y1 = -4.20, 10.20
+    gs_x0, gs_x1 = x1 - 0.05, x1 + 2.85
+    gs_h = 1.08
+    n_gs = 7
+    for si in range(n_gs):
+        sh = gs_h * (si + 1) / n_gs
+        sd = (gs_x1 - gs_x0) / n_gs
+        sx_c = gs_x1 - (si + 0.5) * sd
+        gp.bm_box(bm_e_slab, (sx_c, 0.5 * (gs_y0 + gs_y1), sh * 0.5), (sd + 0.04, gs_y1 - gs_y0 - 0.52, sh))
+    xz_gs_cheek = [
+        (gs_x0, 0.02), (gs_x1 + 0.12, 0.02), (gs_x1 + 0.12, 0.72),
+        (gs_x0 + 0.35, gs_h + 0.88), (gs_x0, gs_h + 0.88),
+    ]
+    _add_sloped_cheek_x(bm_e_cream, gs_y0, gs_y0 + 0.28, xz_gs_cheek)
+    _add_sloped_cheek_x(bm_e_cream, gs_y1 - 0.28, gs_y1, xz_gs_cheek)
+    gp.bm_box(bm_e_slab, (0.5 * (core_x1 + x1), 0.5 * (gs_y0 + gs_y1), gs_h * 0.5), (x1 - core_x1 + 0.10, gs_y1 - gs_y0, gs_h))
+    gp.bm_box(bm_e_slab, (cx, 2.63, 0.52), (wx - 0.2, 8.10, 1.04))
+    for sh_y0_g, sh_y1_g in [(-3.80, -1.65), (6.95, 9.75)]:
+        gp.bm_box(bm_e_cream, (core_x1 + 0.06, 0.5 * (sh_y0_g + sh_y1_g), 2.30), (0.16, sh_y1_g - sh_y0_g + 0.30, 2.60))
+        _add_plane_uv(bm_e_shut, (core_x1 + 0.18, sh_y0_g, gs_h), (core_x1 + 0.18, sh_y1_g, gs_h), (core_x1 + 0.18, sh_y1_g, 3.32), (core_x1 + 0.18, sh_y0_g, 3.32))
+
+    # (5c) Mid-North 1F Cream Classroom Facade
+    gp.bm_box(bm_e_cream, (x1 - 0.26, 0.5 * (10.20 + 23.12), 1.80), (0.28, 23.12 - 10.20, 3.56))
+    for wy_c, ww_c in [(12.25, 3.10), (15.55, 2.55), (21.15, 2.85)]:
+        _add_detailed_window(bm_e_wglass, bm_e_wfrm, (x1 - 0.08, wy_c, 2.48), ww_c, 1.48, axis="Y", cols=3)
+    for vy_b in (12.15, 15.60):
+        _add_detailed_window(bm_e_wglass, bm_e_wfrm, (x1 - 0.08, vy_b, 0.48), 1.48, 0.44, axis="Y", cols=2, has_transom=False)
+    _add_plane_uv(bm_e_shut, (x1 - 0.08, 17.35, 0.08), (x1 - 0.08, 19.35, 0.08), (x1 - 0.08, 19.35, 2.65), (x1 - 0.08, 17.35, 2.65))
+
+    # (5d) Stair 9 Special 1F Service Facade
+    gp.bm_box(bm_e_cream, (x1 - 0.26, 0.5 * (23.12 + 31.31), 1.80), (0.28, 31.31 - 23.12, 3.56))
+    for dy_9 in (23.75, 30.65):
+        _add_detailed_window(bm_e_wglass, bm_e_wfrm, (x1 - 0.08, dy_9, 1.06), 0.96, 2.02, axis="Y", cols=1, has_transom=False)
+    for fwi in range(3):
+        fwy = 24.05 + fwi * 1.22
+        gp.bm_box(bm_e_wfrm, (x1 - 0.10, fwy, 2.66), (0.09, 1.18, 1.54))
+        gp.bm_box(bm_e_fglass, (x1 - 0.06, fwy, 2.66), (0.05, 1.08, 1.42))
+    for lwi in range(3):
+        lwy = 28.25 + lwi * 1.10
+        gp.bm_box(bm_e_dark, (x1 - 0.12, lwy, 2.68), (0.08, 0.78, 1.48))
+        _add_plane_uv(bm_e_lat, (x1 - 0.06, lwy - 0.36, 1.96), (x1 - 0.06, lwy + 0.36, 1.96), (x1 - 0.06, lwy + 0.36, 3.40), (x1 - 0.06, lwy - 0.36, 3.40))
+    gp.bm_box(bm_e_trim, (x1 - 0.07, 28.85, 1.58), (0.06, 0.88, 0.42))
+    gp.bm_box(bm_e_trim, (x1 + 0.16, 27.20, 0.50), (0.48, 5.55, 0.14))
+    for bleg_y in (25.10, 27.20, 29.30):
+        gp.bm_box(bm_e_dark, (x1 + 0.10, bleg_y, 0.22), (0.34, 0.22, 0.42))
+
+    # (5e) North End Wide Staircase + Open 1F Breezeway + Painted Sky & Hills Mural
+    ns_y0, ns_y1 = 31.90, 39.00
+    ns_x0, ns_x1 = x1 - 0.05, x1 + 2.60
+    ns_h = 1.02
+    n_ns = 6
+    for si in range(n_ns):
+        sh = ns_h * (si + 1) / n_ns
+        sd = (ns_x1 - ns_x0) / n_ns
+        sx_c = ns_x1 - (si + 0.5) * sd
+        gp.bm_box(bm_e_slab, (sx_c, 0.5 * (ns_y0 + ns_y1), sh * 0.5), (sd + 0.04, ns_y1 - ns_y0 - 0.50, sh))
+    xz_ns_cheek = [
+        (ns_x0, 0.02), (ns_x1 + 0.10, 0.02), (ns_x1 + 0.10, 0.68),
+        (ns_x0 + 0.32, ns_h + 0.86), (ns_x0, ns_h + 0.86),
+    ]
+    _add_sloped_cheek_x(bm_e_cream, ns_y0, ns_y0 + 0.26, xz_ns_cheek)
+    _add_sloped_cheek_x(bm_e_cream, ns_y1 - 0.26, ns_y1, xz_ns_cheek)
+    for ry_ns in (ns_y0 + 0.13, ns_y1 - 0.13):
+        gp.bm_cyl_p2p(bm_e_steel, (ns_x1 + 0.05, ry_ns, 0.78), (ns_x0 + 0.32, ry_ns, ns_h + 0.96), 0.024, 0.024, segments=8)
+    gp.bm_box(bm_e_slab, (cx, 35.45, 0.50), (wx - 0.2, 7.20, 1.00))
+    _add_plane_uv(bm_e_mural, (1.80, 39.02, 1.04), (6.15, 39.02, 1.04), (6.15, 39.02, 3.32), (1.80, 39.02, 3.32))
+
+    objs.append(su.create_mesh_object(f"{prefix}_East1FCreamWalls", bm_e_cream, palette["wall_guanghe"], col, uv_scale=0.38))
+    objs.append(su.create_mesh_object(f"{prefix}_EastStairsRamps", bm_e_slab, palette["concrete_floor"], col, uv_scale=0.36))
+    objs.append(su.create_mesh_object(f"{prefix}_EastTrimBench", bm_e_trim, palette["concrete_trim"], col, uv_scale=0.45))
+    objs.append(su.create_mesh_object(f"{prefix}_EastDarkRecess", bm_e_dark, palette["metal_dark"], col))
+    objs.append(su.create_mesh_object(f"{prefix}_EastSilverRailsPipes", bm_e_steel, palette["steel_silver"], col, smooth=True))
+    objs.append(su.create_mesh_object(f"{prefix}_EastBrickLattice", bm_e_lat, palette["brick_lattice_band"], col, auto_uv=False))
+    objs.append(su.create_mesh_object(f"{prefix}_EastGrayShutters", bm_e_shut, palette["wuquan_shutter_gray"], col, auto_uv=False))
+    objs.append(su.create_mesh_object(f"{prefix}_EastStair9FrostedGlass", bm_e_fglass, palette["glass_frosted_blue"], col))
+    objs.append(su.create_mesh_object(f"{prefix}_East1FWindows", bm_e_wglass, palette["window_glass"], col))
+    objs.append(su.create_mesh_object(f"{prefix}_East1FWinFrames", bm_e_wfrm, palette["window_frame"], col))
+    objs.append(su.create_mesh_object(f"{prefix}_EastVerticalBanner", bm_e_vban, palette["wuquan_vertical_banner"], col, auto_uv=False))
+    objs.append(su.create_mesh_object(f"{prefix}_EastBlueSigns", bm_e_bban, palette["wuquan_blue_banner"], col, auto_uv=False))
+    objs.append(su.create_mesh_object(f"{prefix}_EastNorthMural", bm_e_mural, palette["wuquan_north_mural"], col, auto_uv=False))
     return objs
 
 

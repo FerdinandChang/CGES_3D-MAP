@@ -29,115 +29,8 @@ const CAT_META = {
 
 const FILTER_ORDER = ["all", "admin", "grade1", "grade2", "grade3", "grade4", "grade5", "grade6", "youxue", "kinder", "special", "public"];
 
-const ZONE_META = [
-  {
-    id: "Bldg_Guanghe",
-    name: "廣和樓（行政大樓）",
-    shortName: "廣和樓",
-    badge: "5F・行政",
-    color: "#ef4444",
-    prefixes: ["Bldg_Guanghe_"],
-    summary: "校長室・各處室・視聽中心・11階穿堂",
-    axisHint: "由北 → 南排列｜面對廣和街主校門",
-    stairsInfo: "樓梯／電梯：3梯（北側）｜4梯（南側）｜電梯（1F–5F 南側無障礙）",
-    bounds: { x0: -53.5, x1: -31.5, y0: -10.5, y1: 11.5, h1: 4.2, hu: 3.4 },
-    labelPos: [-42.5, 0.5, 22.8],
-    cam: { pos: [-88, -3, 14], tgt: [-42, 0.5, 9.2] },
-  },
-  {
-    id: "Bldg_Heping",
-    name: "和平樓（北翼校舍）",
-    shortName: "和平樓",
-    badge: "5F・北翼",
-    color: "#38bdf8",
-    prefixes: ["Bldg_Heping_", "Landmark_CornerTowers_"],
-    summary: "一/三/五/六年級・優學・幼兒園・海豚天橋",
-    axisHint: "由東 → 西排列｜1梯 2F 直連海豚天橋",
-    stairsInfo: "樓梯：1梯（東中段・2F 通往體育館海豚天橋）｜2梯（西側）",
-    bounds: { x0: -60.5, x1: -7.0, y0: 25.5, y1: 39.0, h1: 3.6, hu: 3.4 },
-    labelPos: [-34.0, 32.0, 22.8],
-    cam: { pos: [-35, -8, 20], tgt: [-33, 28, 9.2] },
-  },
-  {
-    id: "Bldg_Wuquan",
-    name: "五權樓（東側主棟）",
-    shortName: "五權樓",
-    badge: "5F・主棟",
-    color: "#34d399",
-    prefixes: ["Bldg_Wuquan_", "Landmark_CornerTowers_"],
-    summary: "各年級・電腦/美勞/英語・穿堂連建司令台",
-    axisHint: "由北 → 南排列｜1F 穿堂東接升旗司令台",
-    stairsInfo: "樓梯：9梯（北端・近和平樓）｜8梯（南端・近 3號大後門）",
-    bounds: { x0: -7.0, x1: 6.5, y0: -67.0, y1: 39.5, h1: 3.6, hu: 3.4 },
-    labelPos: [0.0, -14.0, 22.8],
-    cam: { pos: [122, -20, 28], tgt: [4, -18, 9.5] },
-  },
-  {
-    id: "Bldg_Chongqing",
-    name: "重慶樓（南翼校舍）",
-    shortName: "重慶樓",
-    badge: "5F・南翼",
-    color: "#f59e0b",
-    prefixes: ["Bldg_Chongqing_", "Landmark_SouthCorner_"],
-    summary: "二/四年級・208 圖書室・自然/音樂/英語",
-    axisHint: "由東 → 西排列｜南臨露天雙籃球場",
-    stairsInfo: "樓梯：7梯（東端接五權樓）｜6梯（中段）｜5梯（西端近廣和街）",
-    bounds: { x0: -74.0, x1: -7.0, y0: -43.0, y1: -29.5, h1: 3.6, hu: 3.4 },
-    labelPos: [-42.0, -36.0, 22.8],
-    cam: { pos: [-44, -84, 19], tgt: [-42, -38, 9.0] },
-  },
-  {
-    id: "Bldg_Gym_Skybridge",
-    name: "運動中心＆海豚天橋",
-    shortName: "運動中心",
-    badge: "體育館＋空橋",
-    color: "#60a5fa",
-    prefixes: ["Bldg_Gym_", "Landmark_Skybridge_"],
-    summary: "室內溫水游泳池・綜合球場・跨和平路空橋",
-    axisHint: "位於和平路北側｜2F 海豚空橋直連和平樓",
-    stairsInfo: "動線：和平樓 2F 1梯出口直行海豚天橋，或由和平路前庭階梯進出",
-    labelPos: [-34.5, 86.0, 17.5],
-    cam: { pos: [2, 34, 12], tgt: [-32, 68, 7.5] },
-    extraDetailed: [
-      { floor: "3F", code: "3F", name: "綜合室內球場", short: "綜合室內球場", cat: "special", pos: [-34.5, 86.0, 10.6], size: [26, 26, 4.2], face: "S", stairs: "運動中心 3F 主場館" },
-      { floor: "3F", code: "3F", name: "看台與玻璃金字塔天窗", short: "看台・天窗", cat: "public", pos: [-46.0, 74.0, 11.8], size: [12, 10, 3.6], face: "S", stairs: "屋頂四座採光天窗" },
-      { floor: "2F", code: "2F", name: "跨和平路海豚彩繪人行天橋", short: "海豚彩繪空橋", cat: "public", pos: [-17.5, 52.0, 6.2], size: [4.6, 24.0, 3.2], face: "E", stairs: "連接和平樓 2F 1梯與運動中心" },
-      { floor: "2F", code: "2F", name: "運動中心主入口大廳", short: "主入口大廳", cat: "public", pos: [-26.0, 66.0, 5.8], size: [14, 6, 3.6], face: "S", stairs: "海豚天橋直達・前庭寬階梯" },
-      { floor: "2F", code: "2F", name: "韻律／體適能中心", short: "韻律體適能", cat: "special", pos: [-44.0, 66.0, 5.8], size: [12, 6, 3.6], face: "S", stairs: "2F 西側" },
-      { floor: "1F", code: "1F", name: "室內溫水游泳池", short: "室內游泳池", cat: "special", pos: [-34.5, 82.0, 2.2], size: [22, 18, 3.6], face: "S", stairs: "運動中心 1F" },
-      { floor: "1F", code: "1F", name: "前庭入口與階梯廣場", short: "運動中心前庭", cat: "public", pos: [-34.5, 64.5, 2.0], size: [24, 6, 3.2], face: "S", stairs: "和平路北側臨路入口" },
-    ],
-  },
-  {
-    id: "Zone_Outdoor",
-    name: "操場・籃球場・生態池・校門",
-    shortName: "戶外空間",
-    badge: "運動與景觀",
-    color: "#a3e635",
-    prefixes: ["Zone_Track_", "Zone_Basketball_", "Zone_Courtyard_", "Zone_Playground_", "Landmark_MainGate_", "Landmark_SouthWall_"],
-    summary: "200m 跑道・連建司令台・雙籃球場・生態池",
-    axisHint: "四大戶外活動分區｜含三處主要出入口",
-    stairsInfo: "出入口：廣和街31號正門（西）｜廣和街 3號大後門（南）｜147B 操場側門（北）",
-    labelPos: [42.0, -12.0, 7.5],
-    cam: { pos: [88, -68, 46], tgt: [16, -16, 4] },
-    extraDetailed: [
-      { floor: "東側", code: "", name: "升旗司令台（五權樓連建式）", short: "升旗司令台", cat: "public", pos: [9.8, -13.75, 2.8], size: [5.5, 19.0, 5.4], face: "E", stairs: "連建於五權樓 1F 穿堂與 2F 露台" },
-      { floor: "東側", code: "", name: "不鏽鋼爬竿架＆高低單槓體健區", short: "爬竿・高低單槓", cat: "special", pos: [68.2, -32.0, 1.8], size: [4.0, 38.0, 3.6], face: "W", stairs: "跑道東側五權街圍牆內樹蔭帶" },
-      { floor: "東側", code: "", name: "200m 六跑道紅 PU 操場", short: "200m PU 跑道", cat: "special", pos: [42.0, -12.0, 1.0], size: [42, 86, 2.0], face: "E", stairs: "五權樓東側灰色透水磚大道" },
-      { floor: "東側", code: "", name: "中央草坪足球場", short: "草坪足球場", cat: "special", pos: [42.0, -12.0, 1.0], size: [24, 52, 2.0], face: "E", stairs: "跑道內圈中央" },
-      { floor: "中庭", code: "", name: "生態水生植物池＆拱形小木橋", short: "生態水生池", cat: "public", pos: [-18.5, 16.5, 1.4], size: [14, 10, 2.4], face: "S", stairs: "四棟校舍合圍之北中庭" },
-      { floor: "中庭", code: "", name: "酒瓶椰子中庭花園", short: "中庭花園", cat: "public", pos: [-22.0, -16.5, 1.4], size: [22, 16, 2.4], face: "S", stairs: "廣和樓穿堂東側直達" },
-      { floor: "南側", code: "", name: "露天薄荷綠雙籃球場", short: "雙籃球場", cat: "special", pos: [-27.0, -55.5, 1.8], size: [36, 22, 3.2], face: "S", stairs: "重慶樓南側・無內側圍欄開闊連通" },
-      { floor: "南側", code: "", name: "廣和街 3號大後門（學童接送區）", short: "3號大後門", cat: "public", pos: [12.5, -69.8, 1.8], size: [8.0, 3.2, 3.2], face: "S", stairs: "緊鄰五權樓 8梯・直通操場與椰林" },
-      { floor: "南側", code: "", name: "兒童遊戲場＆花磚馬賽克圍牆", short: "兒童遊戲場", cat: "public", pos: [-56.0, -58.0, 1.8], size: [14, 12, 3.0], face: "S", stairs: "西南角重慶樓南側" },
-      { floor: "西側", code: "", name: "廣和街 31 號主校門＆半圓拱警衛室", short: "主校門・警衛室", cat: "public", pos: [-69.5, 2.8, 3.0], size: [8.0, 16.0, 6.2], face: "W", stairs: "正對廣和樓 11 階寬階梯穿堂" },
-      { floor: "西側", code: "", name: "前庭紅磚廣場＆幼童車接送區", short: "前庭廣場", cat: "public", pos: [-61.0, 0.5, 1.2], size: [12, 22, 2.2], face: "W", stairs: "主校門內側" },
-      { floor: "北側", code: "", name: "東北角雙半場籃球場＆涼亭", short: "北側雙半場籃球場", cat: "special", pos: [48.3, 40.2, 1.8], size: [26.0, 13.0, 3.4], face: "S", stairs: "100m 延長跑道東側" },
-      { floor: "北側", code: "", name: "和平路 B1 雙鐵捲門通道", short: "B1 雙鐵捲門", cat: "public", pos: [1.2, 41.5, 2.0], size: [10.0, 4.5, 3.4], face: "N", stairs: "五權樓北牆 1F（147 和平路）" },
-      { floor: "北側", code: "", name: "147B 操場側門＆公車亭", short: "147B 操場側門", cat: "public", pos: [8.7, 47.0, 2.0], size: [6.0, 4.0, 3.0], face: "N", stairs: "和平路北側・操場西北角" },
-    ],
-  },
-];
+// Dynamic zone metadata loaded from single-source-of-truth campus_cges.json ("zones")
+let ZONE_META = [];
 
 const GUIDED_TOUR = [
   {
@@ -686,14 +579,70 @@ function focusRoomByUid(uid, keepFloorAll = false) {
   scene.add(pin);
   activeRoomPin = pin;
 
-  // Update Room Inspector Bar
+  // Update Room Inspector Bar & URL Deep Link Hash
   updateRoomInspector(room);
   refresh3DLabels();
   renderSidebar();
+  syncUrlHash();
 
   const { camPos, tgt } = computeCameraForRoom(room, false);
   flyTo(camPos, tgt);
 }
+
+// --- URL Hash Deep Linking (#room=305 or #zone=Bldg_Wuquan&floor=3F) ---
+let suppressHashSync = false;
+
+function getRoomSlug(room) {
+  return room.code || room.short || room.name;
+}
+
+function syncUrlHash() {
+  if (suppressHashSync) return;
+  let newHash = "";
+  if (state.activeRoomUid) {
+    const r = state.allRooms.find((item) => item.uid === state.activeRoomUid);
+    if (r) newHash = `#room=${encodeURIComponent(getRoomSlug(r))}`;
+  } else if (state.selectedZoneId) {
+    newHash = `#zone=${encodeURIComponent(state.selectedZoneId)}`;
+    if (state.selectedFloor && state.selectedFloor !== "ALL") {
+      newHash += `&floor=${encodeURIComponent(state.selectedFloor)}`;
+    }
+  }
+  const curHash = window.location.hash || "";
+  if (curHash !== newHash) {
+    history.replaceState(null, "", newHash || window.location.pathname + window.location.search);
+  }
+}
+
+function applyUrlHash() {
+  const raw = (window.location.hash || "").replace(/^#/, "").trim();
+  if (!raw) return;
+  const params = new URLSearchParams(raw);
+  const roomQuery = (params.get("room") || "").trim().toLowerCase();
+  const zoneQuery = (params.get("zone") || "").trim();
+  const floorQuery = (params.get("floor") || "").trim();
+
+  suppressHashSync = true;
+  try {
+    if (roomQuery) {
+      const target =
+        state.allRooms.find((r) => (r.code && r.code.toLowerCase() === roomQuery) || r.short.toLowerCase() === roomQuery || r.name.toLowerCase() === roomQuery) ||
+        state.allRooms.find((r) => r.haystack.includes(roomQuery));
+      if (target) {
+        focusRoomByUid(target.uid, false);
+        return;
+      }
+    }
+    if (zoneQuery && ZONE_META.some((z) => z.id === zoneQuery)) {
+      selectZone(zoneQuery, true);
+      if (floorQuery) selectFloor(floorQuery);
+    }
+  } finally {
+    suppressHashSync = false;
+  }
+}
+
+window.addEventListener("hashchange", applyUrlHash);
 
 function updateRoomInspector(room) {
   const bar = document.getElementById("roomInspector");
@@ -762,6 +711,7 @@ function selectZone(zoneId, shouldFly = true) {
   updateFloorBand();
   refresh3DLabels();
   renderSidebar();
+  syncUrlHash();
   if (zoneId && shouldFly) {
     const z = ZONE_META.find((item) => item.id === zoneId);
     if (z) flyTo(z.cam.pos, z.cam.tgt);
@@ -774,6 +724,7 @@ function selectFloor(floorKey) {
   updateFloorBand();
   refresh3DLabels();
   renderSidebar();
+  syncUrlHash();
 }
 
 // --- Sidebar UI Rendering ---
@@ -1173,10 +1124,26 @@ document.getElementById("btnRoomViewToggle").addEventListener("click", () => {
   const { camPos, tgt } = computeCameraForRoom(room, state.roomViewAerial);
   flyTo(camPos, tgt);
 });
+document.getElementById("btnRoomShare").addEventListener("click", async (e) => {
+  const btn = e.currentTarget;
+  syncUrlHash();
+  const shareUrl = window.location.href;
+  try {
+    await navigator.clipboard.writeText(shareUrl);
+    const orig = btn.textContent;
+    btn.textContent = "✓ 已複製";
+    setTimeout(() => {
+      btn.textContent = orig;
+    }, 1800);
+  } catch (_) {
+    window.prompt("複製此教室 3D 定位連結：", shareUrl);
+  }
+});
 document.getElementById("btnCloseInspector").addEventListener("click", () => {
   clearRoomPin();
   refresh3DLabels();
   renderSidebar();
+  syncUrlHash();
 });
 
 // Guided Tour Buttons
@@ -1251,14 +1218,16 @@ const GROUND_ONLY_RECEIVE_PATTERNS = [
   "Zone_Basketball_Court",
 ];
 
-// --- Load Spec & Compressed GLB (with Build-Hash Cache & Draco Decoder) ---
+// --- Load Spec & Compressed GLB (with Build-Hash Cache, Progress Bar & Draco Decoder) ---
 async function init() {
   let buildHash = "12.7";
+  let expectedGlbBytes = 5349084;
   try {
     const metaRes = await fetch("./build_meta.json");
     if (metaRes.ok) {
       const meta = await metaRes.json();
       if (meta?.hash) buildHash = `${meta.version || "12.7"}-${meta.hash}`;
+      if (meta?.glb_bytes) expectedGlbBytes = meta.glb_bytes;
     }
   } catch (_) {
     // Fallback to static version string
@@ -1267,6 +1236,9 @@ async function init() {
   try {
     const res = await fetch(`./campus_cges.json?v=${buildHash}`);
     state.spec = await res.json();
+    if (Array.isArray(state.spec?.zones) && state.spec.zones.length > 0) {
+      ZONE_META = state.spec.zones;
+    }
   } catch (e) {
     console.warn("Spec load failed:", e);
   }
@@ -1275,7 +1247,12 @@ async function init() {
   renderCategoryPills();
   refresh3DLabels();
   renderSidebar();
+  applyUrlHash();
   requestRender(12);
+
+  const statusTextEl = document.getElementById("statusText");
+  const statusPctEl = document.getElementById("statusPct");
+  const statusBarEl = document.getElementById("statusBar");
 
   const maxAniso = renderer.capabilities.getMaxAnisotropy();
   const dracoLoader = new DRACOLoader();
@@ -1285,6 +1262,8 @@ async function init() {
   loader.load(
     `./exports/cges_campus.glb?v=${buildHash}`,
     (gltf) => {
+      if (statusPctEl) statusPctEl.textContent = "100%";
+      if (statusBarEl) statusBarEl.style.width = "100%";
       state.rootModel = gltf.scene;
       gltf.scene.traverse((obj) => {
         if (obj.isMesh) {
@@ -1301,18 +1280,22 @@ async function init() {
         }
       });
       scene.add(gltf.scene);
+      applyVisualModes();
       statusEl.remove();
       dracoLoader.dispose();
       requestShadowUpdate();
     },
     (xhr) => {
-      if (xhr.total) {
-        statusEl.textContent = `載入重慶國小 3D 模型中… ${Math.round((xhr.loaded / xhr.total) * 100)}%`;
-      }
+      const total = xhr.total > 0 ? xhr.total : expectedGlbBytes;
+      const pct = Math.min(99, Math.max(1, Math.round((xhr.loaded / total) * 100)));
+      if (statusPctEl) statusPctEl.textContent = `${pct}%`;
+      if (statusBarEl) statusBarEl.style.width = `${pct}%`;
+      if (statusTextEl) statusTextEl.textContent = "載入重慶國小 3D 實景模型中…";
     },
     (err) => {
       console.error(err);
-      statusEl.textContent = "載入模型失敗：" + err.message;
+      if (statusTextEl) statusTextEl.textContent = "載入模型失敗：" + err.message;
+      else statusEl.textContent = "載入模型失敗：" + err.message;
     }
   );
 }
