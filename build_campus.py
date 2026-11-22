@@ -125,8 +125,8 @@ def main() -> None:
 
     # 2. Fast EEVEE verification renders
     shots = [
-        ("Shot_V12_9_South_Basketball", (-45.5, -75.0, 13.8), (-20.5, -51.5, 3.6), "cges_v12_9_south_basketball.png", 1280, 900, 30.0),
-        ("Shot_V12_9_Court_Close", (-33.0, -61.0, 5.8), (-16.0, -48.5, 3.2), "cges_v12_9_court_close.png", 1280, 900, 32.0),
+        ("Shot_V12_10_Emblem_Close", (-78.0, 0.5, 17.5), (-53.5, 0.5, 19.3), "cges_v12_10_emblem_close.png", 1280, 900, 52.0),
+        ("Shot_V12_10_Guanghe_Front", (-88.0, 0.5, 11.5), (-53.5, 0.5, 14.5), "cges_v12_10_guanghe_front.png", 1280, 900, 34.0),
     ]
     shot_filters = [s.strip().lower() for s in args.shots.split(",") if s.strip()]
     for s_name, loc, tgt, fname, w, h, lens in shots:

@@ -224,25 +224,152 @@ def gen_school_sign() -> None:
 
 
 def gen_emblem_cges() -> None:
-    size = 512
-    im = Image.new("RGB", (size, size), (232, 226, 220))
-    draw = ImageDraw.Draw(im)
-    # Subtle stone tile lines on emblem plaque
-    for i in range(0, size, 64):
-        draw.line([(i, 0), (i, size)], fill=(214, 208, 202), width=1)
-        draw.line([(0, i), (size, i)], fill=(214, 208, 202), width=1)
+    """1:1 像素級還原 27 廣和街 15.6y 特寫街景之重慶國小校徽馬賽克小方磚牆（6 條雙色灰綠幾何樹幹＋波浪樹冠葉帶＆44x48 白方磚十字灰縫）。"""
+    size = 1024
+    base_white = (233, 232, 228)
+    col_dark = (106, 114, 100)   # 深灰墨綠馬賽克方磚（第 1、3 條主幹 ＆ 第 1、3 條樹冠葉帶）
+    col_light = (148, 174, 154)  # 淺粉灰綠馬賽克方磚（第 2 條中幹 ＆ 第 2 條中葉帶）
 
-    green = (108, 142, 122)
-    shadow = (76, 98, 86)
-    # Drop shadow then raised geometric green '重' emblem
-    for off, col in [((6, 6), shadow), ((0, 0), green)]:
-        ox, oy = off
-        draw.polygon([(140 + ox, 430 + oy), (195 + ox, 430 + oy), (195 + ox, 210 + oy), (140 + ox, 210 + oy)], fill=col)
-        draw.polygon([(80 + ox, 140 + oy), (225 + ox, 140 + oy), (200 + ox, 190 + oy), (110 + ox, 190 + oy)], fill=col)
-        draw.polygon([(225 + ox, 430 + oy), (275 + ox, 430 + oy), (275 + ox, 240 + oy), (420 + ox, 175 + oy), (420 + ox, 125 + oy), (225 + ox, 210 + oy)], fill=col)
-        draw.polygon([(295 + ox, 430 + oy), (345 + ox, 430 + oy), (345 + ox, 290 + oy), (425 + ox, 255 + oy), (425 + ox, 205 + oy), (295 + ox, 260 + oy)], fill=col)
-        draw.polygon([(170 + ox, 90 + oy), (370 + ox, 90 + oy), (350 + ox, 130 + oy), (190 + ox, 130 + oy)], fill=col)
-    im.save(os.path.join(TEX_DIR, "tex_emblem_cges.png"))
+    im = Image.new("RGB", (size, size), base_white)
+    draw = ImageDraw.Draw(im)
+
+    def _pts(norm_coords: list[tuple[float, float]]) -> list[tuple[int, int]]:
+        # Scale around center (0.50, 0.49) to match exact 78% width & bold 5-6 tile band thickness in 27 廣和街 step_2.png!
+        cx_e, cy_e = 0.50, 0.49
+        sx_e, sy_e = 1.36, 1.08
+        out = []
+        for nx, ny in norm_coords:
+            px_n = cx_e + (nx - cx_e) * sx_e
+            py_n = cy_e + (ny - cy_e) * sy_e
+            out.append((int(round(px_n * size)), int(round(py_n * size))))
+        return out
+
+    # --- A. 下半部主幹組（3 條「垂直樹幹 -> 銳角折向右上 24°」的平行粗折帶） ---
+    # 1. 左幹（深灰墨綠，垂直段最長，右上端帶標誌性微勾斜切角）
+    stem_left = _pts([
+        (0.362, 0.842),
+        (0.362, 0.448),
+        (0.658, 0.320),
+        (0.674, 0.296),
+        (0.704, 0.376),
+        (0.434, 0.494),
+        (0.434, 0.844),
+    ])
+    # 2. 中幹（淺粉灰綠，平行嵌於左幹內側，隔 1.5 格白磚縫）
+    stem_mid = _pts([
+        (0.456, 0.846),
+        (0.456, 0.512),
+        (0.720, 0.398),
+        (0.750, 0.468),
+        (0.528, 0.564),
+        (0.528, 0.849),
+    ])
+    # 3. 右幹（深灰墨綠，平行嵌於中幹右側，隔 1.5 格白磚縫）
+    stem_right = _pts([
+        (0.550, 0.850),
+        (0.550, 0.578),
+        (0.756, 0.488),
+        (0.786, 0.556),
+        (0.634, 0.624),
+        (0.622, 0.634),
+        (0.622, 0.854),
+    ])
+
+    # --- B. 左上部樹冠飄帶組（3 條平行「左上葉尖斜切 -> 平滑波浪拱 -> 右下彎入左幹斜邊上方」的流線色帶） ---
+    # 1. 上葉帶（深灰墨綠）
+    leaf_top = _pts([
+        (0.400, 0.138),
+        (0.422, 0.162),
+        (0.448, 0.178),
+        (0.486, 0.188),
+        (0.532, 0.194),
+        (0.570, 0.204),
+        (0.596, 0.226),
+        (0.612, 0.262),
+        (0.626, 0.306),
+        (0.562, 0.334),
+        (0.552, 0.292),
+        (0.538, 0.266),
+        (0.514, 0.254),
+        (0.472, 0.246),
+        (0.430, 0.236),
+        (0.394, 0.218),
+        (0.356, 0.190),
+    ])
+    # 2. 中葉帶（淺粉灰綠，與上葉帶隔約 1.2 格緊湊均勻白磚縫）
+    leaf_mid = _pts([
+        (0.338, 0.202),
+        (0.374, 0.230),
+        (0.416, 0.252),
+        (0.460, 0.264),
+        (0.504, 0.272),
+        (0.530, 0.286),
+        (0.540, 0.312),
+        (0.546, 0.344),
+        (0.480, 0.373),
+        (0.472, 0.344),
+        (0.458, 0.328),
+        (0.428, 0.318),
+        (0.384, 0.306),
+        (0.338, 0.286),
+        (0.290, 0.250),
+    ])
+    # 3. 下葉帶（深灰墨綠，與中葉帶隔約 1.2 格緊湊均勻白磚縫）
+    leaf_bot = _pts([
+        (0.274, 0.262),
+        (0.320, 0.296),
+        (0.366, 0.320),
+        (0.410, 0.334),
+        (0.444, 0.346),
+        (0.458, 0.362),
+        (0.462, 0.382),
+        (0.376, 0.420),
+        (0.334, 0.402),
+        (0.290, 0.376),
+        (0.224, 0.314),
+    ])
+
+    for poly in (stem_left, stem_right, leaf_top, leaf_bot):
+        draw.polygon(poly, fill=col_dark)
+    for poly in (stem_mid, leaf_mid):
+        draw.polygon(poly, fill=col_light)
+
+    # --- C. 44x48 馬賽克小方磚自然窯燒微色差 ＋ 貫穿全牆的十字水泥灰磁磚縫 ---
+    cols_t, rows_t = 44, 48
+    rng = random.Random(2731)
+    px = im.load()
+    for r in range(rows_t):
+        y0 = int(round(r * size / rows_t))
+        y1 = int(round((r + 1) * size / rows_t))
+        for c in range(cols_t):
+            x0 = int(round(c * size / cols_t))
+            x1 = int(round((c + 1) * size / cols_t))
+            d = rng.randint(-5, 5)
+            if d != 0:
+                for yy in range(y0 + 1, y1 - 1):
+                    for xx in range(x0 + 1, x1 - 1):
+                        pr, pg, pb = px[xx, yy]
+                        px[xx, yy] = (
+                            max(0, min(255, pr + d)),
+                            max(0, min(255, pg + d)),
+                            max(0, min(255, pb + d)),
+                        )
+
+    # Tile grout lines (every 6th seam slightly darker to match real mosaic sheet joints in step_2.png!)
+    for c in range(1, cols_t):
+        gx = int(round(c * size / cols_t))
+        g_col = (146, 144, 140) if (c % 6 == 0) else (184, 182, 178)
+        g_w = 2 if (c % 6 == 0) else 1
+        draw.line([(gx, 0), (gx, size - 1)], fill=g_col, width=g_w)
+    for r in range(1, rows_t):
+        gy = int(round(r * size / rows_t))
+        g_col = (146, 144, 140) if (r % 6 == 0) else (184, 182, 178)
+        g_w = 2 if (r % 6 == 0) else 1
+        draw.line([(0, gy), (size - 1, gy)], fill=g_col, width=g_w)
+
+    # Subtle outer panel shadow edge at bottom sill
+    draw.line([(0, size - 3), (size - 1, size - 3)], fill=(120, 116, 112), width=5)
+    im.save(os.path.join(TEX_DIR, "tex_emblem_cges.png"), optimize=True)
 
 
 def gen_facade_banner(filename: str, word: str, en_word: str, bg_grad: tuple[tuple[int, int, int], tuple[int, int, int]], accent: tuple[int, int, int]) -> None:

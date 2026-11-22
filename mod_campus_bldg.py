@@ -272,6 +272,9 @@ def build_guanghe_building(cfg: dict, palette: Dict[str, bpy.types.Material]) ->
     # 2F north wing detailed window
     _add_detailed_window(bm_glass, bm_frame, (x0 - 0.04, y1 - 2.8, z2 + 1.9), 3.4, 1.48, axis="Y", cols=3)
 
+    bm_salmon_gh = bmesh.new()
+    bm_dark_gh = bmesh.new()
+
     # 4. 3F ~ 5F 主體（深凹鋁框細格窗＋磚紅水平飾帶＋雨庇＋東側半開放走廊）
     corridor_w = 2.5
     core_x1 = x1 - corridor_w
@@ -281,12 +284,29 @@ def build_guanghe_building(cfg: dict, palette: Dict[str, bpy.types.Material]) ->
         gp.bm_box(bm_wall, ((x0 + core_x1) * 0.5, cy, zf + hu * 0.5), (core_x1 - x0, wy, hu))
         win_z = zf + 2.02
         win_h = 1.48
-        # Central 6-bay aluminum ribbon window (matching campus_01.jpg!)
-        _add_detailed_window(bm_glass, bm_frame, (x0 - 0.05, cy, win_z), 11.4, win_h, axis="Y", cols=8)
+        if fl < 4:
+            # 3F & 4F: Central 6-bay aluminum ribbon window
+            _add_detailed_window(bm_glass, bm_frame, (x0 - 0.05, cy, win_z), 11.4, win_h, axis="Y", cols=8)
+        else:
+            # 5F (exact 27 廣和街 step_4_shot_2.png & final_step_6.png!):
+            # Flanking the central white emblem tower (cy +- 2.65) are recessed salmon-tile twin-tier blind panels (cy +- 2.65 .. cy +- 5.45)
+            # bordered by full-height crisp white square-tile vertical pilasters at cy +- 5.70!
+            for sgn_y in (-1.0, 1.0):
+                rec_yc = cy + sgn_y * 4.05
+                rec_w = 2.76
+                # Recessed salmon-tile blind panel (lower 5F tier + upper parapet tier)
+                gp.bm_box(bm_salmon_gh, (x0 - 0.06, rec_yc, zf + 2.38), (0.12, rec_w, 2.12))
+                gp.bm_box(bm_salmon_gh, (x0 - 0.06, rec_yc, z_roof + 0.96), (0.12, rec_w, 1.48))
+                # Projecting terracotta mid-transom band & top dark shadow eave over recessed bay
+                gp.bm_box(bm_brick, (x0 - 0.20, rec_yc, z_roof + 0.04), (0.34, rec_w + 0.06, 0.36))
+                gp.bm_box(bm_dark_gh, (x0 - 0.26, rec_yc, z_roof + 1.76), (0.44, rec_w + 0.08, 0.18))
+                gp.bm_box(bm_wall, (x0 - 0.30, rec_yc, z_roof + 1.90), (0.50, rec_w + 0.12, 0.12))
+                # Outer vertical white square-tile pilaster separating recessed bay from side wing
+                gp.bm_box(bm_wall, (x0 - 0.24, cy + sgn_y * 5.72, 0.5 * (zf + 1.28 + z_roof + 2.18)), (0.44, 0.58, (z_roof + 2.18) - (zf + 1.28)))
         # Side wings: 2 crisp windows with projecting drip lintels
-        for wy_mid in (y0 + 2.8, y1 - 2.8):
-            _add_detailed_window(bm_glass, bm_frame, (x0 - 0.05, wy_mid, win_z), 3.4, win_h, axis="Y", cols=3)
-            gp.bm_box(bm_wall, (x0 - 0.22, wy_mid, win_z + win_h * 0.5 + 0.08), (0.36, 3.65, 0.14))
+        for wy_mid in (y0 + 2.65, y1 - 2.65):
+            _add_detailed_window(bm_glass, bm_frame, (x0 - 0.05, wy_mid, win_z), 3.3, win_h, axis="Y", cols=3)
+            gp.bm_box(bm_wall, (x0 - 0.22, wy_mid, win_z + win_h * 0.5 + 0.08), (0.36, 3.55, 0.14))
         # North & south flank windows on east half (clear of x=-49.2..-43.6 North/South connector bridges!) + D-03 projecting sunshade!
         for side_y, sdir in ((y0 - 0.05, -1.0), (y1 + 0.05, 1.0)):
             _add_detailed_window(bm_glass, bm_frame, (x0 + 14.2, side_y, win_z), 5.6, win_h, axis="X", cols=4)
@@ -303,33 +323,100 @@ def build_guanghe_building(cfg: dict, palette: Dict[str, bpy.types.Material]) ->
             gp.bm_box(bm_wall, (x1 - 0.25, py, zf + hu * 0.5), (0.48, 0.48, hu))
         _add_detailed_window(bm_glass, bm_frame, (core_x1 + 0.04, cy, win_z), wy - 3.0, 1.42, axis="Y", cols=10)
 
-    # 5. 屋頂四周女兒牆與壓頂（保留中央露空給太陽能板！）＋ 厚實半圓拱山牆與校徽
+    # 5. 屋頂四周女兒牆與兩翼階梯抬升女兒牆 ＋ 1:1 27 廣和街純白方磚校徽山牆＆淡粉紅磚矩形截面半圓鏤空拱圈
     gp.bm_box(bm_floor, (cx, cy, z_roof + 0.15), (wx, wy, 0.30))
     gp.bm_box(bm_wall, (cx, y0 + 0.2, z_roof + parapet * 0.5), (wx, 0.4, parapet))
     gp.bm_box(bm_wall, (cx, y1 - 0.2, z_roof + parapet * 0.5), (wx, 0.4, parapet))
     gp.bm_box(bm_wall, (x1 - 0.2, cy, z_roof + parapet * 0.5), (0.4, wy, parapet))
-    gp.bm_box(bm_wall, (x0 + 0.2, cy, z_roof + parapet * 0.5), (0.4, wy, parapet))
     gp.bm_box(bm_brick, (cx, y0 + 0.2, z_roof + parapet + 0.12), (wx + 0.24, 0.52, 0.24))
     gp.bm_box(bm_brick, (cx, y1 - 0.2, z_roof + parapet + 0.12), (wx + 0.24, 0.52, 0.24))
     gp.bm_box(bm_brick, (x1 - 0.2, cy, z_roof + parapet + 0.12), (0.52, wy + 0.24, 0.24))
-    gp.bm_box(bm_brick, (x0 + 0.2, cy, z_roof + parapet + 0.12), (0.52, wy + 0.24, 0.24))
 
-    # Hero central arched gable on west facade (thick concrete arch ring + stepped relief backing, campus_01.jpg!)
-    gable_w = 5.4
-    gp.bm_box(bm_wall, (x0 - 0.32, cy, z_roof + 0.95), (0.95, gable_w, 4.7))
-    gp.bm_box(bm_brick, (x0 - 0.18, cy, z_roof + 0.95), (0.65, gable_w + 0.55, 4.85))
-    arch_r = gable_w * 0.48
-    arch_z = z_roof + 3.15
-    segs = 20
-    for i in range(segs):
-        a0 = math.pi * i / segs
-        a1 = math.pi * (i + 1) / segs
-        p0 = (x0 - 0.32, cy + math.cos(a0) * arch_r, arch_z + math.sin(a0) * arch_r)
-        p1 = (x0 - 0.32, cy + math.cos(a1) * arch_r, arch_z + math.sin(a1) * arch_r)
-        gp.bm_cyl_p2p(bm_wall, p0, p1, 0.38, 0.38, segments=10)
-        q0 = (x0 - 0.32, cy + math.cos(a0) * (arch_r + 0.24), arch_z + math.sin(a0) * (arch_r + 0.24))
-        q1 = (x0 - 0.32, cy + math.cos(a1) * (arch_r + 0.24), arch_z + math.sin(a1) * (arch_r + 0.24))
-        gp.bm_cyl_p2p(bm_brick, q0, q1, 0.18, 0.18, segments=8)
+    # Stepped-up outer wing parapets on west facade (y0..cy-5.45 & cy+5.45..y1, H=2.18m above roof + salmon waist band + dark red coping!)
+    for sgn_w in (-1.0, 1.0):
+        wy_c = 0.5 * ((cy + sgn_w * 5.45) + (y1 if sgn_w > 0 else y0))
+        wy_l = abs((y1 if sgn_w > 0 else y0) - (cy + sgn_w * 5.45))
+        gp.bm_box(bm_wall, (x0 + 0.16, wy_c, z_roof + 1.09), (0.44, wy_l, 2.18))
+        gp.bm_box(bm_salmon_gh, (x0 - 0.08, wy_c, z_roof + 0.42), (0.12, wy_l + 0.04, 0.36))
+        gp.bm_box(bm_brick, (x0 + 0.12, wy_c, z_roof + 2.24), (0.56, wy_l + 0.12, 0.14))
+    # Rear rooftop lightning arrestor rods visible behind stepped parapets (step_4_shot_2.png!)
+    for ly_rod in (cy - 8.2, cy - 6.4, cy - 3.8, cy + 3.8, cy + 6.4, cy + 8.2):
+        gp.bm_cyl_axis(bm_dark_gh, (x0 + 0.55, ly_rod, z_roof + 2.55), 0.018, 2.40, axis="Z", segments=6)
+
+    # Central protruding pure-white square-tile Emblem Tower Box (NO red brick side borders! exact final_step_6.png & step_2.png!)
+    gable_w = 5.30
+    z_emb_bot = z_roof - 2.10   # Sits cleanly right above 5F '勤學' banner top (15.70m)
+    z_emb_top = z_roof + 2.15   # Arch springline (19.95m)
+    emb_h = z_emb_top - z_emb_bot
+    x_emb_front = x0 - 0.72
+    x_emb_back = x0 + 0.18
+    gp.bm_box(bm_wall, (0.5 * (x_emb_front + x_emb_back), cy, 0.5 * (z_emb_bot + z_emb_top)), (x_emb_back - x_emb_front, gable_w, emb_h))
+    # Dark underside shadow reveal at bottom sill of white emblem box & top of arch sill
+    gp.bm_box(bm_dark_gh, (0.5 * (x_emb_front + x0), cy, z_emb_bot - 0.03), (x0 - x_emb_front - 0.04, gable_w - 0.06, 0.06))
+    gp.bm_box(bm_dark_gh, (0.5 * (x_emb_front + x_emb_back), cy, z_emb_top + 0.02), (x_emb_back - x_emb_front - 0.04, 3.80, 0.05))
+
+    # True Rectangular-Cross-Section Semicircular Hollow Arch Ring in Salmon-Pink Tile (exact final_step_6.png!)
+    # Outer width matches white emblem box width (r_out = gable_w * 0.5 = 2.65m), inner radius r_in = 1.98m (arch ring thickness 0.67m)!
+    r_out_a = gable_w * 0.5
+    r_in_a = 1.98
+    r_intrados = 1.93
+    spring_h = 0.34
+    arch_zc = z_emb_top + spring_h
+    # Short vertical springer legs at left/right before curving into semicircle
+    leg_w = r_out_a - r_in_a
+    for sgn_a in (-1.0, 1.0):
+        ly_a = cy + sgn_a * (r_in_a + leg_w * 0.5)
+        gp.bm_box(bm_salmon_gh, (0.5 * (x_emb_front + x_emb_back), ly_a, z_emb_top + spring_h * 0.5), (x_emb_back - x_emb_front, leg_w, spring_h))
+        gp.bm_box(bm_dark_gh, (0.5 * (x_emb_front + x_emb_back), cy + sgn_a * (r_in_a - 0.025), z_emb_top + spring_h * 0.5), (x_emb_back - x_emb_front - 0.06, 0.05, spring_h))
+
+    segs_arch = 28
+    arch_faces = []
+    intr_faces = []
+    for i in range(segs_arch):
+        a0 = math.pi * i / segs_arch
+        a1 = math.pi * (i + 1) / segs_arch
+        c0, s0 = math.cos(a0), math.sin(a0)
+        c1, s1 = math.cos(a1), math.sin(a1)
+        # 8 vertices of rectangular-section salmon arch voussoir block
+        yf_o0, zf_o0 = cy + c0 * r_out_a, arch_zc + s0 * r_out_a
+        yf_o1, zf_o1 = cy + c1 * r_out_a, arch_zc + s1 * r_out_a
+        yf_i0, zf_i0 = cy + c0 * r_in_a, arch_zc + s0 * r_in_a
+        yf_i1, zf_i1 = cy + c1 * r_in_a, arch_zc + s1 * r_in_a
+        vf_o0 = bm_salmon_gh.verts.new((x_emb_front, yf_o0, zf_o0))
+        vf_o1 = bm_salmon_gh.verts.new((x_emb_front, yf_o1, zf_o1))
+        vf_i1 = bm_salmon_gh.verts.new((x_emb_front, yf_i1, zf_i1))
+        vf_i0 = bm_salmon_gh.verts.new((x_emb_front, yf_i0, zf_i0))
+        vb_o0 = bm_salmon_gh.verts.new((x_emb_back, yf_o0, zf_o0))
+        vb_o1 = bm_salmon_gh.verts.new((x_emb_back, yf_o1, zf_o1))
+        vb_i1 = bm_salmon_gh.verts.new((x_emb_back, yf_i1, zf_i1))
+        vb_i0 = bm_salmon_gh.verts.new((x_emb_back, yf_i0, zf_i0))
+        arch_faces.extend([
+            bm_salmon_gh.faces.new((vf_o0, vf_o1, vf_i1, vf_i0)),
+            bm_salmon_gh.faces.new((vb_i0, vb_i1, vb_o1, vb_o0)),
+            bm_salmon_gh.faces.new((vf_o0, vb_o0, vb_o1, vf_o1)),
+            bm_salmon_gh.faces.new((vf_i1, vb_i1, vb_i0, vf_i0)),
+        ])
+        # Dark intrados inner soffit liner inside arch opening (exact dark inner shadow rim in final_step_6.png!)
+        yi_0, zi_0 = cy + c0 * r_intrados, arch_zc + s0 * r_intrados
+        yi_1, zi_1 = cy + c1 * r_intrados, arch_zc + s1 * r_intrados
+        xf0, xf1 = x_emb_front + 0.03, x_emb_back - 0.03
+        d_fo0 = bm_dark_gh.verts.new((xf0, yf_i0, zf_i0))
+        d_fo1 = bm_dark_gh.verts.new((xf0, yf_i1, zf_i1))
+        d_fi1 = bm_dark_gh.verts.new((xf0, yi_1, zi_1))
+        d_fi0 = bm_dark_gh.verts.new((xf0, yi_0, zi_0))
+        d_bo0 = bm_dark_gh.verts.new((xf1, yf_i0, zf_i0))
+        d_bo1 = bm_dark_gh.verts.new((xf1, yf_i1, zf_i1))
+        d_bi1 = bm_dark_gh.verts.new((xf1, yi_1, zi_1))
+        d_bi0 = bm_dark_gh.verts.new((xf1, yi_0, zi_0))
+        intr_faces.extend([
+            bm_dark_gh.faces.new((d_fo0, d_fo1, d_fi1, d_fi0)),
+            bm_dark_gh.faces.new((d_bi0, d_bi1, d_bo1, d_bo0)),
+            bm_dark_gh.faces.new((d_fi1, d_bi1, d_bi0, d_fi0)),
+        ])
+    bmesh.ops.recalc_face_normals(bm_salmon_gh, faces=arch_faces)
+    bmesh.ops.recalc_face_normals(bm_dark_gh, faces=intr_faces)
+    objs.append(su.create_mesh_object(f"{prefix}_ArchSalmonTile", bm_salmon_gh, palette["wall_salmon"], col, uv_scale=0.45))
+    objs.append(su.create_mesh_object(f"{prefix}_ArchDarkTrim", bm_dark_gh, palette["metal_dark"], col))
 
     # 2F right-side LED screen frame (dark metal housing)
     bm_led_box = bmesh.new()
@@ -351,8 +438,9 @@ def build_guanghe_building(cfg: dict, palette: Dict[str, bpy.types.Material]) ->
 
     # Emblem, 3F-5F banners & breezeway header
     bm_emb = bmesh.new()
-    ex = x0 - 0.82
-    _add_plane_uv(bm_emb, (ex, cy + 2.25, z_roof - 1.15), (ex, cy - 2.25, z_roof - 1.15), (ex, cy - 2.25, z_roof + 3.15), (ex, cy + 2.25, z_roof + 3.15))
+    ex = x_emb_front - 0.012
+    hw_emb = gable_w * 0.5 - 0.02
+    _add_plane_uv(bm_emb, (ex, cy + hw_emb, z_emb_bot + 0.02), (ex, cy - hw_emb, z_emb_bot + 0.02), (ex, cy - hw_emb, z_emb_top - 0.02), (ex, cy + hw_emb, z_emb_top - 0.02))
     objs.append(su.create_mesh_object(f"{prefix}_Emblem", bm_emb, palette["emblem_cges"], col, auto_uv=False))
 
     for fl_idx, key in ((2, "banner_3f"), (3, "banner_4f"), (4, "banner_5f")):
