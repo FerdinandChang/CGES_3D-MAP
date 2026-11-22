@@ -8,6 +8,7 @@ import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 import { DRACOLoader } from "three/addons/loaders/DRACOLoader.js";
 import { CSS2DRenderer, CSS2DObject } from "three/addons/renderers/CSS2DRenderer.js";
 import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
+import { computeCampusRoute, ROUTE_STARTS } from "./campus_routing.js";
 
 // Blender (X, Y, Z) -> Three.js (X, Z, -Y)
 const b2t = (x, y, z) => new THREE.Vector3(x, z, -y);
@@ -230,6 +231,12 @@ const state = {
   tourIndex: 0,
   tourTimer: null,
   searchQuery: "",
+  routeOpen: false,
+  routeStartId: "gate_main",
+  routeAccessible: false,
+  routeData: null,
+  routeFlyAlong: false,
+  routeFlyProgress: 0,
 };
 
 function updateCameraViewportOffset() {
@@ -272,6 +279,7 @@ controls.update();
 controls.addEventListener("start", () => {
   tweenPos = null;
   tweenTgt = null;
+  if (typeof stopRouteFlyAlong === "function") stopRouteFlyAlong();
 });
 
 // --- Data Hydration & Search Normalization ---
@@ -357,6 +365,144 @@ scene.add(roomLabelsGroup);
 let activeRoomPin = null;
 let activeRoomBox = null;
 let activeFloorBand = null;
+const activeRouteGroup = new THREE.Group();
+scene.add(activeRouteGroup);
+let routeCurve = null;
+let routePulseOrb = null;
+const routeWaypointLabels = [];
+
+function stopRouteFlyAlong() {
+  state.routeFlyAlong = false;
+  const btn = document.getElementById("btnRouteFlyAlong");
+  if (btn) {
+    btn.textContent = "▶ 沿線導航";
+    btn.classList.remove("active");
+  }
+}
+
+function clearRouteVisuals() {
+  stopRouteFlyAlong();
+  while (activeRouteGroup.children.length > 0) {
+    const child = activeRouteGroup.children[0];
+    child.geometry?.dispose();
+    child.material?.dispose();
+    activeRouteGroup.remove(child);
+  }
+  while (routeWaypointLabels.length > 0) {
+    const lbl = routeWaypointLabels.pop();
+    scene.remove(lbl);
+    lbl.element?.remove();
+  }
+  routeCurve = null;
+  routePulseOrb = null;
+}
+
+function renderActiveRoute(room, shouldOpenPanel = false) {
+  clearRouteVisuals();
+  if (!room) {
+    state.routeData = null;
+    document.getElementById("routePanel").hidden = true;
+    return;
+  }
+
+  const data = computeCampusRoute(room, state.routeStartId, state.routeAccessible);
+  state.routeData = data;
+  if (shouldOpenPanel) state.routeOpen = true;
+
+  const routeBtn = document.getElementById("btnRoomRoute");
+  if (routeBtn) routeBtn.classList.toggle("active", state.routeOpen);
+
+  const panel = document.getElementById("routePanel");
+  if (!state.routeOpen || !data) {
+    panel.hidden = true;
+    return;
+  }
+
+  panel.hidden = false;
+  document.getElementById("routeSummary").textContent = `約 ${data.totalMeters} 公尺 · 約 ${data.estMinutes} 分鐘`;
+  document.getElementById("btnRouteAccess").classList.toggle("active", state.routeAccessible);
+
+  const listEl = document.getElementById("routeStepsList");
+  listEl.innerHTML = "";
+  data.steps.forEach((step, idx) => {
+    const li = document.createElement("li");
+    li.className = "route-step-item";
+    li.innerHTML = `
+      <span class="route-step-num">${idx + 1}</span>
+      <div class="route-step-body">${step.icon} ${step.text}</div>
+      <span class="route-step-badge">${step.badge}</span>
+    `;
+    li.addEventListener("click", () => {
+      stopRouteFlyAlong();
+      document.querySelectorAll(".route-step-item").forEach((el) => el.classList.remove("active"));
+      li.classList.add("active");
+      const [sx, sy, sz] = step.pos;
+      flyTo([sx - 18, sy - 18, Math.max(8, sz + 11)], [sx, sy, sz]);
+    });
+    listEl.appendChild(li);
+  });
+
+  // Build 3D Glowing Route Tube + Moving Golden Orb + Waypoint Chips
+  if (data.points3D.length >= 2) {
+    const pts = data.points3D.map(([x, y, z]) => b2t(x, y, z));
+    routeCurve = new THREE.CurvePath();
+    for (let k = 0; k < pts.length - 1; k++) {
+      routeCurve.add(new THREE.LineCurve3(pts[k], pts[k + 1]));
+    }
+    const segCount = Math.max(24, pts.length * 10);
+    const tubeGeo = new THREE.TubeGeometry(routeCurve, segCount, 0.24, 8, false);
+    const tubeMat = new THREE.MeshBasicMaterial({ color: 0x22d3ee });
+    activeRouteGroup.add(new THREE.Mesh(tubeGeo, tubeMat));
+
+    const haloGeo = new THREE.TubeGeometry(routeCurve, segCount, 0.44, 8, false);
+    const haloMat = new THREE.MeshBasicMaterial({ color: 0x38bdf8, transparent: true, opacity: 0.24, depthWrite: false });
+    activeRouteGroup.add(new THREE.Mesh(haloGeo, haloMat));
+
+    const nodeGeo = new THREE.SphereGeometry(0.36, 10, 10);
+    const nodeMat = new THREE.MeshBasicMaterial({ color: 0xfde047 });
+    for (const p of pts) {
+      const m = new THREE.Mesh(nodeGeo.clone(), nodeMat.clone());
+      m.position.copy(p);
+      activeRouteGroup.add(m);
+    }
+
+    routePulseOrb = new THREE.Mesh(
+      new THREE.SphereGeometry(0.56, 14, 14),
+      new THREE.MeshBasicMaterial({ color: 0xfde047 })
+    );
+    routePulseOrb.position.copy(pts[0]);
+    activeRouteGroup.add(routePulseOrb);
+
+    for (const wp of data.waypoints) {
+      const el = document.createElement("div");
+      el.className = "label-route-wp";
+      el.textContent = wp.label;
+      const obj = new CSS2DObject(el);
+      obj.position.copy(b2t(...wp.pos));
+      scene.add(obj);
+      routeWaypointLabels.push(obj);
+    }
+    requestRender(12);
+  }
+}
+
+function flyToRouteOverview() {
+  if (!state.routeData || state.routeData.points3D.length < 2) return;
+  stopRouteFlyAlong();
+  const pts = state.routeData.points3D;
+  let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity, maxZ = 2;
+  for (const [x, y, z] of pts) {
+    if (x < minX) minX = x;
+    if (x > maxX) maxX = x;
+    if (y < minY) minY = y;
+    if (y > maxY) maxY = y;
+    if (z > maxZ) maxZ = z;
+  }
+  const cx = (minX + maxX) * 0.5;
+  const cy = (minY + maxY) * 0.5;
+  const span = Math.max(36, Math.hypot(maxX - minX, maxY - minY));
+  flyTo([cx - span * 0.62, cy - span * 0.62, Math.max(24, span * 0.58 + maxZ * 0.5)], [cx, cy, maxZ * 0.45]);
+}
 
 function clearGroupLabels(grp) {
   while (grp.children.length > 0) {
@@ -527,6 +673,8 @@ function clearRoomPin() {
   }
   state.activeRoomUid = null;
   document.getElementById("roomInspector").hidden = true;
+  clearRouteVisuals();
+  document.getElementById("routePanel").hidden = true;
 }
 
 function computeCameraForRoom(room, aerial = false) {
@@ -542,7 +690,7 @@ function computeCameraForRoom(room, aerial = false) {
   };
 }
 
-function focusRoomByUid(uid, keepFloorAll = false) {
+function focusRoomByUid(uid, keepFloorAll = false, openRoute = false) {
   const room = state.allRooms.find((r) => r.uid === uid);
   if (!room) return;
 
@@ -579,14 +727,19 @@ function focusRoomByUid(uid, keepFloorAll = false) {
   scene.add(pin);
   activeRoomPin = pin;
 
-  // Update Room Inspector Bar & URL Deep Link Hash
+  // Update Room Inspector Bar, 3D Wayfinding Route & URL Deep Link Hash
   updateRoomInspector(room);
+  renderActiveRoute(room, openRoute);
   refresh3DLabels();
   renderSidebar();
   syncUrlHash();
 
-  const { camPos, tgt } = computeCameraForRoom(room, false);
-  flyTo(camPos, tgt);
+  if (openRoute && state.routeData) {
+    flyToRouteOverview();
+  } else {
+    const { camPos, tgt } = computeCameraForRoom(room, false);
+    flyTo(camPos, tgt);
+  }
 }
 
 // --- URL Hash Deep Linking (#room=305 or #zone=Bldg_Wuquan&floor=3F) ---
@@ -841,9 +994,12 @@ function renderSidebar() {
           </div>
           <div class="sr-loc">${r.zone.shortName}・${r.stairs || cat.label}</div>
         </div>
-        <span class="sr-badge" style="border-left: 3px solid ${r.zone.color}">${r.floor}</span>
+        <div class="sr-right">
+          <span class="sr-badge" style="border-left: 3px solid ${r.zone.color}">${r.floor}</span>
+          <span class="sr-route-hint">🧭 看路線</span>
+        </div>
       `;
-      item.addEventListener("click", () => focusRoomByUid(r.uid, true));
+      item.addEventListener("click", () => focusRoomByUid(r.uid, true, true));
       container.appendChild(item);
     }
     return;
@@ -1113,9 +1269,63 @@ document.getElementById("btnRuler").addEventListener("click", (e) => {
 document.getElementById("btnClearRuler").addEventListener("click", clearRuler);
 document.querySelectorAll("[data-sun]").forEach((btn) => btn.addEventListener("click", () => applySun(btn.dataset.sun)));
 
-// Room Inspector Actions
+// Room Inspector & Wayfinding Route Panel Actions
 document.getElementById("btnRoomPrev").addEventListener("click", () => stepActiveRoom(-1));
 document.getElementById("btnRoomNext").addEventListener("click", () => stepActiveRoom(1));
+document.getElementById("btnRoomRoute").addEventListener("click", () => {
+  const room = state.allRooms.find((r) => r.uid === state.activeRoomUid);
+  if (!room) return;
+  state.routeOpen = !state.routeOpen;
+  renderActiveRoute(room, false);
+  if (state.routeOpen) flyToRouteOverview();
+});
+document.getElementById("btnCloseRoute").addEventListener("click", () => {
+  state.routeOpen = false;
+  clearRouteVisuals();
+  document.getElementById("routePanel").hidden = true;
+  document.getElementById("btnRoomRoute")?.classList.remove("active");
+});
+
+const routeStartSelect = document.getElementById("routeStartSelect");
+for (const st of ROUTE_STARTS) {
+  const opt = document.createElement("option");
+  opt.value = st.id;
+  opt.textContent = st.shortLabel;
+  routeStartSelect.appendChild(opt);
+}
+routeStartSelect.value = state.routeStartId;
+routeStartSelect.addEventListener("change", (e) => {
+  state.routeStartId = e.target.value;
+  const room = state.allRooms.find((r) => r.uid === state.activeRoomUid);
+  if (room) {
+    renderActiveRoute(room, true);
+    flyToRouteOverview();
+  }
+});
+
+document.getElementById("btnRouteAccess").addEventListener("click", () => {
+  state.routeAccessible = !state.routeAccessible;
+  const room = state.allRooms.find((r) => r.uid === state.activeRoomUid);
+  if (room) {
+    renderActiveRoute(room, true);
+    flyToRouteOverview();
+  }
+});
+document.getElementById("btnRouteOverview").addEventListener("click", flyToRouteOverview);
+document.getElementById("btnRouteFlyAlong").addEventListener("click", (e) => {
+  if (!routeCurve) return;
+  state.routeFlyAlong = !state.routeFlyAlong;
+  if (state.routeFlyAlong) {
+    state.routeFlyProgress = 0;
+    tweenPos = null;
+    tweenTgt = null;
+    e.currentTarget.textContent = "⏸ 暫停飛覽";
+    e.currentTarget.classList.add("active");
+    requestRender(20);
+  } else {
+    stopRouteFlyAlong();
+  }
+});
 document.getElementById("btnRoomViewToggle").addEventListener("click", () => {
   const room = state.allRooms.find((r) => r.uid === state.activeRoomUid);
   if (!room) return;
@@ -1318,6 +1528,33 @@ function animate() {
     const fill = activeRoomBox.children[0];
     if (fill?.material) fill.material.opacity = 0.18 + 0.1 * Math.sin(t * 4.0);
     needsDraw = true;
+  }
+  if (routeCurve && routePulseOrb) {
+    const len = routeCurve.getLength();
+    const duration = Math.max(4.5, len / 18.0);
+    const u = ((clock.getElapsedTime() % duration) / duration);
+    const pt = routeCurve.getPointAt(u);
+    routePulseOrb.position.copy(pt);
+    needsDraw = true;
+
+    if (state.routeFlyAlong) {
+      state.routeFlyProgress = Math.min(1, state.routeFlyProgress + 0.0042);
+      const uCam = state.routeFlyProgress;
+      const curP = routeCurve.getPointAt(uCam);
+      const aheadU = Math.min(1, uCam + 0.06);
+      const aheadP = routeCurve.getPointAt(aheadU);
+      const tan = aheadP.clone().sub(curP);
+      if (tan.lengthSq() < 0.01) tan.set(1, 0, 0);
+      tan.y = 0;
+      if (tan.lengthSq() < 0.001) tan.set(0, 0, -1);
+      tan.normalize();
+      const desiredPos = curP.clone().addScaledVector(tan, -14).add(new THREE.Vector3(0, 10.5, 0));
+      camera.position.lerp(desiredPos, 0.08);
+      controls.target.lerp(aheadP.clone().add(new THREE.Vector3(0, 0.8, 0)), 0.1);
+      if (state.routeFlyProgress >= 1) {
+        stopRouteFlyAlong();
+      }
+    }
   }
   if (tweenPos && tweenTgt) {
     camera.position.lerp(tweenPos, 0.085);

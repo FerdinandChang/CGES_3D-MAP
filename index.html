@@ -136,11 +136,35 @@
       <div class="ri-actions">
         <button class="btn btn-sm" id="btnRoomPrev" title="同層上一間">◀</button>
         <button class="btn btn-sm" id="btnRoomNext" title="同層下一間">▶</button>
+        <button class="btn btn-sm" id="btnRoomRoute" title="查看從校門前往此空間的詳細步行路線與 3D 動線">🧭 怎麼走</button>
         <button class="btn btn-sm" id="btnRoomViewToggle" title="切換近距平視／棟別鳥瞰">🦅 鳥瞰</button>
         <button class="btn btn-sm" id="btnRoomShare" title="複製此空間的 3D 深層分享連結">🔗 分享</button>
         <button class="icon-btn" id="btnCloseInspector" title="關閉定位">✕</button>
       </div>
     </div>
+
+    <!-- Turn-by-Turn Campus Wayfinding Drawer -->
+    <aside class="route-panel" id="routePanel" hidden aria-label="校園到達路線導引">
+      <div class="route-head">
+        <div class="route-head-left">
+          <span class="route-title">🧭 到達路線導引</span>
+          <span class="route-summary" id="routeSummary">計算中…</span>
+        </div>
+        <button class="icon-btn" id="btnCloseRoute" title="收合路線">✕</button>
+      </div>
+      <div class="route-controls">
+        <label class="route-start-wrap" title="切換出發校門起點">
+          <span>起點</span>
+          <select id="routeStartSelect" class="route-select"></select>
+        </label>
+        <button class="btn btn-sm" id="btnRouteAccess" title="優先經由廣和樓無障礙電梯與空中連廊（免爬樓梯）">♿ 無障礙</button>
+      </div>
+      <div class="route-cam-actions">
+        <button class="btn btn-sm" id="btnRouteOverview" title="調整鏡頭俯瞰整條到達動線">👁 全線視角</button>
+        <button class="btn btn-sm" id="btnRouteFlyAlong" title="第一人稱沿路線動畫飛往教室">▶ 沿線導航</button>
+      </div>
+      <ol class="route-steps" id="routeStepsList"></ol>
+    </aside>
 
     <!-- Bottom Guided Tour Narration Overlay -->
     <div class="tour-card" id="tourCard">

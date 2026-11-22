@@ -55,9 +55,9 @@ def main() -> int:
     assert glb_hash == meta["hash"], f"GLB hash mismatch: {glb_hash} != {meta['hash']}"
     assert glb_bytes < 8 * 1024 * 1024, f"Expected compressed GLB < 8MB, got {glb_bytes}"
 
-    # 4. Verify index.html, favicons & tour_app.js features (progress bar, deep-link share button, Single Source of Truth)
-    for icon_file in ("favicon.ico", "favicon.png", "apple-touch-icon.png"):
-        assert os.path.exists(os.path.join(ROOT, icon_file)), f"Missing {icon_file}"
+    # 4. Verify index.html, favicons, routing module & tour_app.js features
+    for req_file in ("favicon.ico", "favicon.png", "apple-touch-icon.png", "campus_routing.js"):
+        assert os.path.exists(os.path.join(ROOT, req_file)), f"Missing {req_file}"
 
     html = open(os.path.join(ROOT, "index.html"), encoding="utf-8").read()
     for required in (
@@ -72,12 +72,15 @@ def main() -> int:
         'id="statusBar"',
         'id="statusPct"',
         'id="btnRoomShare"',
+        'id="btnRoomRoute"',
+        'id="routePanel"',
     ):
         assert required in html, f"index.html missing required token: {required}"
 
     js = open(os.path.join(ROOT, "tour_app.js"), encoding="utf-8").read()
     assert "state.spec.zones" in js, "tour_app.js should load zones from state.spec.zones"
     assert "applyUrlHash" in js and "syncUrlHash" in js, "tour_app.js missing URL hash deep-linking functions"
+    assert "computeCampusRoute" in js, "tour_app.js missing computeCampusRoute integration"
 
     print(
         f"ALL_INTEGRITY_CHECKS_PASSED: {len(py_modules)} py modules compiled, "
