@@ -235,7 +235,7 @@ scene.fog = new THREE.FogExp2(0xd4e4f4, 0.00105);
 const camera = new THREE.PerspectiveCamera(40, window.innerWidth / window.innerHeight, 0.5, 1400);
 const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: "high-performance" });
 renderer.setSize(window.innerWidth, window.innerHeight);
-renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, window.innerWidth <= 900 ? 1.5 : 2));
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
 renderer.toneMappingExposure = 1.04;
 renderer.shadowMap.enabled = true;
@@ -344,6 +344,10 @@ function updateCameraViewportOffset() {
   const h = window.innerHeight;
   const sidebarEl = document.getElementById("sidebar");
   const isCollapsed = sidebarEl?.classList.contains("collapsed");
+  const collapseBtn = document.getElementById("btnCollapse");
+  const footerTip = document.querySelector(".footer-tip");
+  if (collapseBtn) collapseBtn.textContent = w <= 900 ? "▼" : "◀";
+  if (footerTip) footerTip.textContent = w <= 900 ? "單指旋轉・雙指平移與縮放" : "左鍵旋轉・右鍵平移・滾輪縮放";
   if (w > 900 && !isCollapsed) {
     // Shift projection center right by half the sidebar width so 3D campus & room pins stay centered in open canvas!
     camera.setViewOffset(w, h, -190, 0, w, h);
@@ -1193,10 +1197,13 @@ document.getElementById("btnTourPlayPause").addEventListener("click", (e) => {
   scheduleNextTourStop();
 });
 
-// Official 115 Classroom Layout Modal
+// Official 115 Classroom Layout Modal (On-Demand Lazy Load saves 325KB on initial boot!)
 const mapModal = document.getElementById("mapModal");
 const mapModalImg = document.getElementById("mapModalImg");
 const openMapModal = () => {
+  if (!mapModalImg.getAttribute("src") && mapModalImg.dataset.src) {
+    mapModalImg.src = mapModalImg.dataset.src;
+  }
   mapModal.hidden = false;
   mapModalImg.classList.remove("zoomed");
 };

@@ -4,7 +4,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 const ROOT = path.dirname(fileURLToPath(import.meta.url));
-const THREE_ROOT = path.resolve(ROOT, "..", "blender_lab", "node_modules", "three");
+const THREE_ROOT = path.resolve(ROOT, "vendor", "three");
 const PORT = Number(process.env.PORT || 8777);
 
 const MIME = {
@@ -23,7 +23,7 @@ const MIME = {
 const server = http.createServer((req, res) => {
   const url = new URL(req.url || "/", `http://localhost:${PORT}`);
   let p = decodeURIComponent(url.pathname);
-  if (p === "/") p = "/preview.html";
+  if (p === "/" || p === "/preview.html") p = "/index.html";
 
   let fullPath;
   if (p.startsWith("/three/")) {
