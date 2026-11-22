@@ -1389,12 +1389,90 @@ body {
   border-color: var(--accent);
 }
 
+.icon-btn:disabled {
+  opacity: 0.36;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+.recent-bar {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  padding-top: 2px;
+}
+
+.recent-bar::-webkit-scrollbar {
+  display: none;
+}
+
+.recent-label {
+  font-size: 10.5px;
+  color: var(--text-muted);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.recent-chip {
+  border: 1px solid rgba(148, 163, 184, 0.25);
+  background: rgba(30, 41, 59, 0.72);
+  color: #e2e8f0;
+  border-radius: 999px;
+  padding: 2px 8px;
+  font-size: 10.5px;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+  white-space: nowrap;
+  flex-shrink: 0;
+  transition: all 0.14s ease;
+}
+
+.recent-chip:hover {
+  background: rgba(2, 132, 199, 0.35);
+  border-color: var(--accent);
+  color: #fff;
+}
+
 .route-cam-actions {
   padding: 0 12px 8px;
   border-bottom: 1px solid var(--border-subtle);
   display: grid;
   grid-template-columns: repeat(2, 1fr);
   gap: 6px;
+}
+
+.route-fly-bar {
+  padding: 6px 12px;
+  border-bottom: 1px solid var(--border-subtle);
+  background: rgba(2, 132, 199, 0.14);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.fly-pct {
+  font-size: 11px;
+  font-weight: 800;
+  color: #7dd3fc;
+  min-width: 32px;
+  font-variant-numeric: tabular-nums;
+}
+
+.fly-slider {
+  flex: 1;
+  min-width: 0;
+  accent-color: #38bdf8;
+  cursor: pointer;
+  height: 5px;
+}
+
+.fly-speed-btn {
+  margin-left: 0;
+  min-width: 36px;
+  font-weight: 800;
 }
 
 .route-steps {

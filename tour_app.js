@@ -9,6 +9,7 @@ import { DRACOLoader } from "three/addons/loaders/DRACOLoader.js";
 import { CSS2DRenderer, CSS2DObject } from "three/addons/renderers/CSS2DRenderer.js";
 import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
 import { computeCampusRoute, ROUTE_STARTS } from "./campus_routing.js";
+import { applyDynamicRoomPlaques } from "./dynamic_plaques.js";
 
 // Blender (X, Y, Z) -> Three.js (X, Z, -Y)
 const b2t = (x, y, z) => new THREE.Vector3(x, z, -y);
@@ -138,9 +139,17 @@ renderer.shadowMap.autoUpdate = false;
 renderer.localClippingEnabled = true;
 wrap.appendChild(renderer.domElement);
 
-// Horizontal Floor Cutaway Plane (clips Y > constant in Three.js world space)
-const floorClipPlane = new THREE.Plane(new THREE.Vector3(0, -1, 0), 999);
-const clippedMatCache = new WeakMap();
+// Per-Building Horizontal Floor Cutaway Planes (clips Y > constant in Three.js world space)
+const CLIP_PLANES = {
+  Bldg_Guanghe: new THREE.Plane(new THREE.Vector3(0, -1, 0), 999),
+  Bldg_Heping: new THREE.Plane(new THREE.Vector3(0, -1, 0), 999),
+  Bldg_Wuquan: new THREE.Plane(new THREE.Vector3(0, -1, 0), 999),
+  Bldg_Chongqing: new THREE.Plane(new THREE.Vector3(0, -1, 0), 999),
+  Bldg_Gym_Skybridge: new THREE.Plane(new THREE.Vector3(0, -1, 0), 999),
+  Campus_Shared: new THREE.Plane(new THREE.Vector3(0, -1, 0), 999),
+};
+const floorClipPlane = CLIP_PLANES.Campus_Shared;
+const clippedMatCacheByGroup = new Map();
 
 let renderFramesLeft = 16;
 function requestRender(frames = 6) {
@@ -243,11 +252,13 @@ const state = {
   autoSliceRoute: true,
   sliceTargetZ: null,
   sliceCurrentZ: 999,
+  sliceActiveZones: null, // null = all buildings, or array of zoneIds to slice selectively
   sliceLabel: "",
   routeData: null,
   activeRouteStepIdx: -1,
   routeFlyAlong: false,
   routeFlyProgress: 0,
+  routeFlySpeed: 1,
 };
 
 function isMobileViewport() {
@@ -342,22 +353,85 @@ controls.addEventListener("start", () => {
   if (typeof stopRouteFlyAlong === "function") stopRouteFlyAlong();
 });
 
-// --- Data Hydration & Search Normalization ---
+// --- Data Hydration, Search Normalization & Recent History ---
+const RECENT_STORAGE_KEY = "cges_3d_recent_rooms_v1";
+const CN_NUMS = ["零", "一", "二", "三", "四", "五", "六", "七", "八", "九", "十", "十一", "十二"];
+
+function loadRecentRooms() {
+  try {
+    const raw = localStorage.getItem(RECENT_STORAGE_KEY);
+    const arr = JSON.parse(raw || "[]");
+    return Array.isArray(arr) ? arr.slice(0, 5) : [];
+  } catch (_) {
+    return [];
+  }
+}
+
+function recordRecentRoom(room) {
+  if (!room) return;
+  const slug = getRoomSlug(room);
+  const label = room.short || room.name;
+  const list = loadRecentRooms().filter((x) => x.slug !== slug);
+  list.unshift({ slug, label });
+  try {
+    localStorage.setItem(RECENT_STORAGE_KEY, JSON.stringify(list.slice(0, 5)));
+  } catch (_) {
+    // ignore storage quota errors
+  }
+  renderRecentSearchBar();
+}
+
+function renderRecentSearchBar() {
+  const bar = document.getElementById("recentSearchBar");
+  if (!bar) return;
+  const list = loadRecentRooms();
+  if (list.length === 0 || state.searchQuery.trim().length > 0) {
+    bar.hidden = true;
+    return;
+  }
+  bar.hidden = false;
+  bar.innerHTML = `<span class="recent-label">最近：</span>`;
+  for (const item of list) {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "recent-chip";
+    btn.textContent = item.label;
+    btn.addEventListener("click", () => {
+      const target = findRoomBySlug(item.slug);
+      if (target) focusRoomByUid(target.uid, true, true);
+    });
+    bar.appendChild(btn);
+  }
+}
+
 function buildSearchHaystack(room, zone) {
   const alias = [];
   const full = `${room.code} ${room.name} ${room.short}`;
-  // Allow shorthand queries like "六6" / "6年6班" / "6-6" / "保健室" (avoid 3-digit room-number collisions like "305"!)
+  // Allow shorthand & Chinese/Arabic digit queries: "六6", "六六", "六年六班", "6年6班", "6-6", "606"
   const mGrade = room.name.match(/^([一二三四五六])年(\d+)班/);
   if (mGrade) {
     const gMap = { 一: "1", 二: "2", 三: "3", 四: "4", 五: "5", 六: "6" };
     const gn = gMap[mGrade[1]];
-    alias.push(`${mGrade[1]}${mGrade[2]}`, `${gn}年${mGrade[2]}班`, `${gn}-${mGrade[2]}`);
+    const clsNum = parseInt(mGrade[2], 10);
+    const clsCn = CN_NUMS[clsNum] || mGrade[2];
+    alias.push(
+      `${mGrade[1]}${mGrade[2]}`,
+      `${mGrade[1]}${clsCn}`,
+      `${mGrade[1]}年${clsCn}班`,
+      `${gn}年${mGrade[2]}班`,
+      `${gn}-${mGrade[2]}`,
+      `${gn}${String(clsNum).padStart(2, "0")}`
+    );
   }
-  if (room.name.includes("健康中心")) alias.push("保健室", "醫護室", "護理師");
-  if (room.name.includes("圖書室")) alias.push("圖書館", "閱讀");
+  if (room.name.includes("健康中心")) alias.push("保健室", "醫護室", "護理師", "護士", "aed");
+  if (room.name.includes("圖書室")) alias.push("圖書館", "閱讀", "library");
   if (room.name.includes("天橋")) alias.push("空橋", "海豚");
-  if (room.name.includes("司令台")) alias.push("升旗台", "講台");
-  if (room.name.includes("廁")) alias.push("洗手間", "廁所", "wc");
+  if (room.name.includes("司令台")) alias.push("升旗台", "講台", "操場");
+  if (room.name.includes("廁")) alias.push("洗手間", "廁所", "wc", "馬桶");
+  if (room.name.includes("游泳")) alias.push("泳池", "游泳", "溫水池");
+  if (room.name.includes("穿堂")) alias.push("大廳", "玄關");
+  if (room.stairs?.includes("電梯")) alias.push("電梯", "無障礙", "輪椅");
+  if (room.name.includes("視聽")) alias.push("演藝廳", "禮堂", "會議");
   const catLabel = CAT_META[room.cat]?.label || "";
   return `${full} ${room.floor} ${room.stairs} ${zone.name} ${zone.shortName} ${catLabel} ${alias.join(" ")}`.toLowerCase();
 }
@@ -429,22 +503,79 @@ const activeRouteGroup = new THREE.Group();
 scene.add(activeRouteGroup);
 let routeCurve = null;
 let routePulseOrb = null;
+let routeFlowTex = null;
 const routeWaypointLabels = [];
 
-function isSliceableBuildingMesh(name) {
-  return (
-    name.startsWith("Bldg_") ||
-    name.startsWith("Campus_") ||
-    name.startsWith("Landmark_CornerTowers") ||
+function createRouteFlowTexture() {
+  const c = document.createElement("canvas");
+  c.width = 128;
+  c.height = 64;
+  const ctx = c.getContext("2d");
+  if (!ctx) return null;
+  ctx.fillStyle = "#0891b2";
+  ctx.fillRect(0, 0, 128, 64);
+
+  // Subtle glowing core rail
+  ctx.fillStyle = "#22d3ee";
+  ctx.fillRect(0, 10, 128, 44);
+
+  // Crisp bright forward-pointing chevron arrows (direction along tube UV.x)
+  ctx.fillStyle = "#f0fdfa";
+  for (const ox of [16, 80]) {
+    ctx.beginPath();
+    ctx.moveTo(ox, 12);
+    ctx.lineTo(ox + 26, 32);
+    ctx.lineTo(ox, 52);
+    ctx.lineTo(ox + 13, 52);
+    ctx.lineTo(ox + 39, 32);
+    ctx.lineTo(ox + 13, 12);
+    ctx.closePath();
+    ctx.fill();
+  }
+  const tex = new THREE.CanvasTexture(c);
+  tex.wrapS = THREE.RepeatWrapping;
+  tex.wrapT = THREE.RepeatWrapping;
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.needsUpdate = true;
+  return tex;
+}
+
+function getClipGroupForMeshName(name) {
+  if (!name) return null;
+  if (name.startsWith("Bldg_Guanghe") || name.startsWith("Landmark_Guanghe")) return "Bldg_Guanghe";
+  if (name.startsWith("Bldg_Heping") || name.startsWith("Landmark_HepingNorth")) return "Bldg_Heping";
+  if (name.startsWith("Bldg_Wuquan") || name.startsWith("Landmark_WuquanB1") || name.startsWith("Landmark_CornerTowers")) return "Bldg_Wuquan";
+  if (
+    name.startsWith("Bldg_Chongqing") ||
     name.startsWith("Landmark_SouthCorner") ||
-    name.startsWith("Landmark_Skybridge") ||
-    name.startsWith("Landmark_Guanghe") ||
-    name.startsWith("Landmark_HepingNorth") ||
-    name.startsWith("Landmark_WuquanB1") ||
     name.startsWith("Landmark_SWPortal") ||
     name.startsWith("Landmark_FrontGreenCanopies") ||
     name.startsWith("Landmark_SouthArchedCanopy")
-  );
+  ) {
+    return "Bldg_Chongqing";
+  }
+  if (name.startsWith("Bldg_Gym") || name.startsWith("Landmark_Skybridge")) return "Bldg_Gym_Skybridge";
+  if (name.startsWith("Campus_")) return "Campus_Shared";
+  return null;
+}
+
+function applySlicePlanes(currentZ) {
+  const activeSet = Array.isArray(state.sliceActiveZones) && state.sliceActiveZones.length > 0 ? new Set(state.sliceActiveZones) : null;
+  for (const [groupKey, plane] of Object.entries(CLIP_PLANES)) {
+    if (currentZ >= 900) {
+      plane.constant = 999;
+    } else if (groupKey === "Campus_Shared" || !activeSet || activeSet.has(groupKey)) {
+      plane.constant = currentZ;
+    } else {
+      plane.constant = 999;
+    }
+  }
+}
+
+function isZoneCurrentlySliced(zoneId) {
+  if (state.sliceTargetZ === null) return false;
+  if (!Array.isArray(state.sliceActiveZones) || state.sliceActiveZones.length === 0) return true;
+  return state.sliceActiveZones.includes(zoneId);
 }
 
 function getFloorSliceZ(zoneId, floorInput) {
@@ -465,14 +596,21 @@ function getFloorSliceZ(zoneId, floorInput) {
   return 3.6 + (f - 1) * 3.4 - 0.35;
 }
 
-function updateSliceCutaway(sliceZ, labelText = "", immediate = false) {
-  const changed = state.sliceTargetZ !== sliceZ;
+function updateSliceCutaway(sliceZ, labelText = "", immediate = false, activeZones = null) {
+  const prevZonesKey = Array.isArray(state.sliceActiveZones) ? state.sliceActiveZones.join(",") : "";
+  const nextZones = Array.isArray(activeZones) && activeZones.length > 0 ? activeZones : null;
+  const nextZonesKey = nextZones ? nextZones.join(",") : "";
+  const changed = state.sliceTargetZ !== sliceZ || prevZonesKey !== nextZonesKey;
+
   state.sliceTargetZ = sliceZ;
+  state.sliceActiveZones = nextZones;
   state.sliceLabel = labelText;
+
   if (immediate || sliceZ === null) {
     state.sliceCurrentZ = sliceZ === null ? 999 : sliceZ;
-    floorClipPlane.constant = state.sliceCurrentZ;
   }
+  applySlicePlanes(state.sliceCurrentZ);
+
   const statusEl = document.getElementById("sliceStatus");
   const xrayBtn = document.getElementById("btnXray");
   const isSliced = sliceZ !== null;
@@ -516,6 +654,58 @@ function setSidebarTab(tab, ensureOpen = false) {
   }
 }
 
+function updateFlySliderUI(u) {
+  const slider = document.getElementById("routeFlySlider");
+  const pctEl = document.getElementById("routeFlyPct");
+  if (slider) slider.value = String(Math.round(u * 1000));
+  if (pctEl) pctEl.textContent = `${Math.round(u * 100)}%`;
+}
+
+function applyFlyCameraAtProgress(uCam, snap = false) {
+  if (!routeCurve) return;
+  const curP = routeCurve.getPointAt(uCam);
+  const aheadU = Math.min(1, uCam + 0.055);
+  const aheadP = routeCurve.getPointAt(aheadU);
+
+  // Dynamically adjust building cutaway as the walk climbs stairs & enters target floor corridor
+  if (state.autoSliceRoute && state.routeData?.buildingsVisited?.length) {
+    const walkZ = curP.y; // Three.js Y === Blender Z
+    if (walkZ > 1.05 || uCam > 0.22) {
+      const liveSlice = Math.max(3.6, walkZ + 2.75);
+      state.sliceTargetZ = liveSlice;
+      state.sliceActiveZones = state.routeData.buildingsVisited;
+      state.sliceCurrentZ = snap ? liveSlice : state.sliceCurrentZ + (liveSlice - state.sliceCurrentZ) * 0.14;
+      applySlicePlanes(state.sliceCurrentZ);
+    }
+  }
+
+  const tan = aheadP.clone().sub(curP);
+  if (tan.lengthSq() < 0.01) tan.set(1, 0, 0);
+  tan.y = 0;
+  if (tan.lengthSq() < 0.001) tan.set(0, 0, -1);
+  tan.normalize();
+
+  const inCorridor = curP.y > 1.05;
+  const backDist = inCorridor ? 7.2 : 11.5;
+  const upHeight = inCorridor ? 4.1 : 6.0;
+  const desiredPos = curP.clone().addScaledVector(tan, -backDist).add(new THREE.Vector3(0, upHeight, 0));
+  const desiredTgt = aheadP.clone().add(new THREE.Vector3(0, 0.5, 0));
+  if (snap) {
+    camera.position.copy(desiredPos);
+    controls.target.copy(desiredTgt);
+  } else {
+    camera.position.lerp(desiredPos, 0.085);
+    controls.target.lerp(desiredTgt, 0.12);
+  }
+  updateFlySliderUI(uCam);
+  requestRender(4);
+}
+
+function resolveStartSpec(startId) {
+  if (!startId || ROUTE_STARTS.some((s) => s.id === startId)) return startId || "gate_main";
+  return state.allRooms.find((r) => r.uid === startId) || "gate_main";
+}
+
 function stopRouteFlyAlong() {
   state.routeFlyAlong = false;
   const btn = document.getElementById("btnRouteFlyAlong");
@@ -527,9 +717,14 @@ function stopRouteFlyAlong() {
 
 function clearRouteVisuals() {
   stopRouteFlyAlong();
+  const flyBar = document.getElementById("routeFlyBar");
+  if (flyBar) flyBar.hidden = true;
   while (activeRouteGroup.children.length > 0) {
     const child = activeRouteGroup.children[0];
     child.geometry?.dispose();
+    if (child.material?.map && child.material.map !== routeFlowTex) {
+      child.material.map.dispose();
+    }
     child.material?.dispose();
     activeRouteGroup.remove(child);
   }
@@ -557,7 +752,8 @@ function selectRouteStep(idx, collapseSheetOnMobile = false) {
   const [dx, dy] = step.dir || [1, 0];
   if (state.autoSliceRoute && step.indoor && step.zoneId && step.zoneId !== "Zone_Outdoor") {
     const sSlice = getFloorSliceZ(step.zoneId, step.floor);
-    updateSliceCutaway(sSlice, `${step.floor}F 走廊`);
+    const zShort = ZONE_META.find((z) => z.id === step.zoneId)?.shortName || "";
+    updateSliceCutaway(sSlice, `${zShort} ${step.floor}F 走廊`.trim(), false, [step.zoneId]);
   } else if (!state.autoSliceRoute || !step.indoor) {
     if (!state.xrayOn) updateSliceCutaway(null, "");
   }
@@ -590,7 +786,8 @@ function renderActiveRoute(room, shouldOpenPanel = false) {
     return;
   }
 
-  const data = computeCampusRoute(room, state.routeStartId, state.routeAccessible);
+  const startSpec = resolveStartSpec(state.routeStartId);
+  const data = computeCampusRoute(room, startSpec, state.routeAccessible);
   state.routeData = data;
   if (shouldOpenPanel) {
     state.routeOpen = true;
@@ -614,6 +811,9 @@ function renderActiveRoute(room, shouldOpenPanel = false) {
     badgeEl.textContent = `${room.floor} · ${data.totalMeters}m`;
   }
 
+  const swapBtn = document.getElementById("btnRouteSwap");
+  if (swapBtn) swapBtn.disabled = !data.startIsRoom;
+
   const destMetaEl = document.getElementById("routeDestMeta");
   const destNameEl = document.getElementById("routeDestName");
   if (destMetaEl) destMetaEl.textContent = `${room.zone.shortName}・${room.floor}${state.routeAccessible ? "・♿ 無障礙優先" : ""}`;
@@ -625,7 +825,8 @@ function renderActiveRoute(room, shouldOpenPanel = false) {
 
   if (state.autoSliceRoute && data.destZoneId && data.destZoneId !== "Zone_Outdoor") {
     const destSlice = getFloorSliceZ(data.destZoneId, data.destFloor);
-    updateSliceCutaway(destSlice, `${room.zone.shortName} ${room.floor} 走廊`);
+    const sliceZones = data.buildingsVisited?.length ? data.buildingsVisited : [data.destZoneId];
+    updateSliceCutaway(destSlice, `${room.zone.shortName} ${room.floor} 走廊`, false, sliceZones);
   } else if (!state.xrayOn) {
     updateSliceCutaway(null, "");
   }
@@ -646,23 +847,33 @@ function renderActiveRoute(room, shouldOpenPanel = false) {
   });
   syncMobileHudState();
 
-  // Build 3D Glowing Route Tube + Moving Golden Orb + Waypoint Chips
+  // Build 3D Animated Chevron Route Tube + Outer Halo + Moving Golden Orb + Waypoint Chips
   if (data.points3D.length >= 2) {
     const pts = data.points3D.map(([x, y, z]) => b2t(x, y, z));
     routeCurve = new THREE.CurvePath();
     for (let k = 0; k < pts.length - 1; k++) {
       routeCurve.add(new THREE.LineCurve3(pts[k], pts[k + 1]));
     }
-    const segCount = Math.max(24, pts.length * 10);
-    const tubeGeo = new THREE.TubeGeometry(routeCurve, segCount, 0.24, 8, false);
-    const tubeMat = new THREE.MeshBasicMaterial({ color: 0x22d3ee });
+    const totalLen = routeCurve.getLength();
+    const segCount = Math.max(36, Math.round(totalLen * 1.4));
+
+    if (!routeFlowTex) routeFlowTex = createRouteFlowTexture();
+    if (routeFlowTex) {
+      routeFlowTex.repeat.set(Math.max(6, Math.round(totalLen / 2.2)), 1);
+    }
+
+    const tubeGeo = new THREE.TubeGeometry(routeCurve, segCount, 0.27, 8, false);
+    const tubeMat = new THREE.MeshBasicMaterial({
+      color: 0xffffff,
+      map: routeFlowTex || null,
+    });
     activeRouteGroup.add(new THREE.Mesh(tubeGeo, tubeMat));
 
-    const haloGeo = new THREE.TubeGeometry(routeCurve, segCount, 0.44, 8, false);
-    const haloMat = new THREE.MeshBasicMaterial({ color: 0x38bdf8, transparent: true, opacity: 0.24, depthWrite: false });
+    const haloGeo = new THREE.TubeGeometry(routeCurve, segCount, 0.46, 8, false);
+    const haloMat = new THREE.MeshBasicMaterial({ color: 0x38bdf8, transparent: true, opacity: 0.2, depthWrite: false });
     activeRouteGroup.add(new THREE.Mesh(haloGeo, haloMat));
 
-    const nodeGeo = new THREE.SphereGeometry(0.36, 10, 10);
+    const nodeGeo = new THREE.SphereGeometry(0.35, 10, 10);
     const nodeMat = new THREE.MeshBasicMaterial({ color: 0xfde047 });
     for (const p of pts) {
       const m = new THREE.Mesh(nodeGeo.clone(), nodeMat.clone());
@@ -686,6 +897,7 @@ function renderActiveRoute(room, shouldOpenPanel = false) {
       scene.add(obj);
       routeWaypointLabels.push(obj);
     }
+    updateFlySliderUI(0);
     requestRender(12);
   }
 }
@@ -695,7 +907,8 @@ function flyToRouteOverview() {
   stopRouteFlyAlong();
   if (state.autoSliceRoute && state.routeData.destZoneId && state.routeData.destZoneId !== "Zone_Outdoor") {
     const destSlice = getFloorSliceZ(state.routeData.destZoneId, state.routeData.destFloor);
-    updateSliceCutaway(destSlice, `${state.routeData.destFloor}F 走廊`);
+    const sliceZones = state.routeData.buildingsVisited?.length ? state.routeData.buildingsVisited : [state.routeData.destZoneId];
+    updateSliceCutaway(destSlice, `${state.routeData.destFloor}F 走廊`, false, sliceZones);
   }
   const pts = state.routeData.points3D;
   let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity, maxZ = 2;
@@ -833,7 +1046,7 @@ function refresh3DLabels() {
 
   for (const r of roomsToShow) {
     if (r.uid === state.activeRoomUid) continue; // Active room gets its own elevated golden pin
-    if (state.sliceTargetZ !== null && r.pos[2] > state.sliceTargetZ + 0.5) continue; // Hide 3D labels above cutaway floor
+    if (isZoneCurrentlySliced(r.zoneId) && r.pos[2] > state.sliceTargetZ + 0.5) continue; // Hide 3D labels above cutaway floor in sliced building
     const el = document.createElement("div");
     el.className = `label-room-chip ${compact ? "compact" : ""}`;
     const catCol = CAT_META[r.cat]?.color || "#38bdf8";
@@ -946,7 +1159,8 @@ function focusRoomByUid(uid, keepFloorAll = false, openRoute = false) {
   scene.add(pin);
   activeRoomPin = pin;
 
-  // Update Room Inspector Bar, 3D Wayfinding Route & URL Deep Link Hash
+  // Update Room Inspector Bar, 3D Wayfinding Route, Recent History & URL Deep Link Hash
+  recordRecentRoom(room);
   updateRoomInspector(room);
   renderActiveRoute(room, openRoute);
   applyVisualModes();
@@ -981,6 +1195,12 @@ function findRoomBySlug(query) {
   );
 }
 
+function getStartSlug(startId) {
+  if (!startId || ROUTE_STARTS.some((s) => s.id === startId)) return startId || "gate_main";
+  const r = state.allRooms.find((item) => item.uid === startId);
+  return r ? getRoomSlug(r) : "gate_main";
+}
+
 function syncUrlHash() {
   if (suppressHashSync) return;
   let newHash = "";
@@ -988,7 +1208,8 @@ function syncUrlHash() {
     const r = state.allRooms.find((item) => item.uid === state.activeRoomUid);
     if (r) {
       if (state.routeOpen) {
-        newHash = `#route=${encodeURIComponent(getRoomSlug(r))}&from=${encodeURIComponent(state.routeStartId)}&acc=${state.routeAccessible ? 1 : 0}`;
+        const fromSlug = getStartSlug(state.routeStartId);
+        newHash = `#route=${encodeURIComponent(getRoomSlug(r))}&from=${encodeURIComponent(fromSlug)}&acc=${state.routeAccessible ? 1 : 0}`;
       } else {
         newHash = `#room=${encodeURIComponent(getRoomSlug(r))}`;
       }
@@ -1021,10 +1242,15 @@ function applyUrlHash() {
     if (routeQuery || roomQuery) {
       const isRouteLink = Boolean(routeQuery);
       if (isRouteLink) {
-        if (fromQuery && ROUTE_STARTS.some((s) => s.id === fromQuery)) {
-          state.routeStartId = fromQuery;
+        if (fromQuery) {
+          if (ROUTE_STARTS.some((s) => s.id === fromQuery)) {
+            state.routeStartId = fromQuery;
+          } else {
+            const fromRoom = findRoomBySlug(fromQuery);
+            if (fromRoom) state.routeStartId = fromRoom.uid;
+          }
           const sel = document.getElementById("routeStartSelect");
-          if (sel) sel.value = fromQuery;
+          if (sel) sel.value = state.routeStartId;
         }
         if (accQuery === "1" || accQuery === "true") {
           state.routeAccessible = true;
@@ -1431,10 +1657,43 @@ function stopTour() {
   syncMobileHudState();
 }
 
-// --- Pointer Raycasting (Click 3D Building / Ruler) ---
+// --- Pointer Raycasting (Click 3D Classroom / Building / Ruler) ---
 const raycaster = new THREE.Raycaster();
 const pointer = new THREE.Vector2();
+const _roomBoxTmp = new THREE.Box3();
+const _roomHitTmp = new THREE.Vector3();
 let downPos = { x: 0, y: 0 };
+
+function pickRoomByRay(ray) {
+  let bestRoom = null;
+  let bestDist = Infinity;
+  const camDistToTarget = camera.position.distanceTo(controls.target);
+  const allowDirectRoomPick = Boolean(state.selectedZoneId || state.sliceTargetZ !== null || state.routeOpen || camDistToTarget < 115);
+  if (!allowDirectRoomPick) return null;
+
+  for (const r of state.allRooms) {
+    if (!r.pos || r.zoneId === "Zone_Outdoor") continue;
+    if (state.selectedZoneId && !state.routeOpen && r.zoneId !== state.selectedZoneId) continue;
+    if (state.selectedFloor !== "ALL" && !state.routeOpen && r.floor !== state.selectedFloor) continue;
+    // Skip rooms sliced away above the active cutaway plane
+    if (isZoneCurrentlySliced(r.zoneId) && r.pos[2] > state.sliceTargetZ + 0.5) continue;
+
+    const [rx, ry, rz] = r.pos;
+    const [sx, sy, sz] = r.size || [5.2, 4.6, 3.1];
+    const center = b2t(rx, ry, rz);
+    const half = new THREE.Vector3(sx * 0.5 + 0.35, sz * 0.5 + 0.2, sy * 0.5 + 0.35);
+    _roomBoxTmp.min.copy(center).sub(half);
+    _roomBoxTmp.max.copy(center).add(half);
+    if (ray.intersectBox(_roomBoxTmp, _roomHitTmp)) {
+      const d = ray.origin.distanceTo(_roomHitTmp);
+      if (d < bestDist) {
+        bestDist = d;
+        bestRoom = r;
+      }
+    }
+  }
+  return bestRoom;
+}
 
 renderer.domElement.addEventListener("pointerdown", (e) => {
   downPos = { x: e.clientX, y: e.clientY };
@@ -1453,6 +1712,13 @@ renderer.domElement.addEventListener("pointerup", (e) => {
     if (hits.length > 0) addRulerPoint(hits[0].point);
     return;
   }
+  // 1. Prioritize direct single-room selection when zoomed in / viewing a building / floor cutaway
+  const pickedRoom = pickRoomByRay(raycaster.ray);
+  if (pickedRoom) {
+    focusRoomByUid(pickedRoom.uid, true, false);
+    return;
+  }
+  // 2. Fallback to building-level selection
   if (hits.length > 0) {
     const z = getZoneForMeshName(hits[0].object.name);
     if (z) {
@@ -1551,6 +1817,7 @@ const clearSearchBtn = document.getElementById("btnClearSearch");
 searchInput.addEventListener("input", (e) => {
   state.searchQuery = e.target.value;
   clearSearchBtn.hidden = state.searchQuery.length === 0;
+  renderRecentSearchBar();
   refresh3DLabels();
   renderSidebar();
 });
@@ -1559,6 +1826,7 @@ clearSearchBtn.addEventListener("click", () => {
   state.searchQuery = "";
   searchInput.value = "";
   clearSearchBtn.hidden = true;
+  renderRecentSearchBar();
   refresh3DLabels();
   renderSidebar();
   searchInput.focus();
@@ -1673,13 +1941,37 @@ document.querySelectorAll("[data-quick-room]").forEach((btn) => {
 });
 
 const routeStartSelect = document.getElementById("routeStartSelect");
-for (const st of ROUTE_STARTS) {
-  const opt = document.createElement("option");
-  opt.value = st.id;
-  opt.textContent = st.shortLabel;
-  routeStartSelect.appendChild(opt);
+
+function populateRouteStartOptions() {
+  if (!routeStartSelect) return;
+  routeStartSelect.innerHTML = "";
+
+  const gateGrp = document.createElement("optgroup");
+  gateGrp.label = "🚪 校園主要出入口";
+  for (const st of ROUTE_STARTS) {
+    const opt = document.createElement("option");
+    opt.value = st.id;
+    opt.textContent = st.shortLabel;
+    gateGrp.appendChild(opt);
+  }
+  routeStartSelect.appendChild(gateGrp);
+
+  for (const z of ZONE_META) {
+    const zRooms = state.allRooms.filter((r) => r.zoneId === z.id);
+    if (zRooms.length === 0) continue;
+    const grp = document.createElement("optgroup");
+    grp.label = `🏫 ${z.shortName}（${zRooms.length}）`;
+    for (const r of zRooms) {
+      const opt = document.createElement("option");
+      opt.value = r.uid;
+      opt.textContent = `${r.floor} · ${r.short}`;
+      grp.appendChild(opt);
+    }
+    routeStartSelect.appendChild(grp);
+  }
+  routeStartSelect.value = state.routeStartId;
 }
-routeStartSelect.value = state.routeStartId;
+
 routeStartSelect.addEventListener("change", (e) => {
   state.routeStartId = e.target.value;
   const room = state.allRooms.find((r) => r.uid === state.activeRoomUid);
@@ -1688,6 +1980,15 @@ routeStartSelect.addEventListener("change", (e) => {
     flyToRouteOverview();
     syncUrlHash();
   }
+});
+
+document.getElementById("btnRouteSwap")?.addEventListener("click", () => {
+  const destRoom = state.allRooms.find((r) => r.uid === state.activeRoomUid);
+  const startRoom = state.allRooms.find((r) => r.uid === state.routeStartId);
+  if (!destRoom || !startRoom) return;
+  state.routeStartId = destRoom.uid;
+  if (routeStartSelect) routeStartSelect.value = state.routeStartId;
+  focusRoomByUid(startRoom.uid, true, true);
 });
 
 document.getElementById("btnRouteAccess").addEventListener("click", () => {
@@ -1704,7 +2005,8 @@ document.getElementById("btnRouteSliceAuto")?.addEventListener("click", (e) => {
   e.currentTarget.classList.toggle("active", state.autoSliceRoute);
   if (state.autoSliceRoute && state.routeData?.destZoneId && state.routeData.destZoneId !== "Zone_Outdoor") {
     const sZ = getFloorSliceZ(state.routeData.destZoneId, state.routeData.destFloor);
-    updateSliceCutaway(sZ, `${state.routeData.destFloor}F 走廊`);
+    const sliceZones = state.routeData.buildingsVisited?.length ? state.routeData.buildingsVisited : [state.routeData.destZoneId];
+    updateSliceCutaway(sZ, `${state.routeData.destFloor}F 走廊`, false, sliceZones);
   } else if (!state.autoSliceRoute && !state.xrayOn) {
     updateSliceCutaway(null, "");
   }
@@ -1716,17 +2018,36 @@ document.getElementById("btnRouteOverview").addEventListener("click", () => {
 document.getElementById("btnRouteFlyAlong").addEventListener("click", (e) => {
   if (!routeCurve) return;
   state.routeFlyAlong = !state.routeFlyAlong;
+  const flyBar = document.getElementById("routeFlyBar");
   if (state.routeFlyAlong) {
-    state.routeFlyProgress = 0;
+    if (state.routeFlyProgress >= 0.99) state.routeFlyProgress = 0;
     tweenPos = null;
     tweenTgt = null;
     e.currentTarget.textContent = "⏸ 暫停實境";
     e.currentTarget.classList.add("active");
+    if (flyBar) flyBar.hidden = false;
     if (isMobileViewport()) setSidebarCollapsed(true);
     requestRender(20);
   } else {
     stopRouteFlyAlong();
   }
+});
+
+document.getElementById("routeFlySlider")?.addEventListener("input", (e) => {
+  if (!routeCurve) return;
+  stopRouteFlyAlong();
+  tweenPos = null;
+  tweenTgt = null;
+  const u = Math.max(0, Math.min(1, Number(e.target.value) / 1000));
+  state.routeFlyProgress = u;
+  applyFlyCameraAtProgress(u, true);
+});
+
+const FLY_SPEEDS = [1, 2, 0.5];
+document.getElementById("btnRouteFlySpeed")?.addEventListener("click", (e) => {
+  const idx = FLY_SPEEDS.indexOf(state.routeFlySpeed);
+  state.routeFlySpeed = FLY_SPEEDS[(idx + 1) % FLY_SPEEDS.length];
+  e.currentTarget.textContent = `${state.routeFlySpeed}x`;
 });
 
 async function copyShareUrlWithFeedback(btn, promptMsg) {
@@ -1801,7 +2122,33 @@ document.getElementById("btnCloseMapModal").addEventListener("click", closeMapMo
 document.getElementById("mapModalBackdrop").addEventListener("click", closeMapModal);
 mapModalImg.addEventListener("click", () => mapModalImg.classList.toggle("zoomed"));
 window.addEventListener("keydown", (e) => {
-  if (e.key === "Escape" && !mapModal.hidden) closeMapModal();
+  const tag = document.activeElement?.tagName;
+  const isTyping = tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT";
+  if (e.key === "Escape") {
+    if (!mapModal.hidden) {
+      closeMapModal();
+    } else if (state.rulerMode) {
+      document.getElementById("btnRuler")?.click();
+    } else if (state.routeOpen) {
+      document.getElementById("btnCloseRoute")?.click();
+    }
+    return;
+  }
+  if (isTyping) return;
+  if (e.key === "/") {
+    e.preventDefault();
+    setSidebarTab("dir", true);
+    searchInput.focus();
+    searchInput.select();
+  } else if (state.routeOpen && state.routeData?.steps?.length) {
+    if (e.key === "ArrowRight") {
+      e.preventDefault();
+      selectRouteStep((state.activeRouteStepIdx >= 0 ? state.activeRouteStepIdx : 0) + 1, false);
+    } else if (e.key === "ArrowLeft") {
+      e.preventDefault();
+      selectRouteStep((state.activeRouteStepIdx >= 0 ? state.activeRouteStepIdx : 0) - 1, false);
+    }
+  }
 });
 
 window.addEventListener("resize", () => {
@@ -1867,9 +2214,16 @@ async function init() {
   } catch (e) {
     console.warn("Spec load failed:", e);
   }
+  if (state.spec?.meta?.academic_year) {
+    const yearEl = document.getElementById("academicYearPill");
+    const yr = String(state.spec.meta.academic_year).trim();
+    if (yearEl) yearEl.textContent = yr.includes("學年度") ? yr : `${yr} 學年度`;
+  }
   hydrateAllRooms();
+  populateRouteStartOptions();
   buildZoneLabels();
   renderCategoryPills();
+  renderRecentSearchBar();
   refresh3DLabels();
   renderSidebar();
   applyUrlHash();
@@ -1900,15 +2254,20 @@ async function init() {
           const isGroundDecal = GROUND_ONLY_RECEIVE_PATTERNS.some((p) => obj.name.startsWith(p));
           obj.castShadow = !isGroundDecal;
           obj.receiveShadow = true;
-          const canSlice = isSliceableBuildingMesh(obj.name);
+          const clipGroup = getClipGroupForMeshName(obj.name);
           const wrapSliceMat = (m) => {
-            if (!m || !canSlice) return m;
-            let cm = clippedMatCache.get(m);
+            if (!m || !clipGroup) return m;
+            let cacheForGroup = clippedMatCacheByGroup.get(clipGroup);
+            if (!cacheForGroup) {
+              cacheForGroup = new WeakMap();
+              clippedMatCacheByGroup.set(clipGroup, cacheForGroup);
+            }
+            let cm = cacheForGroup.get(m);
             if (!cm) {
               cm = m.clone();
-              cm.clippingPlanes = [floorClipPlane];
+              cm.clippingPlanes = [CLIP_PLANES[clipGroup]];
               cm.clipShadows = false;
-              clippedMatCache.set(m, cm);
+              cacheForGroup.set(m, cm);
             }
             return cm;
           };
@@ -1927,6 +2286,11 @@ async function init() {
       statusEl.remove();
       dracoLoader.dispose();
       requestShadowUpdate();
+      // Hot-render all 127 3D double-sided corridor plaques asynchronously after first paint (zero boot blocking!)
+      setTimeout(() => {
+        const res = applyDynamicRoomPlaques(gltf.scene, state.spec, { maxAniso, isMobile: isMobileViewport() });
+        if (res) requestRender(6);
+      }, 280);
     },
     (xhr) => {
       const total = xhr.total > 0 ? xhr.total : expectedGlbBytes;
@@ -1944,18 +2308,21 @@ async function init() {
 }
 
 const clock = new THREE.Clock();
+let lastFrameTime = 0;
 function animate() {
   requestAnimationFrame(animate);
+  const nowSec = clock.getElapsedTime();
+  const dt = Math.min(0.1, Math.max(0.001, nowSec - lastFrameTime));
+  lastFrameTime = nowSec;
   let needsDraw = renderFramesLeft > 0;
   if (renderFramesLeft > 0) renderFramesLeft--;
 
   if (activeRoomBox) {
-    const t = clock.getElapsedTime();
     const fill = activeRoomBox.children[0];
-    if (fill?.material) fill.material.opacity = 0.18 + 0.1 * Math.sin(t * 4.0);
+    if (fill?.material) fill.material.opacity = 0.18 + 0.1 * Math.sin(nowSec * 4.0);
     needsDraw = true;
   }
-  // Smoothly animate horizontal floor cutaway clipping plane
+  // Smoothly animate horizontal floor cutaway clipping planes
   const goalSlice = state.sliceTargetZ !== null ? state.sliceTargetZ : 999;
   if (Math.abs(state.sliceCurrentZ - goalSlice) > 0.03) {
     if (goalSlice > 100 || state.sliceCurrentZ > 100) {
@@ -1963,49 +2330,25 @@ function animate() {
     } else {
       state.sliceCurrentZ += (goalSlice - state.sliceCurrentZ) * 0.16;
     }
-    floorClipPlane.constant = state.sliceCurrentZ;
+    applySlicePlanes(state.sliceCurrentZ);
     needsDraw = true;
   }
 
   if (routeCurve && routePulseOrb) {
     const len = routeCurve.getLength();
     const duration = Math.max(4.5, len / 18.0);
-    const u = ((clock.getElapsedTime() % duration) / duration);
+    const u = (nowSec % duration) / duration;
     const pt = routeCurve.getPointAt(u);
     routePulseOrb.position.copy(pt);
+    if (routeFlowTex) {
+      routeFlowTex.offset.x -= dt * 1.65;
+    }
     needsDraw = true;
 
     if (state.routeFlyAlong) {
-      const stepDelta = Math.max(0.0022, Math.min(0.0042, 0.36 / Math.max(45, len)));
-      state.routeFlyProgress = Math.min(1, state.routeFlyProgress + stepDelta);
-      const uCam = state.routeFlyProgress;
-      const curP = routeCurve.getPointAt(uCam);
-      const aheadU = Math.min(1, uCam + 0.055);
-      const aheadP = routeCurve.getPointAt(aheadU);
-
-      // Dynamically adjust building cutaway as the walk climbs stairs & enters target floor corridor
-      if (state.autoSliceRoute && state.routeData?.destZoneId && state.routeData.destZoneId !== "Zone_Outdoor") {
-        const walkZ = curP.y; // Three.js Y === Blender Z
-        if (walkZ > 1.05 || uCam > 0.28) {
-          const liveSlice = Math.max(3.6, walkZ + 2.75);
-          state.sliceTargetZ = liveSlice;
-          state.sliceCurrentZ += (liveSlice - state.sliceCurrentZ) * 0.14;
-          floorClipPlane.constant = state.sliceCurrentZ;
-        }
-      }
-
-      const tan = aheadP.clone().sub(curP);
-      if (tan.lengthSq() < 0.01) tan.set(1, 0, 0);
-      tan.y = 0;
-      if (tan.lengthSq() < 0.001) tan.set(0, 0, -1);
-      tan.normalize();
-
-      const inCorridor = curP.y > 1.05;
-      const backDist = inCorridor ? 7.2 : 11.5;
-      const upHeight = inCorridor ? 4.1 : 6.0;
-      const desiredPos = curP.clone().addScaledVector(tan, -backDist).add(new THREE.Vector3(0, upHeight, 0));
-      camera.position.lerp(desiredPos, 0.085);
-      controls.target.lerp(aheadP.clone().add(new THREE.Vector3(0, 0.5, 0)), 0.12);
+      const baseStep = Math.max(0.0022, Math.min(0.0042, 0.36 / Math.max(45, len)));
+      state.routeFlyProgress = Math.min(1, state.routeFlyProgress + baseStep * state.routeFlySpeed);
+      applyFlyCameraAtProgress(state.routeFlyProgress, false);
       if (state.routeFlyProgress >= 1) {
         stopRouteFlyAlong();
       }

@@ -52,7 +52,7 @@
         <div class="brand-block">
           <div class="brand-top">
             <h1 class="school-title">新北市板橋區重慶國小</h1>
-            <span class="year-pill">115 學年度</span>
+            <span class="year-pill" id="academicYearPill">115 學年度</span>
           </div>
           <div class="school-sub">3D 實景校園空間・走廊導航與教室配置</div>
         </div>
@@ -111,6 +111,8 @@
 
           <!-- Category Quick Filter Pills -->
           <div class="cat-filter-bar" id="catFilterBar" role="tablist" aria-label="空間分類篩選"></div>
+          <!-- Recent Searched / Viewed Rooms -->
+          <div class="recent-bar" id="recentSearchBar" hidden></div>
         </div>
 
         <!-- Contextual Drill-down Bar (Zone Breadcrumb + Floor Tabs) -->
@@ -150,10 +152,11 @@
           </div>
 
           <div class="route-controls">
-            <label class="route-start-wrap" title="切換出發校門起點">
+            <label class="route-start-wrap" title="切換出發校門或校內任一教室起點">
               <span>起點</span>
               <select id="routeStartSelect" class="route-select"></select>
             </label>
+            <button class="icon-btn icon-btn-sm" id="btnRouteSwap" title="起終點互換（當起點為校內空間時可用）" disabled>⇅</button>
             <button class="btn btn-sm" id="btnRouteAccess" title="優先搭乘廣和樓無障礙電梯與連廊">♿ 無障礙</button>
           </div>
 
@@ -162,6 +165,12 @@
             <button class="btn btn-sm" id="btnRouteFlyAlong" title="沿真實走廊與梯間動畫走進教室">▶ 走廊實境</button>
             <button class="btn btn-sm active" id="btnRouteSliceAuto" title="進入室內步驟時自動剖開樓板露出該層走廊">🔪 走廊剖視</button>
             <button class="btn btn-sm" id="btnRouteShare" title="複製含起點與無障礙模式的路線分享連結">🔗 分享路線</button>
+          </div>
+
+          <div class="route-fly-bar" id="routeFlyBar" hidden>
+            <span class="fly-pct" id="routeFlyPct">0%</span>
+            <input type="range" id="routeFlySlider" class="fly-slider" min="0" max="1000" value="0" aria-label="走廊實境飛覽進度" />
+            <button class="btn btn-xs fly-speed-btn" id="btnRouteFlySpeed" title="切換飛覽速度">1x</button>
           </div>
 
           <ol class="route-steps" id="routeStepsList"></ol>

@@ -55,8 +55,8 @@ def main() -> int:
     assert glb_hash == meta["hash"], f"GLB hash mismatch: {glb_hash} != {meta['hash']}"
     assert glb_bytes < 8 * 1024 * 1024, f"Expected compressed GLB < 8MB, got {glb_bytes}"
 
-    # 4. Verify index.html, favicons, routing module & tour_app.js features
-    for req_file in ("favicon.ico", "favicon.png", "apple-touch-icon.png", "campus_routing.js"):
+    # 4. Verify index.html, favicons, routing & dynamic plaque modules
+    for req_file in ("favicon.ico", "favicon.png", "apple-touch-icon.png", "campus_routing.js", "dynamic_plaques.js"):
         assert os.path.exists(os.path.join(ROOT, req_file)), f"Missing {req_file}"
 
     html = open(os.path.join(ROOT, "index.html"), encoding="utf-8").read()
@@ -78,6 +78,8 @@ def main() -> int:
         'id="paneRoute"',
         'id="btnRouteShare"',
         'id="btnRouteSliceAuto"',
+        'id="btnRouteSwap"',
+        'id="routeFlySlider"',
     ):
         assert required in html, f"index.html missing required token: {required}"
 
@@ -86,6 +88,7 @@ def main() -> int:
     assert "applyUrlHash" in js and "syncUrlHash" in js, "tour_app.js missing URL hash deep-linking functions"
     assert "computeCampusRoute" in js, "tour_app.js missing computeCampusRoute integration"
     assert "floorClipPlane" in js, "tour_app.js missing floorClipPlane corridor slice engine"
+    assert "applyDynamicRoomPlaques" in js, "tour_app.js missing dynamic corridor plaque hot-renderer"
 
     print(
         f"ALL_INTEGRITY_CHECKS_PASSED: {len(py_modules)} py modules compiled, "

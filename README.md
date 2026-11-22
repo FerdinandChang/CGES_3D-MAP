@@ -10,7 +10,8 @@
 - **指定空間與路線直達連結範例（Deep Linking）**：
   - 校長室：https://ferdinandchang.github.io/CGES_3D-MAP/#room=305
   - 指定班級：https://ferdinandchang.github.io/CGES_3D-MAP/#room=六年7班
-  - **指定步行路線分享（含起點與無障礙模式）**：https://ferdinandchang.github.io/CGES_3D-MAP/#route=408&from=gate_main&acc=1
+  - **校門出發無障礙路線分享**：https://ferdinandchang.github.io/CGES_3D-MAP/#route=408&from=gate_main&acc=1
+  - **教室 ➔ 教室點對點路線分享**：https://ferdinandchang.github.io/CGES_3D-MAP/#route=208&from=305&acc=0
   - 指定樓棟樓層：https://ferdinandchang.github.io/CGES_3D-MAP/#zone=Bldg_Wuquan&floor=3F
 - **GitHub 專案儲存庫**：https://github.com/FerdinandChang/CGES_3D-MAP
 - **學校官網參考基準**：https://www.cges.ntpc.edu.tw/（站點圖示 `favicon.ico` 與官網同步）
@@ -22,10 +23,10 @@
 ### 1. 115 學年度全校 148 處空間 1:1 定位、步行導引＋深層分享
 - **單一真相來源（Single Source of Truth）**：由 `campus_cges.json` 統一驅動建築規格、6 大分區邊界、預設鏡頭與全校 **148 處空間**（4 棟 5F 校舍 **127 間**室內空間＋運動中心與戶外操場球場 **21 處**空間）。
 - **🧭 左側一體化導覽面板＋3D 樓層走廊實景剖視**：
-  - **左側雙頁籤整合工作區**：將自動導覽、3D 標牌切換、官方配置圖、樓層剖視、測距尺、三時段日照與「空間目錄／路線導引」完整收合於左側面板，保留右上與中央最大 3D 視野。
-  - **水平樓層剖視（Floor Cutaway）＆走廊實境飛覽**：導航切換或點擊室內步驟／點選 `▶ 走廊實境` 時，依真實樓高即時將目標樓層以上樓板與上層導引牌水平切平，露出真實走廊地面、欄杆與雙面班級門牌，讓鏡頭沿真實走廊動線推進至教室門口。
-  - 支援 **三大校門起點**、**♿ 無障礙電梯優先模式**、`1梯～9梯／電梯` 精確左右轉分步文字，以及 **`🔗 分享路線`**（複製 `#route=<目標>&from=<校門>&acc=<0|1>` 一鍵重現路線與走廊剖視）。
-- **雙面正字走廊門牌 Atlas**：走廊懸掛 **4096×4096 雙面無反字班級門牌**，正反雙向皆呈現端正繁體班級與房號。
+  - **點對點教室導航（3 校門 + 全校 148 處空間任選起點）**：支援任一教室出發前往另一教室、`⇅` 一鍵起終點互換、**♿ 無障礙電梯優先模式**、`1梯～9梯／電梯` 精確左右轉分步文字，以及 **`🔗 分享路線`**（`#route=<終點>&from=<起點>&acc=<0|1>`）。
+  - **分棟獨立剖視（Per-Building Cutaway）＋ 流動方向箭頭光帶**：導航或點擊單一步驟時，僅剖開路線所經之目標棟樓板，其餘未經過校舍保留完整屋頂天際線；3D 路徑以動態流動白色箭頭光帶呈現方向，並提供 **`▶ 走廊實境` 進度拖曳條與 `0.5x / 1x / 2x` 倍速控制**。
+  - **3D 畫布直點單室＋行動端 RWD 底部抽屜**：拉近或剖層時可直接點擊 3D 走廊上的單一教室鎖定；手機版（`≤ 900px`）支援觸控拖曳高度切換與頂部極薄迷你步驟條，保留 84%+ 3D 視野；桌機支援 `/` 搜尋、`Esc` 退出、`←`/`→` 切換步驟與最近搜尋紀錄。
+- **🔄 免開 Blender 前端動態門牌熱更新（`dynamic_plaques.js`）**：前端載入 GLB 後於背景非同步依 `campus_cges.json` 即時重繪全校 **127 面走廊 3D 雙面門牌貼圖**並熱替換至 `Campus_CorridorRoomPlaques`（桌機 2048²／手機 1024²），未來跨學年度異動班級只需修改 `campus_cges.json`，免重跑 Blender 與 GLB 即刻同步更新。
 - **URL Hash 深層連結＆一鍵分享（`🔗 分享`）**：點選任一教室即更新網址 Hash（支援瀏覽器上一頁／下一頁與 RWD 響應式版面），並可一鍵複製直達該教室的 3D 導覽連結。
 
 ### 2. 四面實景建築與校園場域 1:1 精細還原
@@ -55,7 +56,8 @@
 |---|---|
 | `index.html` / `preview.html` | 3D 校園導覽網頁入口（含官方重慶國小校徽 `favicon.ico` / `apple-touch-icon.png` 與 OpenGraph 預覽設定） |
 | `tour_app.js` / `tour_ui.css` | Three.js 導覽核心、115 學年度分類篩選、URL Hash 深層連結分享、載入進度條、3D 樓層高亮、測距尺與三時段日照切換 |
-| `campus_routing.js` | 全校 148 處空間跨棟跨樓層步行導引引擎（狀態擴展 Dijkstra、`1梯～9梯／電梯` 路線、2D 向量左右轉與無障礙模式） |
+| `campus_routing.js` | 全校 148 處空間跨棟跨樓層點對點步行導引引擎（3 校門 + 148 空間任選起點、狀態擴展 Dijkstra、`1梯～9梯／電梯` 與無障礙模式） |
+| `dynamic_plaques.js` | 免開 Blender 前端動態 3D 走廊雙面門牌熱更新引擎（依 `campus_cges.json` 背景重繪 8×16 UV Atlas 並熱替換貼圖） |
 | `campus_cges.json` | 單一真相來源資料庫（4 棟建築幾何規格、6 大分區邊界鏡頭＋全校 148 處空間 3D 座標） |
 | `exports/cges_campus.glb` | Draco + WebP 壓縮後之全校 3D 模型（5.28 MB，386 物件） |
 | `build_meta.json` | 建置版本、檔案位元組與 MD5 雜湊（供前端進度條與快取驗證） |
@@ -90,5 +92,6 @@ python gen_cges_textures.py
 ```powershell
 python test_campus_integrity.py
 node --check campus_routing.js
+node --check dynamic_plaques.js
 node --check tour_app.js
 ```

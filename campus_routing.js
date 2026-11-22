@@ -381,15 +381,53 @@ function classifySide(heading, toRoomVec) {
 }
 
 /**
- * 計算由指定起點（預設為主校門）前往目標空間之最短合理步行路線與分步文字導引
+ * 計算由指定起點（3 大校門 ID，或全校 148 處任一空間物件）前往目標空間之最短合理步行路線與分步文字導引
  */
-export function computeCampusRoute(room, startId = "gate_main", accessible = false) {
-  if (!room || !GRAPH.nodes.has(startId)) return null;
+export function computeCampusRoute(room, startSpec = "gate_main", accessible = false) {
+  if (!room) return null;
+
+  const isRoomStart = typeof startSpec === "object" && startSpec !== null && Array.isArray(startSpec.pos);
+  const startId = isRoomStart ? "__START__" : String(startSpec || "gate_main");
+  if (!isRoomStart && !GRAPH.nodes.has(startId)) return null;
 
   const targetMeta = resolveRoomAttachPoint(room);
   const { nodes, adj } = GRAPH;
 
+  // 若起終點為同一空間，直接回傳原地抵達結果
+  if (isRoomStart && ((room.uid && startSpec.uid === room.uid) || (room.code && room.code === startSpec.code && room.name === startSpec.name))) {
+    const flNum = parseFloorNum(room.floor);
+    return {
+      startId: startSpec.uid || startSpec.code || startSpec.name,
+      startLabel: startSpec.short || startSpec.name,
+      startIsRoom: true,
+      startZoneId: startSpec.zoneId,
+      accessible,
+      destZoneId: room.zoneId,
+      destFloor: flNum,
+      buildingsVisited: room.zoneId && room.zoneId !== "Zone_Outdoor" ? [room.zoneId] : [],
+      totalMeters: 0,
+      estMinutes: 1,
+      steps: [
+        {
+          icon: "🎯",
+          action: "已在目的地",
+          text: `您目前就在 <strong>${room.short || room.name}</strong>`,
+          pos: [targetMeta.x, targetMeta.y, targetMeta.z],
+          badge: "抵達",
+          zoneId: room.zoneId,
+          floor: flNum,
+          dir: [1, 0],
+          indoor: Boolean(room.zoneId && room.zoneId !== "Zone_Outdoor"),
+        },
+      ],
+      points3D: [targetMeta.doorPt || [targetMeta.x, targetMeta.y, targetMeta.z + 0.15]],
+      waypoints: [{ label: `📍 ${room.short || room.name}`, pos: [targetMeta.x, targetMeta.y, targetMeta.z + 1.1] }],
+    };
+  }
+
+  const startRoomMeta = isRoomStart ? resolveRoomAttachPoint(startSpec) : null;
   const targetId = "__TARGET__";
+
   const tempEdges = targetMeta.anchors
     .filter((aid) => nodes.has(aid))
     .map((aid) => {
@@ -401,6 +439,29 @@ export function computeCampusRoute(room, startId = "gate_main", accessible = fal
 
   if (tempEdges.length === 0) return null;
 
+  const startOutEdges = [];
+  if (isRoomStart && startRoomMeta) {
+    for (const aid of startRoomMeta.anchors) {
+      if (!nodes.has(aid)) continue;
+      const n = nodes.get(aid);
+      const d = Math.hypot(n.x - startRoomMeta.x, n.y - startRoomMeta.y, n.z - startRoomMeta.z);
+      startOutEdges.push({ to: aid, dist: d, kind: startSpec.zoneId === "Zone_Outdoor" ? "outdoor" : "corridor" });
+    }
+    // 同棟同層同一走廊軸直接連通，避免隔壁兩間教室繞去梯口再折返
+    const sameBldg = startSpec.zoneId === room.zoneId && room.zoneId !== "Zone_Outdoor";
+    const sameFloor = parseFloorNum(startSpec.floor) === parseFloorNum(room.floor);
+    const sameCorridorPlane =
+      sameBldg &&
+      sameFloor &&
+      Math.abs(startRoomMeta.z - targetMeta.z) < 0.8 &&
+      (Math.abs(startRoomMeta.x - targetMeta.x) < 1.5 || Math.abs(startRoomMeta.y - targetMeta.y) < 1.5);
+    if (sameCorridorPlane) {
+      const directDist = Math.hypot(targetMeta.x - startRoomMeta.x, targetMeta.y - startRoomMeta.y, targetMeta.z - startRoomMeta.z);
+      startOutEdges.push({ to: targetId, dist: directDist, kind: "corridor", isDirectSameCorridor: true });
+    }
+    if (startOutEdges.length === 0) return null;
+  }
+
   // 狀態擴展 Dijkstra：stateKey = `${nodeId}|${curStair}`，避免無意義分段轉搭不同樓梯
   const startKey = `${startId}|`;
   const distMap = new Map([[startKey, 0]]);
@@ -410,6 +471,7 @@ export function computeCampusRoute(room, startId = "gate_main", accessible = fal
   let finalKey = null;
 
   const getNeighbors = (id) => {
+    if (id === "__START__") return startOutEdges;
     const base = adj.get(id) || [];
     const hit = tempEdges.find((e) => e.id === id);
     if (!hit) return base;
@@ -463,6 +525,17 @@ export function computeCampusRoute(room, startId = "gate_main", accessible = fal
         label: room.short,
         edgeFromPrev: prev ? prev.edge : null,
       });
+    } else if (nodeId === "__START__" && startRoomMeta) {
+      rawSteps.unshift({
+        id: "__START__",
+        zoneId: startSpec.zoneId,
+        x: startRoomMeta.x,
+        y: startRoomMeta.y,
+        z: startRoomMeta.z,
+        floor: parseFloorNum(startSpec.floor),
+        label: startSpec.short || startSpec.name,
+        edgeFromPrev: null,
+      });
     } else {
       const nd = nodes.get(nodeId);
       rawSteps.unshift({
@@ -473,8 +546,11 @@ export function computeCampusRoute(room, startId = "gate_main", accessible = fal
     cursorKey = prev ? prev.fromKey : null;
   }
 
-  // 組裝 3D 繪製點序列（末端加上教室門口點，並移除相鄰重複座標）
+  // 組裝 3D 繪製點序列（若從教室出發於起端加入起點門口，末端加上終點教室門口）
   const points3D = [];
+  if (isRoomStart && startRoomMeta?.doorPt) {
+    points3D.push([...startRoomMeta.doorPt]);
+  }
   for (const s of rawSteps) {
     const last = points3D[points3D.length - 1];
     if (!last || Math.hypot(s.x - last[0], s.y - last[1], s.z - last[2]) > 0.25) {
@@ -507,8 +583,22 @@ export function computeCampusRoute(room, startId = "gate_main", accessible = fal
   };
   const isIndoorZone = (zId) => Boolean(zId && zId !== "Zone_Outdoor");
   const steps = [];
-  const startMeta = ROUTE_STARTS.find((s) => s.id === startId) || ROUTE_STARTS[0];
-  let heading = startId === "gate_main" ? [1, 0] : startId === "gate_back3" ? [0, 1] : [0, -1];
+  const startMeta = isRoomStart
+    ? {
+        id: startSpec.uid || startSpec.code || startSpec.name,
+        label: startSpec.short || startSpec.name,
+        icon: "📍",
+      }
+    : ROUTE_STARTS.find((s) => s.id === startId) || ROUTE_STARTS[0];
+  let heading = isRoomStart
+    ? startRoomMeta?.roomVec
+      ? [-startRoomMeta.roomVec[0], -startRoomMeta.roomVec[1]]
+      : [1, 0]
+    : startId === "gate_main"
+      ? [1, 0]
+      : startId === "gate_back3"
+        ? [0, 1]
+        : [0, -1];
   let i = 0;
 
   while (i < rawSteps.length - 1) {
@@ -629,19 +719,39 @@ export function computeCampusRoute(room, startId = "gate_main", accessible = fal
 
     if (isFirstLeg) {
       const destLabel = endNode.id === targetId ? `<strong>${room.short}</strong>` : `<strong>${endNode.label || "校內廣場"}</strong>`;
-      steps.push({
-        icon: startMeta.icon,
-        action: "進校門",
-        text: isFinalLeg
-          ? `從 <strong>${startMeta.label}</strong> 進入後直走約 ${distM}m，即達 ${destLabel}`
-          : `從 <strong>${startMeta.label}</strong> 進入校園直走約 ${distM}m 至 ${destLabel}`,
-        pos: [cur.x, cur.y, cur.z],
-        badge: `${distM}m`,
-        zoneId: cur.zoneId || "Zone_Outdoor",
-        floor: 1,
-        dir: normDir(heading),
-        indoor: false,
-      });
+      if (isRoomStart) {
+        const outTurn = classifyTurn(heading, runVec);
+        const outTurnTxt = outTurn === "直走" ? "直走" : `<strong>${outTurn}</strong>直走`;
+        const side = isFinalLeg ? classifySide(runVec, targetMeta.roomVec) : "";
+        const sideTxt = side ? `，<strong>${side}</strong>即達` : "即達";
+        steps.push({
+          icon: isFinalLeg ? "🎯" : "🚪",
+          action: "離開起點",
+          text: isFinalLeg
+            ? `從 <strong>${startMeta.label}</strong> 出門${outTurnTxt}約 ${distM}m${sideTxt} ${destLabel}`
+            : `從 <strong>${startMeta.label}</strong> 出門${outTurnTxt}約 ${distM}m 至 ${destLabel}`,
+          pos: isFinalLeg ? midPos : [cur.x, cur.y, cur.z],
+          badge: isFinalLeg ? "抵達" : `${distM}m`,
+          zoneId: startSpec.zoneId || "Zone_Outdoor",
+          floor: parseFloorNum(startSpec.floor),
+          dir: normDir(runVec),
+          indoor: isIndoorZone(startSpec.zoneId),
+        });
+      } else {
+        steps.push({
+          icon: startMeta.icon,
+          action: "進校門",
+          text: isFinalLeg
+            ? `從 <strong>${startMeta.label}</strong> 進入後直走約 ${distM}m，即達 ${destLabel}`
+            : `從 <strong>${startMeta.label}</strong> 進入校園直走約 ${distM}m 至 ${destLabel}`,
+          pos: [cur.x, cur.y, cur.z],
+          badge: `${distM}m`,
+          zoneId: cur.zoneId || "Zone_Outdoor",
+          floor: 1,
+          dir: normDir(heading),
+          indoor: false,
+        });
+      }
     } else if (isFinalLeg) {
       const side = classifySide(heading, targetMeta.roomVec);
       const turnText = turn === "直走" ? "沿走廊直走" : `<strong>${turn}</strong>沿走廊直走`;
@@ -703,12 +813,23 @@ export function computeCampusRoute(room, startId = "gate_main", accessible = fal
     }
   }
 
+  const buildingsVisited = [
+    ...new Set(
+      rawSteps
+        .map((s) => s.zoneId)
+        .filter((zid) => zid && zid !== "Zone_Outdoor")
+    ),
+  ];
+
   return {
-    startId,
+    startId: isRoomStart ? startMeta.id : startId,
     startLabel: startMeta.label,
+    startIsRoom: isRoomStart,
+    startZoneId: isRoomStart ? startSpec.zoneId : "Zone_Outdoor",
     accessible,
     destZoneId: room.zoneId,
     destFloor: parseFloorNum(room.floor),
+    buildingsVisited,
     totalMeters,
     estMinutes,
     steps,
