@@ -1747,6 +1747,7 @@ def _build_north_basketball_court(palette: Dict[str, bpy.types.Material], col: s
 
 
 def build_basketball_courts(spec: dict, palette: Dict[str, bpy.types.Material]) -> List[bpy.types.Object]:
+    """建置重慶樓南側／五權樓西側高細節雙全場壓克力籃球場（4 座藍護墊懸臂籃球架＋黑框紅準星籃板＋橘色籃框與立體籃網＋走廊步下階梯＋排水明溝＋磨石子緩衝步道）。"""
     col = "Zone_Basketball"
     cfg = spec["grounds"]["basketball_courts"]
     x0, x1 = cfg["x_min"], cfg["x_max"]
@@ -1755,29 +1756,143 @@ def build_basketball_courts(spec: dict, palette: Dict[str, bpy.types.Material]) 
     wx, wy = x1 - x0, y1 - y0
     objs: List[bpy.types.Object] = []
 
+    def _add_uv_quad_bb(
+        bm_q: bmesh.types.BMesh,
+        p0: Tuple[float, float, float],
+        p1: Tuple[float, float, float],
+        p2: Tuple[float, float, float],
+        p3: Tuple[float, float, float],
+    ) -> None:
+        uv_l = bm_q.loops.layers.uv.verify()
+        vs = [bm_q.verts.new(p) for p in (p0, p1, p2, p3)]
+        f = bm_q.faces.new(vs)
+        for lp, uv in zip(f.loops, [(0.0, 0.0), (1.0, 0.0), (1.0, 1.0), (0.0, 1.0)]):
+            lp[uv_l].uv = uv
+
+    # 1. Light-warm-gray terrazzo transition walkway apron connecting Chongqing 1F south corridor (y=-43.0) & Wuquan 1F west corridor (x=-7.0)
+    #    Layered at z=0.044 (< court deck 0.050, < semicircular balcony 0.080 -> ZERO clipping on semicircular tower!)
+    bm_walk = bmesh.new()
+    _quad_extrude(
+        bm_walk,
+        [
+            (x0 - 0.35, y0 - 0.35),
+            (-7.00, y0 - 0.35),
+            (-7.00, -43.00),
+            (x0 - 0.35, -43.00),
+        ],
+        0.020,
+        0.044,
+    )
+    objs.append(su.create_mesh_object("Zone_Basketball_Walkway", bm_walk, palette["walkway_gray_paver"], col, uv_scale=0.32))
+
+    # 2. 1F Corridor Step-Down Stairs (from z=0.36m 1F corridor plinth down to z=0.044m court walkway) + Storm Drain Grating!
+    bm_steps = bmesh.new()
+    bm_drain = bmesh.new()
+    # North side along Chongqing 1F open south corridor & breezeway (x=-32.1..-15.5, clear of semicircular tower at x=-15.1..-9.9!)
+    for step_i, (sz_top, sy_off) in enumerate(((0.25, -43.16), (0.14, -43.46))):
+        gp.bm_box(bm_steps, (-23.80, sy_off, sz_top * 0.5), (16.50, 0.30, sz_top))
+    gp.bm_box(bm_drain, (-26.60, -43.82, 0.046), (38.80, 0.28, 0.012))
+    # East side along Wuquan 1F open west corridor (y=-66.8..-43.2)
+    for step_i, (sz_top, sx_off) in enumerate(((0.25, -7.16), (0.14, -7.46))):
+        gp.bm_box(bm_steps, (sx_off, -55.00, sz_top * 0.5), (0.30, 23.40, sz_top))
+    gp.bm_box(bm_drain, (-7.82, -55.80, 0.046), (0.28, 25.00, 0.012))
+    # Subtle concrete border curb framing the acrylic dual basketball court deck
+    gp.bm_box(bm_steps, (cx, cy, 0.036), (wx + 0.28, wy + 0.28, 0.022))
+    objs.append(su.create_mesh_object("Zone_Basketball_CorridorSteps", bm_steps, palette["curb_concrete"], col, uv_scale=0.40))
+    objs.append(su.create_mesh_object("Zone_Basketball_DrainGrates", bm_drain, palette["drain_grate"], col, uv_scale=1.2))
+
+    # 3. Main Dual Full-Court Acrylic Basketball Deck (z=0.050m, mapped 1:1 to 2048x1280 tex_court_bball.png)
     bm_deck = bmesh.new()
-    uv_layer = bm_deck.loops.layers.uv.verify()
-    v0 = bm_deck.verts.new((x0, y0, 0.05))
-    v1 = bm_deck.verts.new((x1, y0, 0.05))
-    v2 = bm_deck.verts.new((x1, y1, 0.05))
-    v3 = bm_deck.verts.new((x0, y1, 0.05))
-    f = bm_deck.faces.new((v0, v1, v2, v3))
-    for loop, uv in zip(f.loops, [(0, 0), (1, 0), (1, 1), (0, 1)]):
-        loop[uv_layer].uv = uv
+    _add_uv_quad_bb(
+        bm_deck,
+        (x0, y0, 0.050), (x1, y0, 0.050),
+        (x1, y1, 0.050), (x0, y1, 0.050),
+    )
     objs.append(su.create_mesh_object("Zone_Basketball_Deck", bm_deck, palette["court_bball"], col, auto_uv=False))
 
-    bm_hoops = bmesh.new()
-    bm_boards = bmesh.new()
-    for hx in (x0 + wx * 0.27, x0 + wx * 0.73):
-        for hy, dir_y in ((y0 + 1.8, 1.0), (y1 - 1.8, -1.0)):
-            gp.bm_cyl_axis(bm_hoops, (hx, hy, 1.65), 0.10, 3.3, axis="Z", segments=8)
-            gp.bm_cyl_p2p(bm_hoops, (hx, hy, 3.1), (hx, hy + dir_y * 1.1, 3.2), 0.07, 0.07, segments=8)
-            gp.bm_box(bm_boards, (hx, hy + dir_y * 1.15, 3.35), (1.8, 0.08, 1.05))
-    objs.append(su.create_mesh_object("Zone_Basketball_Poles", bm_hoops, palette["metal_dark"], col))
-    objs.append(su.create_mesh_object("Zone_Basketball_Backboards", bm_boards, palette["railing_white"], col))
+    # 4. 4 Detailed Full-Court Cantilevered Basketball Hoops (centered at U=0.275 & U=0.725 to match court texture key axes!)
+    bm_steel = bmesh.new()
+    bm_pad = bmesh.new()
+    bm_bb_face = bmesh.new()
+    bm_bb_back = bmesh.new()
+    bm_rim = bmesh.new()
+    bm_net = bmesh.new()
+    bm_base = bmesh.new()
+    bm_wood = bmesh.new()
+    bm_dark = bmesh.new()
 
-    # Perimeter high ball-stop mesh lives strictly on outer South Guanghe St wall (Landmark_SouthWall_BallMesh);
-    # keep all inner campus edges (east Wuquan corridor, west playground & inner court apron) completely open!
+    for hx in (x0 + wx * 0.275, x0 + wx * 0.725):
+        for hy, dir_y in ((y0 + 0.86, 1.0), (y1 - 0.86, -1.0)):
+            # Concrete foundation pier + main silver upright post (z=0.05..3.52m) + Royal-Blue cylindrical safety pad (z=0.12..2.00m)
+            gp.bm_cyl_axis(bm_base, (hx, hy, 0.09), 0.24, 0.12, axis="Z", segments=12)
+            gp.bm_cyl_axis(bm_steel, (hx, hy, 1.80), 0.086, 3.50, axis="Z", segments=12)
+            gp.bm_cyl_axis(bm_pad, (hx, hy, 1.06), 0.152, 1.88, axis="Z", segments=14)
+
+            # Upper horizontal boom arm + lower diagonal strut + 4-bar V-truss rear backboard mounting frame
+            gp.bm_cyl_p2p(bm_steel, (hx, hy, 3.45), (hx, hy + dir_y * 1.16, 3.45), 0.054, 0.054, segments=10)
+            gp.bm_cyl_p2p(bm_steel, (hx, hy, 2.74), (hx, hy + dir_y * 1.13, 3.18), 0.040, 0.040, segments=8)
+            for sx_b in (-0.54, 0.54):
+                gp.bm_cyl_p2p(bm_steel, (hx, hy + dir_y * 0.62, 3.45), (hx + sx_b, hy + dir_y * 1.16, 3.64), 0.024, 0.024, segments=6)
+                gp.bm_cyl_p2p(bm_steel, (hx, hy + dir_y * 0.62, 3.04), (hx + sx_b, hy + dir_y * 1.16, 3.10), 0.024, 0.024, segments=6)
+
+            # White Rectangular Backboard (1.80m x 1.05m) + dark metal outer frame + rear center mounting plate + bottom royal-blue safety edge padding!
+            bb_y = hy + dir_y * 1.20
+            bb_zc = 3.42
+            gp.bm_box(bm_bb_back, (hx, bb_y - dir_y * 0.03, bb_zc), (1.80, 0.045, 1.05))
+            gp.bm_box(bm_steel, (hx, bb_y - dir_y * 0.03, bb_zc + 0.535), (1.84, 0.06, 0.035))
+            gp.bm_box(bm_steel, (hx - 0.91, bb_y - dir_y * 0.03, bb_zc), (0.035, 0.06, 1.08))
+            gp.bm_box(bm_steel, (hx + 0.91, bb_y - dir_y * 0.03, bb_zc), (0.035, 0.06, 1.08))
+            gp.bm_box(bm_steel, (hx, bb_y - dir_y * 0.055, bb_zc - 0.14), (0.36, 0.04, 0.34))
+            gp.bm_box(bm_pad, (hx, bb_y - dir_y * 0.025, bb_zc - 0.535), (1.84, 0.075, 0.075))
+            if dir_y > 0:
+                # Facing NORTH (+Y)
+                _add_uv_quad_bb(
+                    bm_bb_face,
+                    (hx + 0.90, bb_y, bb_zc - 0.525), (hx - 0.90, bb_y, bb_zc - 0.525),
+                    (hx - 0.90, bb_y, bb_zc + 0.525), (hx + 0.90, bb_y, bb_zc + 0.525),
+                )
+            else:
+                # Facing SOUTH (-Y)
+                _add_uv_quad_bb(
+                    bm_bb_face,
+                    (hx - 0.90, bb_y, bb_zc - 0.525), (hx + 0.90, bb_y, bb_zc - 0.525),
+                    (hx + 0.90, bb_y, bb_zc + 0.525), (hx - 0.90, bb_y, bb_zc + 0.525),
+                )
+
+            # Breakaway orange steel rim (z=3.05m, r=0.23m) + mounting bracket + 12-strand 3D conical white nylon net
+            rim_y = bb_y + dir_y * 0.28
+            rim_z = 3.05
+            gp.bm_box(bm_rim, (hx, bb_y + dir_y * 0.04, rim_z), (0.14, 0.08, 0.10))
+            r_rim = 0.23
+            n_rim = 12
+            for ri in range(n_rim):
+                a0 = 2.0 * math.pi * ri / n_rim
+                a1 = 2.0 * math.pi * ((ri + 1) % n_rim) / n_rim
+                p_r0 = (hx + math.cos(a0) * r_rim, rim_y + math.sin(a0) * r_rim, rim_z)
+                p_r1 = (hx + math.cos(a1) * r_rim, rim_y + math.sin(a1) * r_rim, rim_z)
+                gp.bm_cyl_p2p(bm_rim, p_r0, p_r1, 0.016, 0.016, segments=6)
+                if ri % 2 == 0:
+                    a_bot = a0 + math.pi / n_rim
+                    p_b = (hx + math.cos(a_bot) * 0.13, rim_y + math.sin(a_bot) * 0.13, rim_z - 0.42)
+                    gp.bm_cyl_p2p(bm_net, p_r0, p_b, 0.008, 0.008, segments=4)
+                    gp.bm_cyl_p2p(bm_net, p_r1, p_b, 0.008, 0.008, segments=4)
+
+    # 5. Sideline Players' Rest Benches along North Apron Center & West Apron (clear of court lines & corridor stairs!)
+    for bx_b, by_b, brot in [(-27.40, -44.65, 0.0), (-41.50, -44.65, 0.0)]:
+        gp.bm_box(bm_wood, (bx_b, by_b, 0.46), (2.40, 0.46, 0.08), rot_z=brot)
+        for lx_off in (-0.88, 0.88):
+            gp.bm_box(bm_dark, (bx_b + lx_off, by_b, 0.24), (0.10, 0.40, 0.42), rot_z=brot)
+
+    objs.append(su.create_mesh_object("Zone_Basketball_Poles", bm_steel, palette["metal_dark"], col, smooth=True))
+    objs.append(su.create_mesh_object("Zone_Basketball_HoopPads", bm_pad, palette["hoop_pad_blue"], col, smooth=True))
+    objs.append(su.create_mesh_object("Zone_Basketball_BackboardFaces", bm_bb_face, palette["backboard_white"], col, auto_uv=False))
+    objs.append(su.create_mesh_object("Zone_Basketball_Backboards", bm_bb_back, palette["railing_white"], col))
+    objs.append(su.create_mesh_object("Zone_Basketball_HoopRims", bm_rim, palette["hoop_rim_orange"], col, smooth=True))
+    objs.append(su.create_mesh_object("Zone_Basketball_HoopNets", bm_net, palette["track_line"], col))
+    objs.append(su.create_mesh_object("Zone_Basketball_HoopBases", bm_base, palette["curb_concrete"], col, smooth=True))
+    objs.append(su.create_mesh_object("Zone_Basketball_BenchesWood", bm_wood, palette["wood_bridge"], col))
+    objs.append(su.create_mesh_object("Zone_Basketball_BenchesLegs", bm_dark, palette["metal_dark"], col))
+
     return objs
 
 

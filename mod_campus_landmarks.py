@@ -871,8 +871,6 @@ def build_gym_and_skybridge(spec: dict, palette: Dict[str, bpy.types.Material]) 
     bm_sc_rail = bmesh.new()
     bm_sc_white = bmesh.new()
     bm_sc_canopy = bmesh.new()
-    bm_sc_pad = bmesh.new()
-    bm_sc_lat = bmesh.new()
 
     sx_c, sy_c = -12.55, -42.98  # Centered cleanly inside Chongqing east bay b=7 (x=-15.375..-7.0), leaving x=-9.9..-7.0 for recessed L-junction!
     r_out, r_in = 2.45, 2.18
@@ -1013,24 +1011,12 @@ def build_gym_and_skybridge(spec: dict, palette: Dict[str, bpy.types.Material]) 
             gp.bm_box(bm_sc_cream, (sx_c, -42.78, 17.80), (5.2, 0.34, 1.15))
             gp.bm_box(bm_sc_cream, (-8.40, -41.65, 17.80), (3.15, 0.34, 1.15))
 
-    # Small white sloped skylight awning at 1F/2F just west of the semicircular tower (exact final_step_14.png lower-left!)
-    gp.bm_box(bm_sc_white, (-16.15, -43.65, 3.18), (1.85, 1.35, 0.10), rot_x=math.radians(14.0))
-
-    # Wuquan Bldg 1F West Basketball-Side Dark-Green Protective Wall + Upper Brick Lattice Band (exact campus_07.jpg & final_step_14.png lower-right!)
-    gp.bm_box(bm_sc_pad, (-7.10, -54.8, 1.32), (0.14, 21.8, 2.58))
-    _add_plane_uv(bm_sc_lat, (-7.18, -43.9, 2.62), (-7.18, -65.7, 2.62), (-7.18, -65.7, 3.30), (-7.18, -43.9, 3.30))
-    for py_gp in (-65.6, -61.2, -56.8, -52.4, -48.0, -44.0):
-        gp.bm_box(bm_sc_pad, (-7.14, py_gp, 1.66), (0.20, 0.28, 3.32))
-    gp.bm_box(bm_sc_pad, (-7.14, -54.8, 3.34), (0.20, 22.0, 0.16))
-
     objs.append(su.create_mesh_object("Landmark_SouthCorner_Columns", bm_sc_salmon, palette["wall_salmon"], "Bldg_Chongqing", uv_scale=0.35))
     objs.append(su.create_mesh_object("Landmark_SouthCorner_ArcParapets", bm_sc_cream, palette["wall_guanghe"], "Bldg_Chongqing", uv_scale=0.38))
     objs.append(su.create_mesh_object("Landmark_SouthCorner_ArcSlabs", bm_sc_slab, palette["concrete_floor"], "Bldg_Chongqing", uv_scale=0.35))
     objs.append(su.create_mesh_object("Landmark_SouthCorner_SteelRails", bm_sc_rail, palette["steel_silver"], "Bldg_Chongqing", smooth=True))
     objs.append(su.create_mesh_object("Landmark_SouthCorner_5FCageWhite", bm_sc_white, palette["railing_white"], "Bldg_Chongqing", smooth=True))
     objs.append(su.create_mesh_object("Landmark_SouthCorner_5FCanopy", bm_sc_canopy, palette["skylight_glass"], "Bldg_Chongqing"))
-    objs.append(su.create_mesh_object("Landmark_SouthCorner_WuquanGreenPad", bm_sc_pad, palette["pad_green"], "Bldg_Wuquan"))
-    objs.append(su.create_mesh_object("Landmark_SouthCorner_WuquanLattice", bm_sc_lat, palette["brick_lattice_band"], "Bldg_Wuquan", auto_uv=False))
 
     # 4. v11.5 43 廣和街 SW CORNER 2-3F STEPPED ANNEX BUILDING (1:1 rebuild matching final_step_14.png!)
     #    - Front 2F clean cream-tile volume w/ wrapping L-shaped 2F balcony + deep dark-bronze security iron cage + recessed AC units

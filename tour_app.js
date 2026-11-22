@@ -1216,6 +1216,9 @@ const GROUND_ONLY_RECEIVE_PATTERNS = [
   "Zone_Courtyard_Lawns",
   "Zone_Courtyard_PondWater",
   "Zone_Basketball_Court",
+  "Zone_Basketball_Deck",
+  "Zone_Basketball_Walkway",
+  "Zone_Basketball_Drain",
 ];
 
 // --- Load Spec & Compressed GLB (with Build-Hash Cache, Progress Bar & Draco Decoder) ---

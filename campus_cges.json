@@ -2774,10 +2774,10 @@
       "north_sprint_extension_y_max": 48.1
     },
     "basketball_courts": {
-      "x_min": -46.0,
-      "x_max": -8.5,
-      "y_min": -67.0,
-      "y_max": -44.0,
+      "x_min": -46.2,
+      "x_max": -8.6,
+      "y_min": -68.45,
+      "y_max": -45.55,
       "has_canopy": false,
       "fence_h": 4.2
     },

@@ -491,8 +491,6 @@ def build_corridor_building(cfg: dict, palette: Dict[str, bpy.types.Material]) -
                             _add_ac_unit(bm_ac, bm_ac_g, (bx0 + 1.15, c_y0 - 0.24, zf + fh - 0.72), facing="S")
                         if "north" in corridor_sides:
                             _add_ac_unit(bm_ac, bm_ac_g, (bx1 - 1.15, c_y1 + 0.24, zf + fh - 0.72), facing="N")
-                    if prefix == "Bldg_Chongqing" and fl == 0 and not is_stair:
-                        gp.bm_box(bm_pad, (bcx, c_y0 - 0.08, 1.15), (bay_len * 0.88, 0.12, 2.0))
 
                 for side in corridor_sides:
                     if side not in ("north", "south"):

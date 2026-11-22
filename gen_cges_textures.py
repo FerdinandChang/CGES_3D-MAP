@@ -310,36 +310,132 @@ def gen_breezeway_header() -> None:
 
 
 def gen_basketball_court() -> None:
-    w, h = 1024, 640
-    im = Image.new("RGB", (w, h), (198, 112, 86))
+    """高細節 2048x1280 雙全場壓克力 PU 籃球場貼圖（含三分線直線＋圓弧、罰球圈實虛線、禁區搶籃板分位格、免責半圓與水泥伸縮縫）。"""
+    w, h = 2048, 1280
+    apron_col = (196, 108, 82)
+    court_col = (134, 178, 150)
+    key_col = (204, 112, 84)
+    wline = (246, 248, 246)
+
+    im = Image.new("RGB", (w, h), apron_col)
     draw = ImageDraw.Draw(im)
-    pad_x, pad_y = 48, 42
-    draw.rectangle([pad_x, pad_y, w - pad_x, h - pad_y], fill=(142, 182, 156))
+    pad_x, pad_y = 82, 74
+    draw.rectangle([pad_x, pad_y, w - pad_x, h - pad_y], fill=court_col)
 
-    # Subtle acrylic grit texture
+    # Subtle weathered acrylic colour variation patches before drawing lines
     rng = random.Random(88)
-    for _ in range(12000):
-        x, y = rng.randint(pad_x, w - pad_x - 1), rng.randint(pad_y, h - pad_y - 1)
+    for _ in range(260):
+        px = rng.randint(pad_x + 20, w - pad_x - 20)
+        py = rng.randint(pad_y + 20, h - pad_y - 20)
+        rw, rh = rng.randint(45, 160), rng.randint(45, 160)
         d = rng.randint(-6, 6)
-        draw.point((x, y), fill=(142 + d, 182 + d, 156 + d))
+        draw.ellipse([px - rw, py - rh, px + rw, py + rh], fill=(court_col[0] + d, court_col[1] + d, court_col[2] + d))
+    im = im.filter(ImageFilter.GaussianBlur(radius=8))
+    draw = ImageDraw.Draw(im)
+    draw.rectangle([0, 0, w - 1, pad_y], fill=apron_col)
+    draw.rectangle([0, h - pad_y, w - 1, h - 1], fill=apron_col)
+    draw.rectangle([0, 0, pad_x, h - 1], fill=apron_col)
+    draw.rectangle([w - pad_x, 0, w - 1, h - 1], fill=apron_col)
+    draw.rectangle([pad_x, pad_y, w - pad_x, h - pad_y], outline=(232, 236, 232), width=3)
 
-    for idx in range(2):
-        cx0 = pad_x + 36 + idx * 452
-        cx1 = cx0 + 404
-        cy0 = pad_y + 24
-        cy1 = h - pad_y - 24
-        mid_x = (cx0 + cx1) // 2
+    # Concrete sub-base expansion joint grid lines across apron & court
+    for gx in range(128, w, 256):
+        draw.line([(gx, 0), (gx, h)], fill=(120, 158, 134), width=2)
+    for gy in range(128, h, 256):
+        draw.line([(0, gy), (w, gy)], fill=(120, 158, 134), width=2)
+
+    # Fine anti-slip silica grit texture
+    for _ in range(36000):
+        x, y = rng.randint(4, w - 5), rng.randint(4, h - 5)
+        d = rng.randint(-7, 7)
+        in_green = (pad_x < x < w - pad_x) and (pad_y < y < h - pad_y)
+        base = court_col if in_green else apron_col
+        draw.point((x, y), fill=(base[0] + d, base[1] + d, base[2] + d))
+
+    # Two full-size courts centered at U = 0.275 (563px) & U = 0.725 (1485px) — exact match with 3D hoop X positions!
+    for mid_x in (int(w * 0.275), int(w * 0.725)):
+        half_cw = 392
+        cx0, cx1 = mid_x - half_cw, mid_x + half_cw
+        cy0, cy1 = 118, h - 118
         mid_y = (cy0 + cy1) // 2
-        draw.rectangle([cx0, cy0, cx1, cy1], outline=(245, 248, 245), width=5)
-        draw.line([(cx0, mid_y), (cx1, mid_y)], fill=(245, 248, 245), width=4)
-        cr = 42
-        draw.ellipse([mid_x - cr, mid_y - cr, mid_x + cr, mid_y + cr], fill=(208, 114, 86), outline=(245, 248, 245), width=4)
-        kw, kh = 108, 112
-        draw.rectangle([mid_x - kw // 2, cy0, mid_x + kw // 2, cy0 + kh], fill=(208, 114, 86), outline=(245, 248, 245), width=4)
-        draw.arc([mid_x - 145, cy0 - 70, mid_x + 145, cy0 + 185], 0, 180, fill=(245, 248, 245), width=4)
-        draw.rectangle([mid_x - kw // 2, cy1 - kh, mid_x + kw // 2, cy1], fill=(208, 114, 86), outline=(245, 248, 245), width=4)
-        draw.arc([mid_x - 145, cy1 - 185, mid_x + 145, cy1 + 70], 180, 360, fill=(245, 248, 245), width=4)
-    im.save(os.path.join(TEX_DIR, "tex_court_bball.png"))
+
+        # 1. North & South Ends (3-point line, key paint, free-throw solid/dashed circle, lane hash marks, restricted arc)
+        kw, kh = 216, 276
+        r3 = 312
+        dx3 = 298
+        dy3_join = int(math.sqrt(max(1, r3 * r3 - dx3 * dx3)))
+        r_ft = 96
+        r_nc = 60
+
+        for is_top in (True, False):
+            yb = cy0 if is_top else cy1
+            sgn = 1 if is_top else -1
+            hoop_y = yb + sgn * 80
+            ft_y = yb + sgn * kh
+
+            # 3-point straight corner lines + main arc
+            y_join = hoop_y + sgn * dy3_join
+            draw.line([(mid_x - dx3, yb), (mid_x - dx3, y_join)], fill=wline, width=8)
+            draw.line([(mid_x + dx3, yb), (mid_x + dx3, y_join)], fill=wline, width=8)
+            ang_deg = math.degrees(math.atan2(dy3_join, dx3))
+            if is_top:
+                draw.arc([mid_x - r3, hoop_y - r3, mid_x + r3, hoop_y + r3], ang_deg, 180 - ang_deg, fill=wline, width=8)
+            else:
+                draw.arc([mid_x - r3, hoop_y - r3, mid_x + r3, hoop_y + r3], 180 + ang_deg, 360 - ang_deg, fill=wline, width=8)
+
+            # Terracotta painted key rectangle
+            ky0, ky1 = (yb, ft_y) if is_top else (ft_y, yb)
+            draw.rectangle([mid_x - kw // 2, ky0, mid_x + kw // 2, ky1], fill=key_col, outline=wline, width=8)
+
+            # Free-throw circle: outer half solid white, inner half (inside key) 7-segment dashed white!
+            ft_box = [mid_x - r_ft, ft_y - r_ft, mid_x + r_ft, ft_y + r_ft]
+            if is_top:
+                draw.arc(ft_box, 0, 180, fill=wline, width=7)
+                for d_idx in range(7):
+                    a0 = 188 + d_idx * 25
+                    draw.arc(ft_box, a0, a0 + 14, fill=wline, width=7)
+            else:
+                draw.arc(ft_box, 180, 360, fill=wline, width=7)
+                for d_idx in range(7):
+                    a0 = 8 + d_idx * 25
+                    draw.arc(ft_box, a0, a0 + 14, fill=wline, width=7)
+
+            # Rebound lane hash marks & low-post neutral-zone block on both sides of the key
+            for lx_side, l_sgn in ((mid_x - kw // 2, -1), (mid_x + kw // 2, 1)):
+                # Low-post wide block at 96..118px from baseline
+                by0_blk = yb + sgn * 96
+                by1_blk = yb + sgn * 116
+                bx0_b, bx1_b = sorted((lx_side, lx_side + l_sgn * 22))
+                by0_b, by1_b = sorted((by0_blk, by1_blk))
+                draw.rectangle([bx0_b, by0_b, bx1_b, by1_b], fill=wline)
+                # 3 standard rebound ticks
+                for tick_off in (156, 196, 236):
+                    ty = yb + sgn * tick_off
+                    draw.line([(lx_side, ty), (lx_side + l_sgn * 20, ty)], fill=wline, width=7)
+
+            # No-charge restricted area open semicircle + short legs + hoop ring marker (clean open U-shape, not a closed D!)
+            r_nc_open = 48
+            nc_box = [mid_x - r_nc_open, hoop_y - r_nc_open, mid_x + r_nc_open, hoop_y + r_nc_open]
+            if is_top:
+                draw.arc(nc_box, 0, 180, fill=wline, width=6)
+            else:
+                draw.arc(nc_box, 180, 360, fill=wline, width=6)
+            draw.line([(mid_x - r_nc_open, yb + sgn * 54), (mid_x - r_nc_open, hoop_y)], fill=wline, width=6)
+            draw.line([(mid_x + r_nc_open, yb + sgn * 54), (mid_x + r_nc_open, hoop_y)], fill=wline, width=6)
+
+        # 2. Outer Court Boundary, Half-Court Line, Sideline Throw-in Ticks & Center Jump Circle
+        draw.rectangle([cx0, cy0, cx1, cy1], outline=wline, width=9)
+        draw.line([(cx0 - 18, mid_y), (cx1 + 18, mid_y)], fill=wline, width=8)
+        cr = 78
+        draw.ellipse([mid_x - cr, mid_y - cr, mid_x + cr, mid_y + cr], fill=key_col, outline=wline, width=8)
+        draw.line([(mid_x - cr, mid_y), (mid_x + cr, mid_y)], fill=wline, width=7)
+        draw.ellipse([mid_x - 24, mid_y - 24, mid_x + 24, mid_y + 24], outline=wline, width=6)
+        # Sideline coaching box & throw-in hash marks
+        for sy_tick in (cy0 + 390, cy1 - 390):
+            draw.line([(cx0 - 18, sy_tick), (cx0, sy_tick)], fill=wline, width=7)
+            draw.line([(cx1, sy_tick), (cx1 + 18, sy_tick)], fill=wline, width=7)
+
+    im.save(os.path.join(TEX_DIR, "tex_court_bball.png"), optimize=True)
 
 
 def gen_track_pu() -> None:
