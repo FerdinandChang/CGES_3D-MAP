@@ -47,6 +47,7 @@
 
     <!-- Left Unified 115 Academic Year Control, Directory & Wayfinding Sidebar -->
     <aside class="sidebar" id="sidebar">
+      <div class="sheet-handle" id="sheetHandle" title="點擊或上下滑動調整面板高度"><span></span></div>
       <div class="sidebar-header">
         <div class="brand-block">
           <div class="brand-top">
@@ -56,12 +57,14 @@
           <div class="school-sub">3D 實景校園空間・走廊導航與教室配置</div>
         </div>
         <div class="header-actions">
+          <button class="icon-btn mobile-only" id="btnMobileTools" title="工具與日照設定">⚙</button>
+          <button class="icon-btn mobile-only" id="btnSheetExpand" title="切換抽屜高度">⤢</button>
           <button class="icon-btn" id="btnCollapse" title="收合側欄">◀</button>
         </div>
       </div>
 
-      <!-- Unified Compact Toolbar (Integrated inside Left Sidebar) -->
-      <div class="sidebar-tools" aria-label="校園導覽工具列">
+      <!-- Unified Compact Toolbar (Integrated inside Left Sidebar; collapsible on mobile) -->
+      <div class="sidebar-tools" id="sidebarTools" aria-label="校園導覽工具列">
         <div class="tool-row">
           <button class="tool-btn tour-accent" id="btnStartTour" title="啟動／停止 7 站校園自動導覽">▶ 導覽</button>
           <button class="tool-btn active" id="btnLabelMode" title="切換 3D 標牌：智慧 → 全校教室 → 隱藏">🏷 智慧</button>
@@ -173,6 +176,21 @@
     </aside>
 
     <button class="btn sidebar-toggle" id="btnExpand">☰ 校園導覽與路線</button>
+
+    <!-- Compact Mobile Floating Step Banner (shown only on small screens when sheet is collapsed in route mode) -->
+    <div class="mobile-route-hud" id="mobileRouteHud" hidden>
+      <div class="mrh-top">
+        <span class="mrh-badge" id="mrhBadge">步驟 1/5</span>
+        <span class="mrh-dest" id="mrhDest">408 自然教室 · 102m</span>
+        <div class="mrh-actions">
+          <button class="icon-btn icon-btn-sm" id="btnMobileStepPrev" title="上一步">◀</button>
+          <button class="icon-btn icon-btn-sm" id="btnMobileStepNext" title="下一步">▶</button>
+          <button class="btn btn-xs mrh-expand-btn" id="btnMobileRouteExpand">📋 步驟</button>
+          <button class="icon-btn icon-btn-sm" id="btnMobileRouteClose" title="結束路線">✕</button>
+        </div>
+      </div>
+      <div class="mrh-text" id="mrhText">準備出發…</div>
+    </div>
 
     <div class="ruler-banner" id="rulerBanner">
       📏 測距模式已啟用：請在 3D 場景點擊兩個位置量測距離（<span id="rulerDist">等待第一點</span>）

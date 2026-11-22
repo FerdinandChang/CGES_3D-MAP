@@ -1503,43 +1503,373 @@ body {
   font-weight: 600;
 }
 
+/* Desktop-hidden mobile helpers */
+.sheet-handle,
+.mobile-only,
+.mobile-route-hud {
+  display: none;
+}
+
 @media (max-width: 900px) {
+  .mobile-only {
+    display: inline-flex;
+  }
+
+  .sheet-handle {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding: 7px 0 3px;
+    cursor: pointer;
+    touch-action: none;
+    flex-shrink: 0;
+  }
+
+  .sheet-handle span {
+    width: 38px;
+    height: 4px;
+    border-radius: 999px;
+    background: rgba(148, 163, 184, 0.48);
+  }
+
+  /* Compact top floating step banner when sheet is collapsed during route mode */
+  .mobile-route-hud {
+    position: fixed;
+    top: calc(10px + env(safe-area-inset-top, 0px));
+    left: 10px;
+    right: 10px;
+    z-index: 34;
+    background: rgba(13, 22, 39, 0.92);
+    border: 1px solid rgba(56, 189, 248, 0.52);
+    border-radius: 14px;
+    padding: 8px 10px;
+    backdrop-filter: blur(16px);
+    box-shadow: 0 12px 30px rgba(0, 0, 0, 0.42);
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .mrh-top {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    min-width: 0;
+  }
+
+  .mrh-badge {
+    font-size: 10.5px;
+    font-weight: 800;
+    padding: 2px 7px;
+    border-radius: 999px;
+    background: rgba(56, 189, 248, 0.22);
+    color: #7dd3fc;
+    border: 1px solid rgba(56, 189, 248, 0.45);
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+
+  .mrh-dest {
+    flex: 1;
+    min-width: 0;
+    font-size: 12px;
+    font-weight: 800;
+    color: #f8fafc;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .mrh-actions {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    flex-shrink: 0;
+  }
+
+  .mrh-expand-btn {
+    margin-left: 0;
+    padding: 3px 8px;
+    font-size: 11px;
+  }
+
+  .mrh-text {
+    font-size: 11.5px;
+    line-height: 1.38;
+    color: #cbd5e1;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+
+  .mrh-text strong {
+    color: #fde047;
+  }
+
   .ruler-banner {
+    top: calc(10px + env(safe-area-inset-top, 0px));
     left: 50%;
     max-width: calc(100vw - 20px);
     font-size: 11.5px;
+    padding: 6px 12px;
   }
+
+  /* Slimmer Bottom-Sheet Sidebar */
   .sidebar {
     width: calc(100vw - 16px);
     max-width: none;
-    height: 48vh;
+    height: 44dvh;
+    max-height: 440px;
     top: auto;
-    bottom: 8px;
+    bottom: calc(8px + env(safe-area-inset-bottom, 0px));
     left: 8px;
-    border-radius: 16px;
+    border-radius: 18px;
+    transition: transform 0.24s cubic-bezier(0.22, 1, 0.36, 1), height 0.22s ease;
   }
+
+  .sidebar.sheet-tall {
+    height: 74dvh;
+    max-height: 82dvh;
+  }
+
   .sidebar.collapsed {
-    transform: translateY(calc(100% + 24px));
+    transform: translateY(calc(100% + 28px));
   }
+
+  .sidebar-header {
+    padding: 4px 10px 7px 12px;
+  }
+
+  .school-title {
+    font-size: 14px;
+  }
+
+  .school-sub {
+    display: none;
+  }
+
+  /* Hide heavy tool rows by default on mobile; toggled via ⚙ button */
+  .sidebar-tools {
+    display: none;
+    padding: 6px 10px;
+    gap: 5px;
+  }
+
+  .sidebar-tools.mobile-tools-open {
+    display: flex;
+  }
+
+  .sidebar-tabs {
+    padding: 6px 10px 5px;
+    gap: 5px;
+  }
+
+  .s-tab {
+    padding: 5px 6px;
+    font-size: 11.5px;
+  }
+
+  .search-wrap {
+    padding: 6px 10px;
+    gap: 6px;
+  }
+
+  .search-input {
+    font-size: 12px;
+    padding: 7px 28px 7px 30px;
+  }
+
+  /* Single-row horizontal scrolling category pills on mobile */
+  .cat-filter-bar {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+    padding-bottom: 2px;
+  }
+
+  .cat-filter-bar::-webkit-scrollbar {
+    display: none;
+  }
+
+  .cat-pill {
+    flex-shrink: 0;
+  }
+
+  .context-bar {
+    padding: 6px 10px;
+  }
+
+  .sidebar-body {
+    padding: 6px 10px 8px;
+  }
+
+  .route-dest-card {
+    padding: 6px 10px;
+  }
+
+  .route-dest-name {
+    font-size: 12.5px;
+  }
+
+  .route-controls {
+    padding: 5px 10px 4px;
+  }
+
+  /* Pack 4 route action buttons onto 1 single row on mobile */
+  .route-cam-actions {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 4px;
+    padding: 0 10px 6px;
+  }
+
+  .route-cam-actions .btn-sm {
+    padding: 4px 3px;
+    font-size: 10.5px;
+    gap: 2px;
+  }
+
+  .route-steps {
+    padding: 6px 8px 8px;
+    gap: 5px;
+  }
+
+  .route-step-item {
+    padding: 6px 8px;
+  }
+
+  .route-step-body {
+    font-size: 11.5px;
+    line-height: 1.4;
+  }
+
+  .sidebar-footer {
+    padding: 5px 10px;
+    justify-content: flex-end;
+  }
+
+  .footer-tip {
+    display: none;
+  }
+
+  /* Floating expand button when collapsed */
   .sidebar-toggle {
     top: auto;
-    bottom: 14px;
+    bottom: calc(14px + env(safe-area-inset-bottom, 0px));
     left: 50%;
     transform: translateX(-50%);
     box-shadow: 0 10px 28px rgba(0, 0, 0, 0.45);
     border: 1px solid rgba(125, 211, 252, 0.55);
+    padding: 8px 16px;
+    font-size: 12.5px;
   }
-  .search-input {
+
+  /* Move expand button to top-left pill if a bottom card (inspector or tour) is active, or hide when mobileRouteHud is up */
+  body.has-bottom-card .sidebar-toggle {
+    top: calc(10px + env(safe-area-inset-top, 0px));
+    left: 10px;
+    bottom: auto;
+    transform: none;
+    padding: 6px 12px;
     font-size: 12px;
   }
-  .room-inspector,
-  .tour-card {
-    left: 50%;
-    width: calc(100vw - 20px);
-    bottom: calc(48vh + 14px);
+
+  body.has-mobile-route-hud .sidebar-toggle {
+    display: none !important;
   }
-  .sidebar.collapsed ~ .room-inspector,
+
+  /* CRITICAL: Never stack room-inspector on top of an expanded bottom sheet! */
+  .sidebar:not(.collapsed) ~ .room-inspector {
+    display: none !important;
+  }
+
+  /* Compact two-row bottom inspector card when sheet is collapsed */
+  .sidebar.collapsed ~ .room-inspector {
+    left: 10px;
+    right: 10px;
+    width: auto;
+    transform: none;
+    bottom: calc(10px + env(safe-area-inset-bottom, 0px));
+    flex-direction: column;
+    align-items: stretch;
+    gap: 7px;
+    padding: 9px 11px;
+    border-radius: 14px;
+  }
+
+  .sidebar.collapsed ~ .room-inspector .ri-left {
+    align-items: center;
+    gap: 8px;
+  }
+
+  .sidebar.collapsed ~ .room-inspector .ri-cat-bar {
+    height: 28px;
+    width: 4px;
+  }
+
+  .sidebar.collapsed ~ .room-inspector .ri-info {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .sidebar.collapsed ~ .room-inspector .ri-meta {
+    font-size: 10.5px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .sidebar.collapsed ~ .room-inspector .ri-title-row {
+    margin: 1px 0 0;
+    min-width: 0;
+  }
+
+  .sidebar.collapsed ~ .room-inspector .ri-name {
+    font-size: 13.5px;
+  }
+
+  .sidebar.collapsed ~ .room-inspector .ri-stairs {
+    display: none;
+  }
+
+  .sidebar.collapsed ~ .room-inspector .ri-actions {
+    width: 100%;
+    justify-content: space-between;
+    gap: 4px;
+  }
+
+  .sidebar.collapsed ~ .room-inspector .ri-actions .btn-sm {
+    padding: 5px 8px;
+    font-size: 11px;
+  }
+
+  .sidebar.collapsed ~ .room-inspector .ri-actions #btnRoomRoute {
+    flex: 1;
+  }
+
+  /* Compact bottom tour card */
+  .tour-card,
   .sidebar.collapsed ~ .tour-card {
-    bottom: 58px;
+    left: 10px;
+    right: 10px;
+    width: auto;
+    transform: none;
+    bottom: calc(10px + env(safe-area-inset-bottom, 0px));
+    padding: 11px 13px;
+  }
+
+  .tour-title {
+    font-size: 14px;
+  }
+
+  .tour-desc {
+    font-size: 11.5px;
+    line-height: 1.45;
+    margin-bottom: 8px;
+  }
+
+  .tour-hint {
+    display: none;
   }
 }

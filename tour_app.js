@@ -245,26 +245,73 @@ const state = {
   sliceCurrentZ: 999,
   sliceLabel: "",
   routeData: null,
+  activeRouteStepIdx: -1,
   routeFlyAlong: false,
   routeFlyProgress: 0,
 };
+
+function isMobileViewport() {
+  return window.innerWidth <= 900;
+}
+
+function syncMobileHudState() {
+  const sidebarEl = document.getElementById("sidebar");
+  const isCollapsed = sidebarEl?.classList.contains("collapsed");
+  const inspector = document.getElementById("roomInspector");
+  const hasBottomCard = Boolean((inspector && !inspector.hidden) || state.tourActive);
+  document.body.classList.toggle("has-bottom-card", hasBottomCard);
+
+  const hud = document.getElementById("mobileRouteHud");
+  if (!hud) return;
+  const showHud = Boolean(isMobileViewport() && isCollapsed && state.routeOpen && state.routeData && state.routeData.steps?.length);
+  hud.hidden = !showHud;
+  document.body.classList.toggle("has-mobile-route-hud", showHud);
+
+  if (showHud) {
+    const steps = state.routeData.steps;
+    const idx = state.activeRouteStepIdx >= 0 && state.activeRouteStepIdx < steps.length ? state.activeRouteStepIdx : 0;
+    const step = steps[idx];
+    const room = state.allRooms.find((r) => r.uid === state.activeRoomUid);
+    const badgeEl = document.getElementById("mrhBadge");
+    const destEl = document.getElementById("mrhDest");
+    const textEl = document.getElementById("mrhText");
+    if (badgeEl) badgeEl.textContent = `步驟 ${idx + 1}/${steps.length}`;
+    if (destEl) destEl.textContent = `${room ? room.short : "目標"} · ${state.routeData.totalMeters}m`;
+    if (textEl) textEl.innerHTML = `${step.icon} ${step.text}`;
+  }
+}
+
+function setSidebarCollapsed(collapsed) {
+  const sidebarEl = document.getElementById("sidebar");
+  if (!sidebarEl) return;
+  sidebarEl.classList.toggle("collapsed", collapsed);
+  if (collapsed) sidebarEl.classList.remove("sheet-tall");
+  updateCameraViewportOffset();
+  syncMobileHudState();
+}
 
 function updateCameraViewportOffset() {
   const w = window.innerWidth;
   const h = window.innerHeight;
   const sidebarEl = document.getElementById("sidebar");
   const isCollapsed = sidebarEl?.classList.contains("collapsed");
+  const isTall = sidebarEl?.classList.contains("sheet-tall");
   const collapseBtn = document.getElementById("btnCollapse");
   const footerTip = document.querySelector(".footer-tip");
   if (collapseBtn) collapseBtn.textContent = w <= 900 ? "▼" : "◀";
   if (footerTip) footerTip.textContent = w <= 900 ? "單指旋轉・雙指平移與縮放" : "左鍵旋轉・右鍵平移・滾輪縮放";
   if (w > 900 && !isCollapsed) {
-    // Shift projection center right by half the sidebar width so 3D campus & room pins stay centered in open canvas!
+    // Desktop: shift projection center right by half sidebar width
     camera.setViewOffset(w, h, -190, 0, w, h);
+  } else if (w <= 900 && !isCollapsed) {
+    // Mobile: shift projection center upward so 3D subject sits centered above the bottom sheet
+    const yShift = Math.round(h * (isTall ? 0.32 : 0.21));
+    camera.setViewOffset(w, h, 0, yShift, w, h);
   } else {
     camera.clearViewOffset();
   }
   camera.updateProjectionMatrix();
+  syncMobileHudState();
 }
 
 // Default hero landing perspective (NW corner framing Heping vertical sign, N/S oculus bridges, Guanghe emblem & main gate!)
@@ -283,6 +330,9 @@ function flyTo(posArr, tgtArr) {
 
 camera.position.copy(b2t(...DEFAULT_VIEW.pos));
 controls.target.copy(b2t(...DEFAULT_VIEW.tgt));
+if (isMobileViewport()) {
+  document.getElementById("sidebar")?.classList.add("collapsed");
+}
 updateCameraViewportOffset();
 controls.update();
 
@@ -492,6 +542,40 @@ function clearRouteVisuals() {
   routePulseOrb = null;
 }
 
+function selectRouteStep(idx, collapseSheetOnMobile = false) {
+  if (!state.routeData || !state.routeData.steps?.length) return;
+  const steps = state.routeData.steps;
+  const safeIdx = ((idx % steps.length) + steps.length) % steps.length;
+  state.activeRouteStepIdx = safeIdx;
+  const step = steps[safeIdx];
+
+  stopRouteFlyAlong();
+  const items = document.querySelectorAll(".route-step-item");
+  items.forEach((el, i) => el.classList.toggle("active", i === safeIdx));
+
+  const [sx, sy, sz] = step.pos;
+  const [dx, dy] = step.dir || [1, 0];
+  if (state.autoSliceRoute && step.indoor && step.zoneId && step.zoneId !== "Zone_Outdoor") {
+    const sSlice = getFloorSliceZ(step.zoneId, step.floor);
+    updateSliceCutaway(sSlice, `${step.floor}F 走廊`);
+  } else if (!state.autoSliceRoute || !step.indoor) {
+    if (!state.xrayOn) updateSliceCutaway(null, "");
+  }
+
+  if (collapseSheetOnMobile && isMobileViewport()) {
+    setSidebarCollapsed(true);
+  } else {
+    syncMobileHudState();
+  }
+
+  if (step.indoor) {
+    // Sloped corridor-eye view looking down the sliced open hallway along direction of travel
+    flyTo([sx - dx * 12.5, sy - dy * 12.5, sz + 5.8], [sx + dx * 5.0, sy + dy * 5.0, sz + 0.4]);
+  } else {
+    flyTo([sx - dx * 16.0, sy - dy * 16.0, Math.max(7.5, sz + 8.5)], [sx + dx * 4.0, sy + dy * 4.0, sz + 0.6]);
+  }
+}
+
 function renderActiveRoute(room, shouldOpenPanel = false) {
   clearRouteVisuals();
   const emptyEl = document.getElementById("routeEmptyState");
@@ -548,6 +632,7 @@ function renderActiveRoute(room, shouldOpenPanel = false) {
 
   const listEl = document.getElementById("routeStepsList");
   listEl.innerHTML = "";
+  state.activeRouteStepIdx = 0;
   data.steps.forEach((step, idx) => {
     const li = document.createElement("li");
     li.className = "route-step-item";
@@ -556,29 +641,10 @@ function renderActiveRoute(room, shouldOpenPanel = false) {
       <div class="route-step-body">${step.icon} ${step.text}</div>
       <span class="route-step-badge">${step.badge}</span>
     `;
-    li.addEventListener("click", () => {
-      stopRouteFlyAlong();
-      document.querySelectorAll(".route-step-item").forEach((el) => el.classList.remove("active"));
-      li.classList.add("active");
-
-      const [sx, sy, sz] = step.pos;
-      const [dx, dy] = step.dir || [1, 0];
-      if (state.autoSliceRoute && step.indoor && step.zoneId && step.zoneId !== "Zone_Outdoor") {
-        const sSlice = getFloorSliceZ(step.zoneId, step.floor);
-        updateSliceCutaway(sSlice, `${step.floor}F 走廊`);
-      } else if (!state.autoSliceRoute || !step.indoor) {
-        if (!state.xrayOn) updateSliceCutaway(null, "");
-      }
-
-      if (step.indoor) {
-        // Sloped corridor-eye view looking down the sliced open hallway along direction of travel
-        flyTo([sx - dx * 12.5, sy - dy * 12.5, sz + 5.8], [sx + dx * 5.0, sy + dy * 5.0, sz + 0.4]);
-      } else {
-        flyTo([sx - dx * 16.0, sy - dy * 16.0, Math.max(7.5, sz + 8.5)], [sx + dx * 4.0, sy + dy * 4.0, sz + 0.6]);
-      }
-    });
+    li.addEventListener("click", () => selectRouteStep(idx, true));
     listEl.appendChild(li);
   });
+  syncMobileHudState();
 
   // Build 3D Glowing Route Tube + Moving Golden Orb + Waypoint Chips
   if (data.points3D.length >= 2) {
@@ -827,6 +893,7 @@ function clearRoomPin() {
   if (activeBodyEl) activeBodyEl.hidden = true;
   if (badgeEl) badgeEl.hidden = true;
   if (!state.xrayOn) updateSliceCutaway(null, "");
+  syncMobileHudState();
 }
 
 function computeCameraForRoom(room, aerial = false) {
@@ -890,9 +957,11 @@ function focusRoomByUid(uid, keepFloorAll = false, openRoute = false) {
   if (openRoute && state.routeData) {
     flyToRouteOverview();
   } else {
+    if (isMobileViewport()) setSidebarCollapsed(true);
     const { camPos, tgt } = computeCameraForRoom(room, false);
     flyTo(camPos, tgt);
   }
+  syncMobileHudState();
 }
 
 // --- URL Hash Deep Linking (#room=305, #route=305&from=gate_main&acc=1, or #zone=Bldg_Wuquan&floor=3F) ---
@@ -1348,6 +1417,8 @@ function startTour() {
   document.getElementById("tourCard").classList.add("show");
   document.getElementById("btnTourPlayPause").textContent = "⏸ 暫停輪播";
   document.getElementById("btnStartTour").classList.add("active");
+  if (isMobileViewport()) setSidebarCollapsed(true);
+  else syncMobileHudState();
   showTourStop(0);
   scheduleNextTourStop();
 }
@@ -1357,6 +1428,7 @@ function stopTour() {
   if (state.tourTimer) clearInterval(state.tourTimer);
   document.getElementById("tourCard").classList.remove("show");
   document.getElementById("btnStartTour").classList.remove("active");
+  syncMobileHudState();
 }
 
 // --- Pointer Raycasting (Click 3D Building / Ruler) ---
@@ -1392,12 +1464,85 @@ renderer.domElement.addEventListener("pointerup", (e) => {
 
 // --- UI Bindings ---
 document.getElementById("btnCollapse").addEventListener("click", () => {
-  document.getElementById("sidebar").classList.add("collapsed");
-  updateCameraViewportOffset();
+  setSidebarCollapsed(true);
 });
 document.getElementById("btnExpand").addEventListener("click", () => {
-  document.getElementById("sidebar").classList.remove("collapsed");
+  setSidebarCollapsed(false);
+});
+
+document.getElementById("btnMobileTools")?.addEventListener("click", (e) => {
+  const tools = document.getElementById("sidebarTools");
+  if (!tools) return;
+  const open = tools.classList.toggle("mobile-tools-open");
+  e.currentTarget.classList.toggle("active", open);
+});
+
+function toggleMobileSheetTall() {
+  if (!isMobileViewport()) return;
+  const sidebarEl = document.getElementById("sidebar");
+  if (!sidebarEl) return;
+  const tall = sidebarEl.classList.toggle("sheet-tall");
+  const btn = document.getElementById("btnSheetExpand");
+  if (btn) btn.classList.toggle("active", tall);
   updateCameraViewportOffset();
+}
+
+document.getElementById("btnSheetExpand")?.addEventListener("click", toggleMobileSheetTall);
+
+// Touch drag gesture on mobile bottom-sheet handle bar (swipe up = tall, swipe down = half/collapse)
+const sheetHandleEl = document.getElementById("sheetHandle");
+if (sheetHandleEl) {
+  let dragStartY = 0;
+  let dragged = false;
+  sheetHandleEl.addEventListener(
+    "touchstart",
+    (e) => {
+      dragStartY = e.touches[0].clientY;
+      dragged = false;
+    },
+    { passive: true }
+  );
+  sheetHandleEl.addEventListener(
+    "touchend",
+    (e) => {
+      const dy = e.changedTouches[0].clientY - dragStartY;
+      const sidebarEl = document.getElementById("sidebar");
+      if (!sidebarEl) return;
+      if (dy < -30) {
+        dragged = true;
+        sidebarEl.classList.add("sheet-tall");
+        document.getElementById("btnSheetExpand")?.classList.add("active");
+        updateCameraViewportOffset();
+      } else if (dy > 30) {
+        dragged = true;
+        if (sidebarEl.classList.contains("sheet-tall")) {
+          sidebarEl.classList.remove("sheet-tall");
+          document.getElementById("btnSheetExpand")?.classList.remove("active");
+          updateCameraViewportOffset();
+        } else {
+          setSidebarCollapsed(true);
+        }
+      }
+    },
+    { passive: true }
+  );
+  sheetHandleEl.addEventListener("click", () => {
+    if (!dragged) toggleMobileSheetTall();
+  });
+}
+
+document.getElementById("btnMobileStepPrev")?.addEventListener("click", () => {
+  selectRouteStep((state.activeRouteStepIdx >= 0 ? state.activeRouteStepIdx : 0) - 1, false);
+});
+document.getElementById("btnMobileStepNext")?.addEventListener("click", () => {
+  selectRouteStep((state.activeRouteStepIdx >= 0 ? state.activeRouteStepIdx : 0) + 1, false);
+});
+document.getElementById("btnMobileRouteExpand")?.addEventListener("click", () => {
+  setSidebarTab("route", true);
+  setSidebarCollapsed(false);
+});
+document.getElementById("btnMobileRouteClose")?.addEventListener("click", () => {
+  document.getElementById("btnCloseRoute")?.click();
 });
 
 const searchInput = document.getElementById("roomSearch");
@@ -1478,6 +1623,7 @@ document.getElementById("btnRuler").addEventListener("click", (e) => {
   state.rulerMode = !state.rulerMode;
   e.currentTarget.classList.toggle("active", state.rulerMode);
   document.getElementById("rulerBanner").classList.toggle("show", state.rulerMode);
+  if (state.rulerMode && isMobileViewport()) setSidebarCollapsed(true);
   if (!state.rulerMode) clearRuler();
 });
 document.getElementById("btnClearRuler").addEventListener("click", clearRuler);
@@ -1489,7 +1635,8 @@ document.getElementById("btnRoomNext").addEventListener("click", () => stepActiv
 document.getElementById("btnRoomRoute").addEventListener("click", () => {
   const room = state.allRooms.find((r) => r.uid === state.activeRoomUid);
   if (!room) return;
-  if (state.routeOpen && state.sidebarTab === "route") {
+  const sidebarCollapsed = document.getElementById("sidebar")?.classList.contains("collapsed");
+  if (state.routeOpen && state.sidebarTab === "route" && !sidebarCollapsed) {
     state.routeOpen = false;
     setSidebarTab("dir");
     renderActiveRoute(room, false);
@@ -1497,10 +1644,12 @@ document.getElementById("btnRoomRoute").addEventListener("click", () => {
   } else {
     state.routeOpen = true;
     renderActiveRoute(room, true);
+    setSidebarCollapsed(false);
     flyToRouteOverview();
   }
   applyVisualModes();
   syncUrlHash();
+  syncMobileHudState();
 });
 document.getElementById("btnCloseRoute").addEventListener("click", () => {
   state.routeOpen = false;
@@ -1512,6 +1661,7 @@ document.getElementById("btnCloseRoute").addEventListener("click", () => {
   if (!state.xrayOn) updateSliceCutaway(null, "");
   applyVisualModes();
   syncUrlHash();
+  syncMobileHudState();
 });
 
 document.querySelectorAll("[data-quick-room]").forEach((btn) => {
@@ -1559,7 +1709,10 @@ document.getElementById("btnRouteSliceAuto")?.addEventListener("click", (e) => {
     updateSliceCutaway(null, "");
   }
 });
-document.getElementById("btnRouteOverview").addEventListener("click", flyToRouteOverview);
+document.getElementById("btnRouteOverview").addEventListener("click", () => {
+  if (isMobileViewport()) setSidebarCollapsed(true);
+  flyToRouteOverview();
+});
 document.getElementById("btnRouteFlyAlong").addEventListener("click", (e) => {
   if (!routeCurve) return;
   state.routeFlyAlong = !state.routeFlyAlong;
@@ -1569,6 +1722,7 @@ document.getElementById("btnRouteFlyAlong").addEventListener("click", (e) => {
     tweenTgt = null;
     e.currentTarget.textContent = "⏸ 暫停實境";
     e.currentTarget.classList.add("active");
+    if (isMobileViewport()) setSidebarCollapsed(true);
     requestRender(20);
   } else {
     stopRouteFlyAlong();
@@ -1719,6 +1873,11 @@ async function init() {
   refresh3DLabels();
   renderSidebar();
   applyUrlHash();
+  if (isMobileViewport()) {
+    setSidebarCollapsed(true);
+  } else {
+    syncMobileHudState();
+  }
   requestRender(12);
 
   const statusTextEl = document.getElementById("statusText");
