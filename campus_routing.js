@@ -455,6 +455,7 @@ export function computeCampusRoute(room, startId = "gate_main", accessible = fal
     if (nodeId === targetId) {
       rawSteps.unshift({
         id: targetId,
+        zoneId: room.zoneId,
         x: targetMeta.x,
         y: targetMeta.y,
         z: targetMeta.z,
@@ -500,6 +501,11 @@ export function computeCampusRoute(room, startId = "gate_main", accessible = fal
   const estMinutes = Math.max(1, Math.round(totalMeters / 65));
 
   // --- 將節點鏈轉譯為自然中文 Turn-by-Turn 分步指引 ---
+  const normDir = (v) => {
+    const l = Math.hypot(v[0], v[1]);
+    return l > 0.01 ? [v[0] / l, v[1] / l] : [1, 0];
+  };
+  const isIndoorZone = (zId) => Boolean(zId && zId !== "Zone_Outdoor");
   const steps = [];
   const startMeta = ROUTE_STARTS.find((s) => s.id === startId) || ROUTE_STARTS[0];
   let heading = startId === "gate_main" ? [1, 0] : startId === "gate_back3" ? [0, 1] : [0, -1];
@@ -522,16 +528,20 @@ export function computeCampusRoute(room, startId = "gate_main", accessible = fal
       const endFloor = endNode.floor || startFloor;
       const isUp = endFloor >= startFloor;
       const verb = edge.kind === "lift" ? "搭乘" : "走";
+      if (endNode.exitDir) {
+        heading = [...endNode.exitDir];
+      }
       steps.push({
         icon: edge.kind === "lift" ? "🛗" : "🪜",
         action: `${verb} ${stairLabel}`,
         text: `${verb} <strong>${stairLabel}</strong> ${isUp ? "上" : "下"}至 <strong>${endFloor}F</strong>（共 ${Math.abs(endFloor - startFloor)} 層）`,
         pos: [endNode.x, endNode.y, endNode.z],
         badge: `${endFloor}F`,
+        zoneId: endNode.zoneId || cur.zoneId || room.zoneId,
+        floor: endFloor,
+        dir: normDir(heading),
+        indoor: true,
       });
-      if (endNode.exitDir) {
-        heading = [...endNode.exitDir];
-      }
       i = j;
       continue;
     }
@@ -553,8 +563,12 @@ export function computeCampusRoute(room, startId = "gate_main", accessible = fal
         icon: "🌉",
         action: `${turn === "直走" ? "直行" : turn}過連廊／天橋`,
         text: `${turn === "直走" ? "直行" : turn}經 <strong>${bName}</strong>（約 ${Math.round(segLen)}m）至 ${endNode.label || "對側校舍"}`,
-        pos: [endNode.x, endNode.y, endNode.z],
+        pos: [(cur.x + endNode.x) * 0.5, (cur.y + endNode.y) * 0.5, (cur.z + endNode.z) * 0.5],
         badge: `${Math.round(segLen)}m`,
+        zoneId: endNode.zoneId || cur.zoneId || room.zoneId,
+        floor: endNode.floor || cur.floor || 2,
+        dir: normDir(heading),
+        indoor: true,
       });
       i = j;
       continue;
@@ -565,12 +579,17 @@ export function computeCampusRoute(room, startId = "gate_main", accessible = fal
       const turn = classifyTurn(heading, vec);
       const dSteps = Math.max(3, Math.round(Math.hypot(vec[0], vec[1])));
       if (Math.hypot(vec[0], vec[1]) > 0.4) heading = vec;
+      const stepZone = nxt.zoneId || cur.zoneId || "Zone_Outdoor";
       steps.push({
         icon: "🪜",
         action: "踏上階梯",
         text: `${turn === "直走" ? "" : `${turn}後`}踏上 <strong>${edge.dirName}</strong>（約 ${dSteps}m）`,
         pos: [nxt.x, nxt.y, nxt.z],
         badge: `${dSteps}m`,
+        zoneId: stepZone,
+        floor: nxt.floor || 1,
+        dir: normDir(heading),
+        indoor: isIndoorZone(stepZone),
       });
       i++;
       continue;
@@ -603,6 +622,10 @@ export function computeCampusRoute(room, startId = "gate_main", accessible = fal
     const isFinalLeg = j === rawSteps.length - 1;
     const turn = isFirstLeg ? "直走" : classifyTurn(heading, runVec);
     if (Math.hypot(runVec[0], runVec[1]) > 0.3) heading = runVec;
+    const midPos = [(cur.x + endNode.x) * 0.5, (cur.y + endNode.y) * 0.5, (cur.z + endNode.z) * 0.5];
+    const segZone = isFinalLeg ? room.zoneId : endNode.zoneId || cur.zoneId || "Zone_Outdoor";
+    const segFloor = endNode.floor || cur.floor || 1;
+    const segIndoor = edge?.kind === "corridor" || isIndoorZone(segZone);
 
     if (isFirstLeg) {
       const destLabel = endNode.id === targetId ? `<strong>${room.short}</strong>` : `<strong>${endNode.label || "校內廣場"}</strong>`;
@@ -614,6 +637,10 @@ export function computeCampusRoute(room, startId = "gate_main", accessible = fal
           : `從 <strong>${startMeta.label}</strong> 進入校園直走約 ${distM}m 至 ${destLabel}`,
         pos: [cur.x, cur.y, cur.z],
         badge: `${distM}m`,
+        zoneId: cur.zoneId || "Zone_Outdoor",
+        floor: 1,
+        dir: normDir(heading),
+        indoor: false,
       });
     } else if (isFinalLeg) {
       const side = classifySide(heading, targetMeta.roomVec);
@@ -625,8 +652,12 @@ export function computeCampusRoute(room, startId = "gate_main", accessible = fal
         icon: turn === "左轉" ? "↩️" : turn === "右轉" ? "↪️" : "🎯",
         action: turn,
         text: `${prefix}${turnText}約 ${distM}m${sideText} <strong>${room.short}</strong>`,
-        pos: [endNode.x, endNode.y, endNode.z],
+        pos: midPos,
         badge: "抵達",
+        zoneId: room.zoneId,
+        floor: parseFloorNum(room.floor),
+        dir: normDir(heading),
+        indoor: isIndoorZone(room.zoneId),
       });
     } else {
       const turnArrow = turn === "左轉" ? "↩️" : turn === "右轉" ? "↪️" : "🚶";
@@ -636,8 +667,12 @@ export function computeCampusRoute(room, startId = "gate_main", accessible = fal
         icon: turnArrow,
         action: turn,
         text: `${turnPhrase}約 ${distM}m 至 <strong>${targetName}</strong>`,
-        pos: [endNode.x, endNode.y, endNode.z],
+        pos: midPos,
         badge: `${distM}m`,
+        zoneId: segZone,
+        floor: segFloor,
+        dir: normDir(heading),
+        indoor: segIndoor,
       });
     }
 
@@ -652,6 +687,10 @@ export function computeCampusRoute(room, startId = "gate_main", accessible = fal
       text: `出梯口${lastSide ? `<strong>${lastSide}</strong>` : "前方"}即達 <strong>${room.short}</strong>`,
       pos: [targetMeta.x, targetMeta.y, targetMeta.z],
       badge: "抵達",
+      zoneId: room.zoneId,
+      floor: parseFloorNum(room.floor),
+      dir: normDir(heading),
+      indoor: isIndoorZone(room.zoneId),
     });
   }
 
@@ -668,6 +707,8 @@ export function computeCampusRoute(room, startId = "gate_main", accessible = fal
     startId,
     startLabel: startMeta.label,
     accessible,
+    destZoneId: room.zoneId,
+    destFloor: parseFloorNum(room.floor),
     totalMeters,
     estMinutes,
     steps,

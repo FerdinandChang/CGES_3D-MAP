@@ -45,7 +45,7 @@
       <div class="status-sub" id="statusSub">115 學年度・全校 148 處空間與雙面走廊門牌</div>
     </div>
 
-    <!-- Left 115 Academic Year Interactive Directory Sidebar -->
+    <!-- Left Unified 115 Academic Year Control, Directory & Wayfinding Sidebar -->
     <aside class="sidebar" id="sidebar">
       <div class="sidebar-header">
         <div class="brand-block">
@@ -53,40 +53,117 @@
             <h1 class="school-title">新北市板橋區重慶國小</h1>
             <span class="year-pill">115 學年度</span>
           </div>
-          <div class="school-sub">3D 實景校園空間與教室配置導覽</div>
+          <div class="school-sub">3D 實景校園空間・走廊導航與教室配置</div>
         </div>
         <div class="header-actions">
-          <button class="icon-btn" id="btnOpenMapSide" title="查看官方 115 學年度班級配置圖">🗺</button>
           <button class="icon-btn" id="btnCollapse" title="收合側欄">◀</button>
         </div>
       </div>
 
-      <!-- Search Bar (Clean SVG icon + clear button, zero text clipping) -->
-      <div class="search-wrap">
-        <div class="search-box">
-          <svg class="search-icon" viewBox="0 0 20 20" fill="none" aria-hidden="true">
-            <circle cx="9" cy="9" r="5.8" stroke="currentColor" stroke-width="1.8" />
-            <path d="M13.5 13.5L17 17" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" />
-          </svg>
-          <input
-            type="text"
-            id="roomSearch"
-            class="search-input"
-            autocomplete="off"
-            placeholder="搜尋房號、班級或處室（例：305、六6、圖書室）"
-          />
-          <button class="search-clear" id="btnClearSearch" title="清除搜尋" hidden>✕</button>
+      <!-- Unified Compact Toolbar (Integrated inside Left Sidebar) -->
+      <div class="sidebar-tools" aria-label="校園導覽工具列">
+        <div class="tool-row">
+          <button class="tool-btn tour-accent" id="btnStartTour" title="啟動／停止 7 站校園自動導覽">▶ 導覽</button>
+          <button class="tool-btn active" id="btnLabelMode" title="切換 3D 標牌：智慧 → 全校教室 → 隱藏">🏷 智慧</button>
+          <button class="tool-btn" id="btnOpenMap" title="開啟 115 學年度官方教室配置圖">🗺 配置圖</button>
+          <button class="tool-btn" id="btnXray" title="剖開樓層天花板露出走廊／透視屋頂">🔪 剖層</button>
+          <button class="tool-btn" id="btnRuler" title="點選場景任兩點量測實際公尺距離">📏 測距</button>
         </div>
-
-        <!-- Category Quick Filter Pills -->
-        <div class="cat-filter-bar" id="catFilterBar" role="tablist" aria-label="空間分類篩選"></div>
+        <div class="tool-sub-row">
+          <span class="slice-status" id="sliceStatus" title="目前建築顯示層面">🏠 完整校舍</span>
+          <div class="sun-pills" role="group" aria-label="日照時段">
+            <button class="sun-btn" data-sun="morning" title="上午光影">☀上午</button>
+            <button class="sun-btn active" data-sun="afternoon" title="午後光影">🌤午後</button>
+            <button class="sun-btn" data-sun="sunset" title="黃昏光影">🌇黃昏</button>
+          </div>
+        </div>
       </div>
 
-      <!-- Contextual Drill-down Bar (Zone Breadcrumb + Floor Tabs) -->
-      <div class="context-bar" id="contextBar" hidden></div>
+      <!-- Left Panel Mode Tabs: Directory vs. Turn-by-Turn Route -->
+      <div class="sidebar-tabs" role="tablist">
+        <button class="s-tab active" id="tabDir" role="tab" aria-selected="true">🏫 空間目錄</button>
+        <button class="s-tab" id="tabRoute" role="tab" aria-selected="false">
+          🧭 路線導引
+          <span class="tab-badge" id="tabRouteBadge" hidden></span>
+        </button>
+      </div>
 
-      <!-- Dynamic Directory Body -->
-      <div class="sidebar-body" id="zoneList"></div>
+      <!-- Pane 1: Directory & Search -->
+      <div class="sidebar-pane" id="paneDir">
+        <div class="search-wrap">
+          <div class="search-box">
+            <svg class="search-icon" viewBox="0 0 20 20" fill="none" aria-hidden="true">
+              <circle cx="9" cy="9" r="5.8" stroke="currentColor" stroke-width="1.8" />
+              <path d="M13.5 13.5L17 17" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" />
+            </svg>
+            <input
+              type="text"
+              id="roomSearch"
+              class="search-input"
+              autocomplete="off"
+              placeholder="搜尋房號、班級或處室（例：305、六6、圖書室）"
+            />
+            <button class="search-clear" id="btnClearSearch" title="清除搜尋" hidden>✕</button>
+          </div>
+
+          <!-- Category Quick Filter Pills -->
+          <div class="cat-filter-bar" id="catFilterBar" role="tablist" aria-label="空間分類篩選"></div>
+        </div>
+
+        <!-- Contextual Drill-down Bar (Zone Breadcrumb + Floor Tabs) -->
+        <div class="context-bar" id="contextBar" hidden></div>
+
+        <!-- Dynamic Directory Body -->
+        <div class="sidebar-body" id="zoneList"></div>
+      </div>
+
+      <!-- Pane 2: Integrated Turn-by-Turn Campus Wayfinding -->
+      <div class="sidebar-pane route-pane" id="paneRoute" hidden>
+        <div class="route-empty" id="routeEmptyState">
+          <div class="route-empty-icon">🧭</div>
+          <div class="route-empty-title">尚未選擇導航目的地</div>
+          <div class="route-empty-desc">
+            前往「空間目錄」搜尋教室，或點選任一空間下方的「怎麼走」，即可產生從校門直達教室走廊的 3D 實景路線。
+          </div>
+          <div class="route-quick-picks">
+            <span class="quick-label">快速試試：</span>
+            <button class="btn btn-sm quick-route-btn" data-quick-room="305">305 校長室</button>
+            <button class="btn btn-sm quick-route-btn" data-quick-room="408">408 社自辦</button>
+            <button class="btn btn-sm quick-route-btn" data-quick-room="516">516 六年7班</button>
+            <button class="btn btn-sm quick-route-btn" data-quick-room="208">208 圖書室</button>
+          </div>
+        </div>
+
+        <div class="route-active-wrap" id="routeActiveBody" hidden>
+          <div class="route-dest-card">
+            <div class="route-dest-main">
+              <div class="route-dest-meta" id="routeDestMeta">重慶樓・4F</div>
+              <div class="route-dest-name" id="routeDestName">408 社會科/自然科辦公室</div>
+            </div>
+            <div class="route-dest-right">
+              <span class="route-summary" id="routeSummary">計算中…</span>
+              <button class="icon-btn icon-btn-sm" id="btnCloseRoute" title="清除並結束路線導引">✕</button>
+            </div>
+          </div>
+
+          <div class="route-controls">
+            <label class="route-start-wrap" title="切換出發校門起點">
+              <span>起點</span>
+              <select id="routeStartSelect" class="route-select"></select>
+            </label>
+            <button class="btn btn-sm" id="btnRouteAccess" title="優先搭乘廣和樓無障礙電梯與連廊">♿ 無障礙</button>
+          </div>
+
+          <div class="route-cam-actions">
+            <button class="btn btn-sm" id="btnRouteOverview" title="調整鏡頭俯瞰整條到達動線">👁 全線</button>
+            <button class="btn btn-sm" id="btnRouteFlyAlong" title="沿真實走廊與梯間動畫走進教室">▶ 走廊實境</button>
+            <button class="btn btn-sm active" id="btnRouteSliceAuto" title="進入室內步驟時自動剖開樓板露出該層走廊">🔪 走廊剖視</button>
+            <button class="btn btn-sm" id="btnRouteShare" title="複製含起點與無障礙模式的路線分享連結">🔗 分享路線</button>
+          </div>
+
+          <ol class="route-steps" id="routeStepsList"></ol>
+        </div>
+      </div>
 
       <!-- Legend & Footer -->
       <div class="sidebar-footer">
@@ -95,25 +172,7 @@
       </div>
     </aside>
 
-    <button class="btn sidebar-toggle" id="btnExpand">☰ 校園教室導覽</button>
-
-    <!-- Top Floating Action Toolbar -->
-    <div class="top-bar">
-      <div class="pill-group">
-        <button class="btn tour-btn" id="btnStartTour">▶ 自動導覽</button>
-        <button class="btn active" id="btnLabelMode" title="切換 3D 標牌顯示模式：智慧（棟別／選棟展開）→ 全校教室 → 隱藏">
-          🏷 標牌：智慧
-        </button>
-        <button class="btn" id="btnOpenMap" title="開啟 115 學年度官方教室配置圖對照">🗺 配置圖</button>
-        <button class="btn" id="btnXray" title="隱藏屋頂與太陽能板以透視校舍結構">👁 透視屋頂</button>
-        <button class="btn" id="btnRuler" title="點選場景任兩點量測實際公尺距離">📏 測距尺</button>
-      </div>
-      <div class="pill-group">
-        <button class="btn" data-sun="morning">☀ 上午</button>
-        <button class="btn active" data-sun="afternoon">🌤 午後</button>
-        <button class="btn" data-sun="sunset">🌇 黃昏</button>
-      </div>
-    </div>
+    <button class="btn sidebar-toggle" id="btnExpand">☰ 校園導覽與路線</button>
 
     <div class="ruler-banner" id="rulerBanner">
       📏 測距模式已啟用：請在 3D 場景點擊兩個位置量測距離（<span id="rulerDist">等待第一點</span>）
@@ -136,35 +195,12 @@
       <div class="ri-actions">
         <button class="btn btn-sm" id="btnRoomPrev" title="同層上一間">◀</button>
         <button class="btn btn-sm" id="btnRoomNext" title="同層下一間">▶</button>
-        <button class="btn btn-sm" id="btnRoomRoute" title="查看從校門前往此空間的詳細步行路線與 3D 動線">🧭 怎麼走</button>
+        <button class="btn btn-sm" id="btnRoomRoute" title="在左側欄展開前往此空間的詳細步行路線與走廊實境">🧭 怎麼走</button>
         <button class="btn btn-sm" id="btnRoomViewToggle" title="切換近距平視／棟別鳥瞰">🦅 鳥瞰</button>
-        <button class="btn btn-sm" id="btnRoomShare" title="複製此空間的 3D 深層分享連結">🔗 分享</button>
+        <button class="btn btn-sm" id="btnRoomShare" title="複製此空間或路線的 3D 分享連結">🔗 分享</button>
         <button class="icon-btn" id="btnCloseInspector" title="關閉定位">✕</button>
       </div>
     </div>
-
-    <!-- Turn-by-Turn Campus Wayfinding Drawer -->
-    <aside class="route-panel" id="routePanel" hidden aria-label="校園到達路線導引">
-      <div class="route-head">
-        <div class="route-head-left">
-          <span class="route-title">🧭 到達路線導引</span>
-          <span class="route-summary" id="routeSummary">計算中…</span>
-        </div>
-        <button class="icon-btn" id="btnCloseRoute" title="收合路線">✕</button>
-      </div>
-      <div class="route-controls">
-        <label class="route-start-wrap" title="切換出發校門起點">
-          <span>起點</span>
-          <select id="routeStartSelect" class="route-select"></select>
-        </label>
-        <button class="btn btn-sm" id="btnRouteAccess" title="優先經由廣和樓無障礙電梯與空中連廊（免爬樓梯）">♿ 無障礙</button>
-      </div>
-      <div class="route-cam-actions">
-        <button class="btn btn-sm" id="btnRouteOverview" title="調整鏡頭俯瞰整條到達動線">👁 全線視角</button>
-        <button class="btn btn-sm" id="btnRouteFlyAlong" title="第一人稱沿路線動畫飛往教室">▶ 沿線導航</button>
-      </div>
-      <ol class="route-steps" id="routeStepsList"></ol>
-    </aside>
 
     <!-- Bottom Guided Tour Narration Overlay -->
     <div class="tour-card" id="tourCard">

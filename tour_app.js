@@ -135,7 +135,12 @@ renderer.toneMappingExposure = 1.04;
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 renderer.shadowMap.autoUpdate = false;
+renderer.localClippingEnabled = true;
 wrap.appendChild(renderer.domElement);
+
+// Horizontal Floor Cutaway Plane (clips Y > constant in Three.js world space)
+const floorClipPlane = new THREE.Plane(new THREE.Vector3(0, -1, 0), 999);
+const clippedMatCache = new WeakMap();
 
 let renderFramesLeft = 16;
 function requestRender(frames = 6) {
@@ -231,9 +236,14 @@ const state = {
   tourIndex: 0,
   tourTimer: null,
   searchQuery: "",
+  sidebarTab: "dir", // "dir" | "route"
   routeOpen: false,
   routeStartId: "gate_main",
   routeAccessible: false,
+  autoSliceRoute: true,
+  sliceTargetZ: null,
+  sliceCurrentZ: 999,
+  sliceLabel: "",
   routeData: null,
   routeFlyAlong: false,
   routeFlyProgress: 0,
@@ -371,11 +381,96 @@ let routeCurve = null;
 let routePulseOrb = null;
 const routeWaypointLabels = [];
 
+function isSliceableBuildingMesh(name) {
+  return (
+    name.startsWith("Bldg_") ||
+    name.startsWith("Campus_") ||
+    name.startsWith("Landmark_CornerTowers") ||
+    name.startsWith("Landmark_SouthCorner") ||
+    name.startsWith("Landmark_Skybridge") ||
+    name.startsWith("Landmark_Guanghe") ||
+    name.startsWith("Landmark_HepingNorth") ||
+    name.startsWith("Landmark_WuquanB1") ||
+    name.startsWith("Landmark_SWPortal") ||
+    name.startsWith("Landmark_FrontGreenCanopies") ||
+    name.startsWith("Landmark_SouthArchedCanopy")
+  );
+}
+
+function getFloorSliceZ(zoneId, floorInput) {
+  const f = typeof floorInput === "number" ? floorInput : parseInt(String(floorInput || ""), 10);
+  if (Number.isNaN(f) || !zoneId || zoneId === "Zone_Outdoor") return null;
+  if (zoneId === "Bldg_Guanghe") {
+    if (f <= 1) return 3.85;
+    if (f >= 5) return 17.65;
+    return 4.2 + (f - 1) * 3.4 - 0.35;
+  }
+  if (zoneId === "Bldg_Gym_Skybridge") {
+    if (f <= 1) return 4.6;
+    if (f === 2) return 9.6;
+    return 16.8;
+  }
+  if (f <= 1) return 3.25;
+  if (f >= 5) return 17.05;
+  return 3.6 + (f - 1) * 3.4 - 0.35;
+}
+
+function updateSliceCutaway(sliceZ, labelText = "", immediate = false) {
+  const changed = state.sliceTargetZ !== sliceZ;
+  state.sliceTargetZ = sliceZ;
+  state.sliceLabel = labelText;
+  if (immediate || sliceZ === null) {
+    state.sliceCurrentZ = sliceZ === null ? 999 : sliceZ;
+    floorClipPlane.constant = state.sliceCurrentZ;
+  }
+  const statusEl = document.getElementById("sliceStatus");
+  const xrayBtn = document.getElementById("btnXray");
+  const isSliced = sliceZ !== null;
+  if (statusEl) {
+    statusEl.classList.toggle("active", isSliced || state.xrayOn);
+    if (isSliced) {
+      statusEl.textContent = `🔪 已剖開：${labelText || "走廊"}`;
+    } else if (state.xrayOn) {
+      statusEl.textContent = "👁 已透視屋頂";
+    } else {
+      statusEl.textContent = "🏠 完整校舍";
+    }
+  }
+  if (xrayBtn) {
+    xrayBtn.classList.toggle("active", state.xrayOn || isSliced);
+    xrayBtn.textContent = isSliced ? "🔪 復原" : state.xrayOn ? "👁 屋頂透視" : "🔪 剖層";
+  }
+  if (changed) refresh3DLabels();
+  requestRender(8);
+}
+
+function setSidebarTab(tab, ensureOpen = false) {
+  state.sidebarTab = tab;
+  const isRoute = tab === "route";
+  document.getElementById("tabDir")?.classList.toggle("active", !isRoute);
+  document.getElementById("tabRoute")?.classList.toggle("active", isRoute);
+  document.getElementById("tabDir")?.setAttribute("aria-selected", String(!isRoute));
+  document.getElementById("tabRoute")?.setAttribute("aria-selected", String(isRoute));
+
+  const paneDir = document.getElementById("paneDir");
+  const paneRoute = document.getElementById("paneRoute");
+  if (paneDir) paneDir.hidden = isRoute;
+  if (paneRoute) paneRoute.hidden = !isRoute;
+
+  if (ensureOpen) {
+    const sidebar = document.getElementById("sidebar");
+    if (sidebar?.classList.contains("collapsed")) {
+      sidebar.classList.remove("collapsed");
+      updateCameraViewportOffset();
+    }
+  }
+}
+
 function stopRouteFlyAlong() {
   state.routeFlyAlong = false;
   const btn = document.getElementById("btnRouteFlyAlong");
   if (btn) {
-    btn.textContent = "▶ 沿線導航";
+    btn.textContent = "▶ 走廊實境";
     btn.classList.remove("active");
   }
 }
@@ -399,28 +494,57 @@ function clearRouteVisuals() {
 
 function renderActiveRoute(room, shouldOpenPanel = false) {
   clearRouteVisuals();
+  const emptyEl = document.getElementById("routeEmptyState");
+  const activeBodyEl = document.getElementById("routeActiveBody");
+  const badgeEl = document.getElementById("tabRouteBadge");
+
   if (!room) {
     state.routeData = null;
-    document.getElementById("routePanel").hidden = true;
+    if (emptyEl) emptyEl.hidden = false;
+    if (activeBodyEl) activeBodyEl.hidden = true;
+    if (badgeEl) badgeEl.hidden = true;
     return;
   }
 
   const data = computeCampusRoute(room, state.routeStartId, state.routeAccessible);
   state.routeData = data;
-  if (shouldOpenPanel) state.routeOpen = true;
+  if (shouldOpenPanel) {
+    state.routeOpen = true;
+    setSidebarTab("route", true);
+  }
 
   const routeBtn = document.getElementById("btnRoomRoute");
   if (routeBtn) routeBtn.classList.toggle("active", state.routeOpen);
 
-  const panel = document.getElementById("routePanel");
   if (!state.routeOpen || !data) {
-    panel.hidden = true;
+    if (emptyEl) emptyEl.hidden = false;
+    if (activeBodyEl) activeBodyEl.hidden = true;
+    if (badgeEl) badgeEl.hidden = true;
     return;
   }
 
-  panel.hidden = false;
-  document.getElementById("routeSummary").textContent = `約 ${data.totalMeters} 公尺 · 約 ${data.estMinutes} 分鐘`;
+  if (emptyEl) emptyEl.hidden = true;
+  if (activeBodyEl) activeBodyEl.hidden = false;
+  if (badgeEl) {
+    badgeEl.hidden = false;
+    badgeEl.textContent = `${room.floor} · ${data.totalMeters}m`;
+  }
+
+  const destMetaEl = document.getElementById("routeDestMeta");
+  const destNameEl = document.getElementById("routeDestName");
+  if (destMetaEl) destMetaEl.textContent = `${room.zone.shortName}・${room.floor}${state.routeAccessible ? "・♿ 無障礙優先" : ""}`;
+  if (destNameEl) destNameEl.textContent = room.short || room.name;
+
+  document.getElementById("routeSummary").textContent = `約 ${data.totalMeters}m · ${data.estMinutes}分`;
   document.getElementById("btnRouteAccess").classList.toggle("active", state.routeAccessible);
+  document.getElementById("btnRouteSliceAuto")?.classList.toggle("active", state.autoSliceRoute);
+
+  if (state.autoSliceRoute && data.destZoneId && data.destZoneId !== "Zone_Outdoor") {
+    const destSlice = getFloorSliceZ(data.destZoneId, data.destFloor);
+    updateSliceCutaway(destSlice, `${room.zone.shortName} ${room.floor} 走廊`);
+  } else if (!state.xrayOn) {
+    updateSliceCutaway(null, "");
+  }
 
   const listEl = document.getElementById("routeStepsList");
   listEl.innerHTML = "";
@@ -436,8 +560,22 @@ function renderActiveRoute(room, shouldOpenPanel = false) {
       stopRouteFlyAlong();
       document.querySelectorAll(".route-step-item").forEach((el) => el.classList.remove("active"));
       li.classList.add("active");
+
       const [sx, sy, sz] = step.pos;
-      flyTo([sx - 18, sy - 18, Math.max(8, sz + 11)], [sx, sy, sz]);
+      const [dx, dy] = step.dir || [1, 0];
+      if (state.autoSliceRoute && step.indoor && step.zoneId && step.zoneId !== "Zone_Outdoor") {
+        const sSlice = getFloorSliceZ(step.zoneId, step.floor);
+        updateSliceCutaway(sSlice, `${step.floor}F 走廊`);
+      } else if (!state.autoSliceRoute || !step.indoor) {
+        if (!state.xrayOn) updateSliceCutaway(null, "");
+      }
+
+      if (step.indoor) {
+        // Sloped corridor-eye view looking down the sliced open hallway along direction of travel
+        flyTo([sx - dx * 12.5, sy - dy * 12.5, sz + 5.8], [sx + dx * 5.0, sy + dy * 5.0, sz + 0.4]);
+      } else {
+        flyTo([sx - dx * 16.0, sy - dy * 16.0, Math.max(7.5, sz + 8.5)], [sx + dx * 4.0, sy + dy * 4.0, sz + 0.6]);
+      }
     });
     listEl.appendChild(li);
   });
@@ -489,6 +627,10 @@ function renderActiveRoute(room, shouldOpenPanel = false) {
 function flyToRouteOverview() {
   if (!state.routeData || state.routeData.points3D.length < 2) return;
   stopRouteFlyAlong();
+  if (state.autoSliceRoute && state.routeData.destZoneId && state.routeData.destZoneId !== "Zone_Outdoor") {
+    const destSlice = getFloorSliceZ(state.routeData.destZoneId, state.routeData.destFloor);
+    updateSliceCutaway(destSlice, `${state.routeData.destFloor}F 走廊`);
+  }
   const pts = state.routeData.points3D;
   let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity, maxZ = 2;
   for (const [x, y, z] of pts) {
@@ -625,6 +767,7 @@ function refresh3DLabels() {
 
   for (const r of roomsToShow) {
     if (r.uid === state.activeRoomUid) continue; // Active room gets its own elevated golden pin
+    if (state.sliceTargetZ !== null && r.pos[2] > state.sliceTargetZ + 0.5) continue; // Hide 3D labels above cutaway floor
     const el = document.createElement("div");
     el.className = `label-room-chip ${compact ? "compact" : ""}`;
     const catCol = CAT_META[r.cat]?.color || "#38bdf8";
@@ -674,7 +817,16 @@ function clearRoomPin() {
   state.activeRoomUid = null;
   document.getElementById("roomInspector").hidden = true;
   clearRouteVisuals();
-  document.getElementById("routePanel").hidden = true;
+  state.routeOpen = false;
+  state.routeData = null;
+  document.getElementById("btnRoomRoute")?.classList.remove("active");
+  const emptyEl = document.getElementById("routeEmptyState");
+  const activeBodyEl = document.getElementById("routeActiveBody");
+  const badgeEl = document.getElementById("tabRouteBadge");
+  if (emptyEl) emptyEl.hidden = false;
+  if (activeBodyEl) activeBodyEl.hidden = true;
+  if (badgeEl) badgeEl.hidden = true;
+  if (!state.xrayOn) updateSliceCutaway(null, "");
 }
 
 function computeCameraForRoom(room, aerial = false) {
@@ -730,6 +882,7 @@ function focusRoomByUid(uid, keepFloorAll = false, openRoute = false) {
   // Update Room Inspector Bar, 3D Wayfinding Route & URL Deep Link Hash
   updateRoomInspector(room);
   renderActiveRoute(room, openRoute);
+  applyVisualModes();
   refresh3DLabels();
   renderSidebar();
   syncUrlHash();
@@ -742,11 +895,21 @@ function focusRoomByUid(uid, keepFloorAll = false, openRoute = false) {
   }
 }
 
-// --- URL Hash Deep Linking (#room=305 or #zone=Bldg_Wuquan&floor=3F) ---
+// --- URL Hash Deep Linking (#room=305, #route=305&from=gate_main&acc=1, or #zone=Bldg_Wuquan&floor=3F) ---
 let suppressHashSync = false;
 
 function getRoomSlug(room) {
   return room.code || room.short || room.name;
+}
+
+function findRoomBySlug(query) {
+  const q = (query || "").trim().toLowerCase();
+  if (!q) return null;
+  return (
+    state.allRooms.find(
+      (r) => (r.code && r.code.toLowerCase() === q) || r.short.toLowerCase() === q || r.name.toLowerCase() === q
+    ) || state.allRooms.find((r) => r.haystack.includes(q))
+  );
 }
 
 function syncUrlHash() {
@@ -754,7 +917,13 @@ function syncUrlHash() {
   let newHash = "";
   if (state.activeRoomUid) {
     const r = state.allRooms.find((item) => item.uid === state.activeRoomUid);
-    if (r) newHash = `#room=${encodeURIComponent(getRoomSlug(r))}`;
+    if (r) {
+      if (state.routeOpen) {
+        newHash = `#route=${encodeURIComponent(getRoomSlug(r))}&from=${encodeURIComponent(state.routeStartId)}&acc=${state.routeAccessible ? 1 : 0}`;
+      } else {
+        newHash = `#room=${encodeURIComponent(getRoomSlug(r))}`;
+      }
+    }
   } else if (state.selectedZoneId) {
     newHash = `#zone=${encodeURIComponent(state.selectedZoneId)}`;
     if (state.selectedFloor && state.selectedFloor !== "ALL") {
@@ -771,18 +940,32 @@ function applyUrlHash() {
   const raw = (window.location.hash || "").replace(/^#/, "").trim();
   if (!raw) return;
   const params = new URLSearchParams(raw);
-  const roomQuery = (params.get("room") || "").trim().toLowerCase();
+  const routeQuery = (params.get("route") || "").trim();
+  const roomQuery = (params.get("room") || "").trim();
+  const fromQuery = (params.get("from") || "").trim();
+  const accQuery = (params.get("acc") || "").trim();
   const zoneQuery = (params.get("zone") || "").trim();
   const floorQuery = (params.get("floor") || "").trim();
 
   suppressHashSync = true;
   try {
-    if (roomQuery) {
-      const target =
-        state.allRooms.find((r) => (r.code && r.code.toLowerCase() === roomQuery) || r.short.toLowerCase() === roomQuery || r.name.toLowerCase() === roomQuery) ||
-        state.allRooms.find((r) => r.haystack.includes(roomQuery));
+    if (routeQuery || roomQuery) {
+      const isRouteLink = Boolean(routeQuery);
+      if (isRouteLink) {
+        if (fromQuery && ROUTE_STARTS.some((s) => s.id === fromQuery)) {
+          state.routeStartId = fromQuery;
+          const sel = document.getElementById("routeStartSelect");
+          if (sel) sel.value = fromQuery;
+        }
+        if (accQuery === "1" || accQuery === "true") {
+          state.routeAccessible = true;
+        } else if (accQuery === "0" || accQuery === "false") {
+          state.routeAccessible = false;
+        }
+      }
+      const target = findRoomBySlug(routeQuery || roomQuery);
       if (target) {
-        focusRoomByUid(target.uid, false);
+        focusRoomByUid(target.uid, isRouteLink, isRouteLink);
         return;
       }
     }
@@ -842,7 +1025,8 @@ function applyVisualModes() {
     mesh.visible = !(state.xrayOn && isRoofOrSolar);
 
     const orig = state.origMaterials.get(mesh);
-    if (!state.selectedZoneId) {
+    // Keep all buildings solid & crisp when showing multi-building wayfinding route
+    if (!state.selectedZoneId || state.routeOpen) {
       mesh.material = orig;
       continue;
     }
@@ -860,6 +1044,8 @@ function selectZone(zoneId, shouldFly = true) {
   state.selectedZoneId = zoneId;
   state.selectedFloor = "ALL";
   clearRoomPin();
+  setSidebarTab("dir");
+  if (!state.xrayOn) updateSliceCutaway(null, "");
   applyVisualModes();
   updateFloorBand();
   refresh3DLabels();
@@ -874,6 +1060,12 @@ function selectZone(zoneId, shouldFly = true) {
 function selectFloor(floorKey) {
   state.selectedFloor = floorKey;
   clearRoomPin();
+  if (state.xrayOn && state.selectedZoneId && floorKey !== "ALL") {
+    const sZ = getFloorSliceZ(state.selectedZoneId, floorKey);
+    updateSliceCutaway(sZ, `${floorKey} 走廊`);
+  } else if (!state.xrayOn) {
+    updateSliceCutaway(null, "");
+  }
   updateFloorBand();
   refresh3DLabels();
   renderSidebar();
@@ -1239,9 +1431,9 @@ document.getElementById("btnResetAll").addEventListener("click", () => {
 });
 
 const LABEL_MODE_CYCLE = [
-  { mode: "smart", text: "🏷 標牌：智慧", active: true },
-  { mode: "all", text: "🏷 標牌：全校教室", active: true },
-  { mode: "off", text: "🏷 標牌：隱藏", active: false },
+  { mode: "smart", text: "🏷 智慧", active: true },
+  { mode: "all", text: "🏷 全校", active: true },
+  { mode: "off", text: "🏷 隱藏", active: false },
 ];
 
 document.getElementById("btnLabelMode").addEventListener("click", (e) => {
@@ -1253,9 +1445,31 @@ document.getElementById("btnLabelMode").addEventListener("click", (e) => {
   refresh3DLabels();
 });
 
-document.getElementById("btnXray").addEventListener("click", (e) => {
-  state.xrayOn = !state.xrayOn;
-  e.currentTarget.classList.toggle("active", state.xrayOn);
+document.getElementById("tabDir").addEventListener("click", () => setSidebarTab("dir"));
+document.getElementById("tabRoute").addEventListener("click", () => setSidebarTab("route"));
+
+document.getElementById("btnXray").addEventListener("click", () => {
+  if (state.sliceTargetZ !== null && !state.xrayOn) {
+    // Restore full building if currently floor-sliced
+    state.autoSliceRoute = false;
+    document.getElementById("btnRouteSliceAuto")?.classList.remove("active");
+    updateSliceCutaway(null, "", false);
+  } else {
+    state.xrayOn = !state.xrayOn;
+    if (state.xrayOn && state.selectedZoneId && state.selectedFloor !== "ALL") {
+      const sZ = getFloorSliceZ(state.selectedZoneId, state.selectedFloor);
+      updateSliceCutaway(sZ, `${state.selectedFloor} 走廊`, false);
+    } else if (state.xrayOn && state.routeOpen && state.routeData?.destZoneId && state.routeData.destZoneId !== "Zone_Outdoor") {
+      state.autoSliceRoute = true;
+      document.getElementById("btnRouteSliceAuto")?.classList.add("active");
+      const sZ = getFloorSliceZ(state.routeData.destZoneId, state.routeData.destFloor);
+      updateSliceCutaway(sZ, `${state.routeData.destFloor}F 走廊`, false);
+    } else if (!state.xrayOn) {
+      updateSliceCutaway(null, "", false);
+    } else {
+      updateSliceCutaway(null, "", false);
+    }
+  }
   applyVisualModes();
   requestShadowUpdate();
 });
@@ -1269,21 +1483,43 @@ document.getElementById("btnRuler").addEventListener("click", (e) => {
 document.getElementById("btnClearRuler").addEventListener("click", clearRuler);
 document.querySelectorAll("[data-sun]").forEach((btn) => btn.addEventListener("click", () => applySun(btn.dataset.sun)));
 
-// Room Inspector & Wayfinding Route Panel Actions
+// Room Inspector & Integrated Wayfinding Tab Actions
 document.getElementById("btnRoomPrev").addEventListener("click", () => stepActiveRoom(-1));
 document.getElementById("btnRoomNext").addEventListener("click", () => stepActiveRoom(1));
 document.getElementById("btnRoomRoute").addEventListener("click", () => {
   const room = state.allRooms.find((r) => r.uid === state.activeRoomUid);
   if (!room) return;
-  state.routeOpen = !state.routeOpen;
-  renderActiveRoute(room, false);
-  if (state.routeOpen) flyToRouteOverview();
+  if (state.routeOpen && state.sidebarTab === "route") {
+    state.routeOpen = false;
+    setSidebarTab("dir");
+    renderActiveRoute(room, false);
+    if (!state.xrayOn) updateSliceCutaway(null, "");
+  } else {
+    state.routeOpen = true;
+    renderActiveRoute(room, true);
+    flyToRouteOverview();
+  }
+  applyVisualModes();
+  syncUrlHash();
 });
 document.getElementById("btnCloseRoute").addEventListener("click", () => {
   state.routeOpen = false;
   clearRouteVisuals();
-  document.getElementById("routePanel").hidden = true;
   document.getElementById("btnRoomRoute")?.classList.remove("active");
+  const room = state.allRooms.find((r) => r.uid === state.activeRoomUid);
+  renderActiveRoute(room, false);
+  setSidebarTab("dir");
+  if (!state.xrayOn) updateSliceCutaway(null, "");
+  applyVisualModes();
+  syncUrlHash();
+});
+
+document.querySelectorAll("[data-quick-room]").forEach((btn) => {
+  btn.addEventListener("click", () => {
+    const q = btn.dataset.quickRoom;
+    const target = findRoomBySlug(q);
+    if (target) focusRoomByUid(target.uid, true, true);
+  });
 });
 
 const routeStartSelect = document.getElementById("routeStartSelect");
@@ -1300,6 +1536,7 @@ routeStartSelect.addEventListener("change", (e) => {
   if (room) {
     renderActiveRoute(room, true);
     flyToRouteOverview();
+    syncUrlHash();
   }
 });
 
@@ -1309,6 +1546,17 @@ document.getElementById("btnRouteAccess").addEventListener("click", () => {
   if (room) {
     renderActiveRoute(room, true);
     flyToRouteOverview();
+    syncUrlHash();
+  }
+});
+document.getElementById("btnRouteSliceAuto")?.addEventListener("click", (e) => {
+  state.autoSliceRoute = !state.autoSliceRoute;
+  e.currentTarget.classList.toggle("active", state.autoSliceRoute);
+  if (state.autoSliceRoute && state.routeData?.destZoneId && state.routeData.destZoneId !== "Zone_Outdoor") {
+    const sZ = getFloorSliceZ(state.routeData.destZoneId, state.routeData.destFloor);
+    updateSliceCutaway(sZ, `${state.routeData.destFloor}F 走廊`);
+  } else if (!state.autoSliceRoute && !state.xrayOn) {
+    updateSliceCutaway(null, "");
   }
 });
 document.getElementById("btnRouteOverview").addEventListener("click", flyToRouteOverview);
@@ -1319,23 +1567,15 @@ document.getElementById("btnRouteFlyAlong").addEventListener("click", (e) => {
     state.routeFlyProgress = 0;
     tweenPos = null;
     tweenTgt = null;
-    e.currentTarget.textContent = "⏸ 暫停飛覽";
+    e.currentTarget.textContent = "⏸ 暫停實境";
     e.currentTarget.classList.add("active");
     requestRender(20);
   } else {
     stopRouteFlyAlong();
   }
 });
-document.getElementById("btnRoomViewToggle").addEventListener("click", () => {
-  const room = state.allRooms.find((r) => r.uid === state.activeRoomUid);
-  if (!room) return;
-  state.roomViewAerial = !state.roomViewAerial;
-  document.getElementById("btnRoomViewToggle").textContent = state.roomViewAerial ? "🎯 平視" : "🦅 鳥瞰";
-  const { camPos, tgt } = computeCameraForRoom(room, state.roomViewAerial);
-  flyTo(camPos, tgt);
-});
-document.getElementById("btnRoomShare").addEventListener("click", async (e) => {
-  const btn = e.currentTarget;
+
+async function copyShareUrlWithFeedback(btn, promptMsg) {
   syncUrlHash();
   const shareUrl = window.location.href;
   try {
@@ -1346,8 +1586,23 @@ document.getElementById("btnRoomShare").addEventListener("click", async (e) => {
       btn.textContent = orig;
     }, 1800);
   } catch (_) {
-    window.prompt("複製此教室 3D 定位連結：", shareUrl);
+    window.prompt(promptMsg, shareUrl);
   }
+}
+
+document.getElementById("btnRouteShare")?.addEventListener("click", (e) => {
+  copyShareUrlWithFeedback(e.currentTarget, "複製此到達路線 3D 導覽連結：");
+});
+document.getElementById("btnRoomViewToggle").addEventListener("click", () => {
+  const room = state.allRooms.find((r) => r.uid === state.activeRoomUid);
+  if (!room) return;
+  state.roomViewAerial = !state.roomViewAerial;
+  document.getElementById("btnRoomViewToggle").textContent = state.roomViewAerial ? "🎯 平視" : "🦅 鳥瞰";
+  const { camPos, tgt } = computeCameraForRoom(room, state.roomViewAerial);
+  flyTo(camPos, tgt);
+});
+document.getElementById("btnRoomShare").addEventListener("click", (e) => {
+  copyShareUrlWithFeedback(e.currentTarget, "複製此 3D 校園導覽連結：");
 });
 document.getElementById("btnCloseInspector").addEventListener("click", () => {
   clearRoomPin();
@@ -1388,7 +1643,6 @@ const closeMapModal = () => {
   mapModal.hidden = true;
 };
 document.getElementById("btnOpenMap").addEventListener("click", openMapModal);
-document.getElementById("btnOpenMapSide").addEventListener("click", openMapModal);
 document.getElementById("btnCloseMapModal").addEventListener("click", closeMapModal);
 document.getElementById("mapModalBackdrop").addEventListener("click", closeMapModal);
 mapModalImg.addEventListener("click", () => mapModalImg.classList.toggle("zoomed"));
@@ -1487,6 +1741,19 @@ async function init() {
           const isGroundDecal = GROUND_ONLY_RECEIVE_PATTERNS.some((p) => obj.name.startsWith(p));
           obj.castShadow = !isGroundDecal;
           obj.receiveShadow = true;
+          const canSlice = isSliceableBuildingMesh(obj.name);
+          const wrapSliceMat = (m) => {
+            if (!m || !canSlice) return m;
+            let cm = clippedMatCache.get(m);
+            if (!cm) {
+              cm = m.clone();
+              cm.clippingPlanes = [floorClipPlane];
+              cm.clipShadows = false;
+              clippedMatCache.set(m, cm);
+            }
+            return cm;
+          };
+          obj.material = Array.isArray(obj.material) ? obj.material.map(wrapSliceMat) : wrapSliceMat(obj.material);
           state.allMeshes.push(obj);
           state.origMaterials.set(obj, obj.material);
           const mats = Array.isArray(obj.material) ? obj.material : [obj.material];
@@ -1529,6 +1796,18 @@ function animate() {
     if (fill?.material) fill.material.opacity = 0.18 + 0.1 * Math.sin(t * 4.0);
     needsDraw = true;
   }
+  // Smoothly animate horizontal floor cutaway clipping plane
+  const goalSlice = state.sliceTargetZ !== null ? state.sliceTargetZ : 999;
+  if (Math.abs(state.sliceCurrentZ - goalSlice) > 0.03) {
+    if (goalSlice > 100 || state.sliceCurrentZ > 100) {
+      state.sliceCurrentZ = goalSlice;
+    } else {
+      state.sliceCurrentZ += (goalSlice - state.sliceCurrentZ) * 0.16;
+    }
+    floorClipPlane.constant = state.sliceCurrentZ;
+    needsDraw = true;
+  }
+
   if (routeCurve && routePulseOrb) {
     const len = routeCurve.getLength();
     const duration = Math.max(4.5, len / 18.0);
@@ -1538,19 +1817,36 @@ function animate() {
     needsDraw = true;
 
     if (state.routeFlyAlong) {
-      state.routeFlyProgress = Math.min(1, state.routeFlyProgress + 0.0042);
+      const stepDelta = Math.max(0.0022, Math.min(0.0042, 0.36 / Math.max(45, len)));
+      state.routeFlyProgress = Math.min(1, state.routeFlyProgress + stepDelta);
       const uCam = state.routeFlyProgress;
       const curP = routeCurve.getPointAt(uCam);
-      const aheadU = Math.min(1, uCam + 0.06);
+      const aheadU = Math.min(1, uCam + 0.055);
       const aheadP = routeCurve.getPointAt(aheadU);
+
+      // Dynamically adjust building cutaway as the walk climbs stairs & enters target floor corridor
+      if (state.autoSliceRoute && state.routeData?.destZoneId && state.routeData.destZoneId !== "Zone_Outdoor") {
+        const walkZ = curP.y; // Three.js Y === Blender Z
+        if (walkZ > 1.05 || uCam > 0.28) {
+          const liveSlice = Math.max(3.6, walkZ + 2.75);
+          state.sliceTargetZ = liveSlice;
+          state.sliceCurrentZ += (liveSlice - state.sliceCurrentZ) * 0.14;
+          floorClipPlane.constant = state.sliceCurrentZ;
+        }
+      }
+
       const tan = aheadP.clone().sub(curP);
       if (tan.lengthSq() < 0.01) tan.set(1, 0, 0);
       tan.y = 0;
       if (tan.lengthSq() < 0.001) tan.set(0, 0, -1);
       tan.normalize();
-      const desiredPos = curP.clone().addScaledVector(tan, -14).add(new THREE.Vector3(0, 10.5, 0));
-      camera.position.lerp(desiredPos, 0.08);
-      controls.target.lerp(aheadP.clone().add(new THREE.Vector3(0, 0.8, 0)), 0.1);
+
+      const inCorridor = curP.y > 1.05;
+      const backDist = inCorridor ? 7.2 : 11.5;
+      const upHeight = inCorridor ? 4.1 : 6.0;
+      const desiredPos = curP.clone().addScaledVector(tan, -backDist).add(new THREE.Vector3(0, upHeight, 0));
+      camera.position.lerp(desiredPos, 0.085);
+      controls.target.lerp(aheadP.clone().add(new THREE.Vector3(0, 0.5, 0)), 0.12);
       if (state.routeFlyProgress >= 1) {
         stopRouteFlyAlong();
       }

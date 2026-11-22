@@ -73,7 +73,11 @@ def main() -> int:
         'id="statusPct"',
         'id="btnRoomShare"',
         'id="btnRoomRoute"',
-        'id="routePanel"',
+        'id="tabDir"',
+        'id="tabRoute"',
+        'id="paneRoute"',
+        'id="btnRouteShare"',
+        'id="btnRouteSliceAuto"',
     ):
         assert required in html, f"index.html missing required token: {required}"
 
@@ -81,6 +85,7 @@ def main() -> int:
     assert "state.spec.zones" in js, "tour_app.js should load zones from state.spec.zones"
     assert "applyUrlHash" in js and "syncUrlHash" in js, "tour_app.js missing URL hash deep-linking functions"
     assert "computeCampusRoute" in js, "tour_app.js missing computeCampusRoute integration"
+    assert "floorClipPlane" in js, "tour_app.js missing floorClipPlane corridor slice engine"
 
     print(
         f"ALL_INTEGRITY_CHECKS_PASSED: {len(py_modules)} py modules compiled, "
