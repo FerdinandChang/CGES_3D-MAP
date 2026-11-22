@@ -2071,6 +2071,104 @@ def gen_v12_6_north_court_textures() -> None:
     im_w.save(os.path.join(TEX_DIR, "tex_walkway_terrazzo.png"), optimize=True)
 
 
+def gen_v12_11_gate_forecourt_textures() -> None:
+    """v12.11 27 廣和街實景大門口內外地磚與重慶樓 1F 圖書室門廊招牌專屬貼圖：
+    1. tex_forecourt_plaza.png (1024x1024, 校門內前庭廣場暖淺米黃方格地磚＋白色幾何導引框線)
+    2. tex_gate_ped_slab.png (512x512, 警衛室旁行人小門入口 4 格寬淺米白大尺寸正方形石板磚)
+    3. tex_library_banner.png (1024x256, 重慶樓北側階梯旁 1F 白色雙柱門廊「圖書室 Library」彩繪招牌)
+    """
+    # --- 1. Inner Forecourt Warm-Cream Square-Tile Plaza with White Geometric Court/Assembly Lines (step_22_shot_1.png!) ---
+    W, H = 1024, 1024
+    rng = random.Random(12111)
+    base_fc = (212, 198, 174)
+    im_fc = Image.new("RGB", (W, H), base_fc)
+    dfc = ImageDraw.Draw(im_fc)
+    cell_fc = 64
+    for r in range(H // cell_fc):
+        for c in range(W // cell_fc):
+            v = rng.randint(-6, 6)
+            x0, y0 = c * cell_fc, r * cell_fc
+            dfc.rectangle([x0, y0, x0 + cell_fc - 1, y0 + cell_fc - 1], fill=(base_fc[0] + v, base_fc[1] + v, base_fc[2] + v))
+    for _ in range(4200):
+        px = rng.randint(0, W - 1)
+        py = rng.randint(0, H - 1)
+        v = rng.randint(-12, 10)
+        dfc.point((px, py), fill=(base_fc[0] + v, base_fc[1] + v, base_fc[2] + v))
+    # Fine tile mortar joints + darker major expansion joints every 256px
+    for i in range(0, W, cell_fc):
+        col_g = (148, 138, 120) if (i % 256 == 0) else (178, 166, 146)
+        w_g = 3 if (i % 256 == 0) else 1
+        dfc.line([(i, 0), (i, H)], fill=col_g, width=w_g)
+        dfc.line([(0, i), (W, i)], fill=col_g, width=w_g)
+    # Crisp white geometric court / assembly queue lines visible through pedestrian gate in step_22_shot_1.png!
+    w_mark = (244, 244, 238)
+    dfc.rectangle([112, 112, W - 112, H - 112], outline=w_mark, width=8)
+    dfc.line([(112, H // 2), (W - 112, H // 2)], fill=w_mark, width=7)
+    dfc.line([(W // 2, 112), (W // 2, H - 112)], fill=w_mark, width=7)
+    # Diagonal white guide lines & center circle
+    dfc.line([(112, 112), (W // 2, H // 2)], fill=w_mark, width=6)
+    dfc.line([(W - 112, 112), (W // 2, H // 2)], fill=w_mark, width=6)
+    dfc.ellipse([W // 2 - 140, H // 2 - 140, W // 2 + 140, H // 2 + 140], outline=w_mark, width=7)
+    im_fc.save(os.path.join(TEX_DIR, "tex_forecourt_plaza.png"), optimize=True)
+
+    # --- 2. Pedestrian Gate Light-Cream Large Square Stone Slabs (4x4 grid, exact step_22_shot_1.png!) ---
+    S = 512
+    rng_s = random.Random(12112)
+    base_sl = (216, 214, 206)
+    im_sl = Image.new("RGB", (S, S), base_sl)
+    dsl = ImageDraw.Draw(im_sl)
+    c_sl = 128
+    for r in range(4):
+        for c in range(4):
+            v = rng_s.randint(-5, 5)
+            x0, y0 = c * c_sl, r * c_sl
+            dsl.rectangle([x0, y0, x0 + c_sl - 1, y0 + c_sl - 1], fill=(base_sl[0] + v, base_sl[1] + v, base_sl[2] + v))
+    for _ in range(1800):
+        px = rng_s.randint(0, S - 1)
+        py = rng_s.randint(0, S - 1)
+        v = rng_s.randint(-10, 10)
+        dsl.point((px, py), fill=(base_sl[0] + v, base_sl[1] + v, base_sl[2] + v))
+    for i in range(0, S, c_sl):
+        dsl.line([(i, 0), (i, S)], fill=(154, 152, 146), width=3)
+        dsl.line([(0, i), (S, i)], fill=(154, 152, 146), width=3)
+    im_sl.save(os.path.join(TEX_DIR, "tex_gate_ped_slab.png"), optimize=True)
+
+    # --- 3. Chongqing Bldg North 1F Portico "圖書室 Library" Illustrated Sign Banner (exact final_step_30.png upper-right!) ---
+    BW, BH = 1024, 256
+    im_lb = Image.new("RGB", (BW, BH), (244, 248, 244))
+    dlb = ImageDraw.Draw(im_lb)
+    # Soft sky/mint bottom garden border with colorful little flowers
+    dlb.rectangle([0, 198, BW - 1, BH - 1], fill=(168, 214, 152))
+    dlb.rectangle([0, 216, BW - 1, BH - 1], fill=(134, 194, 122))
+    rng_l = random.Random(12113)
+    flower_cols = [(242, 106, 98), (248, 198, 76), (238, 134, 178), (104, 176, 236), (252, 248, 240)]
+    for fx in range(28, BW - 24, 34):
+        fy = rng_l.randint(192, 232)
+        fc = flower_cols[(fx // 34) % len(flower_cols)]
+        dlb.ellipse([fx - 11, fy - 11, fx + 11, fy + 11], fill=fc, outline=(255, 255, 255), width=2)
+    # Left side: 3 colorful illustrated open/framed storybooks (blue, orange, green frames in final_step_30.png!)
+    for idx_bk, (bx0, by0, bcol) in enumerate([
+        (46, 62, (64, 126, 208)),
+        (178, 52, (226, 124, 72)),
+        (312, 58, (88, 168, 116)),
+    ]):
+        dlb.rounded_rectangle([bx0, by0, bx0 + 108, by0 + 124], radius=10, fill=(252, 250, 242), outline=bcol, width=9)
+        dlb.rectangle([bx0 + 18, by0 + 22, bx0 + 90, by0 + 76], fill=bcol)
+        dlb.ellipse([bx0 + 34, by0 + 30, bx0 + 74, by0 + 68], fill=(248, 224, 118))
+    # Right side: Green outlined Chinese "圖 書 室" + Orange-Red English "Library"
+    f_zh_lb = _get_font(86, bold=True)
+    zh_lb = "圖  書  室"
+    for ox in (-3, 0, 3):
+        for oy in (-3, 0, 3):
+            if ox or oy:
+                dlb.text((480 + ox, 32 + oy), zh_lb, fill=(92, 166, 108), font=f_zh_lb)
+    dlb.text((480, 32), zh_lb, fill=(242, 250, 242), font=f_zh_lb)
+    f_en_lb = _get_font(56, bold=True)
+    dlb.text((565, 134), "Library", fill=(224, 112, 78), font=f_en_lb)
+    dlb.rectangle([4, 4, BW - 5, BH - 5], outline=(188, 204, 188), width=6)
+    im_lb.save(os.path.join(TEX_DIR, "tex_library_banner.png"), optimize=True)
+
+
 def main() -> None:
     gen_tile_wall_pbr("tex_wall_guanghe", (232, 224, 218), (182, 174, 168), cols=16, rows=16, jitter=6, seed=11)
     gen_tile_wall_pbr("tex_wall_brick_red", (166, 98, 86), (116, 70, 62), cols=16, rows=16, jitter=9, seed=22)
@@ -2107,6 +2205,7 @@ def main() -> None:
     gen_room_plaque_atlas()
     gen_v12_5_wuquan_east_textures()
     gen_v12_6_north_court_textures()
+    gen_v12_11_gate_forecourt_textures()
     print(f"Generated PBR textures + normal maps in {TEX_DIR}: {len(os.listdir(TEX_DIR))} files")
 
 

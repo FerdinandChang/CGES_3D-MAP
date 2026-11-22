@@ -597,6 +597,21 @@ def build_base_roads_and_city(spec: dict, palette: Dict[str, bpy.types.Material]
     gp.bm_box(bm_brick_pave, (42.0, -12.0, -0.03), (50.0, 102.0, 0.06))
     objs.append(su.create_mesh_object("Base_CampusPaving", bm_brick_pave, palette["paving_redbrick"], col, uv_scale=0.45))
 
+    # v12.11 27 廣和街 Inner Main Gate Forecourt Warm-Cream Square-Tile Plaza with White Geometric Guiding Lines (step_22_shot_1.png & step_18_shot_1.png!)
+    bm_forecourt = bmesh.new()
+    _quad_extrude(
+        bm_forecourt,
+        [
+            (wall_x(-29.2) + 0.45, -29.2),
+            (-51.2, -29.2),
+            (-51.2, 16.5),
+            (wall_x(16.5) + 0.45, 16.5),
+        ],
+        0.005,
+        0.046,
+    )
+    objs.append(su.create_mesh_object("Base_ForecourtPlaza", bm_forecourt, palette["forecourt_plaza"], col, uv_scale=0.065))
+
     # === 1. Asphalt Road Network (Exact +8.5° West Guanghe St + widened South Guanghe St & East Wuquan St!) ===
     bm_road = bmesh.new()
     # West Guanghe St (extended to y=-84 so SW intersection asphalt is 100% seamless!)
@@ -621,29 +636,67 @@ def build_base_roads_and_city(spec: dict, palette: Dict[str, bpy.types.Material]
     bm_red = bmesh.new()
     bm_tactile = bmesh.new()
 
-    # (a) North Guanghe Checkerboard Sidewalk (y=+6.8..+35.6): full 4.5m width + smooth R=1.35m fillet at gate north corner!
+    # (a) North Guanghe Checkerboard Sidewalk (y=+8.8..+35.6) + Dark Washed-Stone Tree-Pit Zone (y=+6.95..+8.8, step_22_shot_1.png!)
     _add_curved_sidewalk_with_fillet(
         bm_checker, bm_curb, bm_red,
-        y_start=6.8, y_end=35.6,
-        fillet_south=True, fillet_north=False, fillet_r=1.35,
-        red_south_len=5.8, red_north_len=10.0, z_top=0.135,
+        y_start=8.8, y_end=35.6,
+        fillet_south=False, fillet_north=False, fillet_r=1.35,
+        red_south_len=4.2, red_north_len=10.0, z_top=0.135,
     )
-    # (b) South Guanghe Checkerboard Sidewalk (y=-31.0..-3.8): full 4.5m width + smooth R=1.35m fillet at gate south corner!
+    _add_curved_sidewalk_with_fillet(
+        bm_south_walk, bm_curb, bm_red,
+        y_start=6.95, y_end=8.85,
+        fillet_south=True, fillet_north=False, fillet_r=1.15,
+        red_south_len=1.8, red_north_len=0.0, z_top=0.136,
+    )
+    # (b) South Guanghe Checkerboard Sidewalk (y=-31.0..-14.8, starting south of School Sign Wall!)
     _add_curved_sidewalk_with_fillet(
         bm_checker, bm_curb, bm_red,
-        y_start=-31.0, y_end=-3.8,
-        fillet_south=False, fillet_north=True, fillet_r=1.35,
-        red_south_len=5.4, red_north_len=8.4, z_top=0.135,
+        y_start=-31.0, y_end=-14.8,
+        fillet_south=False, fillet_north=False, fillet_r=1.35,
+        red_south_len=5.4, red_north_len=0.0, z_top=0.135,
+    )
+    # School Sign Wall Front Sidewalk (y=-14.8..-3.8, Red-Brick Paver w/ Gray Geometric Border Bands matching final_step_30.png bottom-right!)
+    _add_curved_sidewalk_with_fillet(
+        bm_gate_ext, bm_curb, bm_red,
+        y_start=-14.8, y_end=-3.8,
+        fillet_south=False, fillet_north=True, fillet_r=1.25,
+        red_south_len=0.0, red_north_len=8.4, z_top=0.135,
     )
     # (b2) East Wuquan St Full-Width (3.3m) Checkerboard Sidewalk (2/9/1/中北段 五權街, y=-62.5..+45.5!)
     _add_strip_along_wuquan(bm_checker, -62.5, 45.5, -EAST_SIDEWALK_W, -0.28, 0.0, 0.135)
     _add_strip_along_wuquan(bm_curb, -62.5, 45.5, -0.30, 0.02, 0.0, 0.150)
     objs.append(su.create_mesh_object("Base_GuangheSidewalk_Checker", bm_checker, palette["sidewalk_checker"], col, uv_scale=0.58))
 
-    # (c) Main Gate Red-Brick Recessed Apron (y=-3.8..+6.8, sloping gently from gate to asphalt curb line!)
-    _add_strip_along_guanghe(bm_gate_ext, -3.82, 6.82, -0.05, SIDEWALK_W + 0.35, 0.0, 0.048)
-    _add_strip_along_guanghe(bm_curb, -3.82, 6.82, -0.22, 0.02, 0.0, 0.032)
+    # (c) Main Gate Driveway Apron (y=-3.82..+5.18 Red-Brick + Gray Paver Geometric Grid) & North Pedestrian Gate Light-Cream Stone Slab Ramp (y=+5.18..+6.95, step_22_shot_1.png!)
+    bm_gate_ped = bmesh.new()
+    bm_gate_gray = bmesh.new()
+    bm_gate_track = bmesh.new()
+    _add_strip_along_guanghe(bm_gate_ext, -3.82, 5.18, -0.05, SIDEWALK_W + 0.45, 0.0, 0.048)
+    _add_strip_along_guanghe(bm_curb, -3.82, 6.95, -0.22, 0.02, 0.0, 0.032)
+    # 4-row wide light-cream large square stone slab walkway leading straight through open pedestrian gate (y=+5.18..+6.95!)
+    _add_strip_along_guanghe(bm_gate_ped, 5.18, 6.95, 0.05, SIDEWALK_W + 1.95, 0.005, 0.054)
+    # Gray concrete border strips flanking the pedestrian stone-slab ramp + geometric gray paver grid bands across red-brick driveway & school-sign sidewalk!
+    _add_strip_along_guanghe(bm_gate_gray, 5.02, 5.20, 0.02, SIDEWALK_W + 1.95, 0.006, 0.055)
+    _add_strip_along_guanghe(bm_gate_gray, 6.88, 7.04, 0.02, SIDEWALK_W + 1.45, 0.006, 0.055)
+    # Roadside 3-course gray paver header band & 2 longitudinal gray paver bands across main gate driveway (step_18_shot_1.png!)
+    for off_g0, off_g1 in [(0.02, 0.56), (1.78, 2.14), (3.36, 3.72), (4.58, 5.12)]:
+        _add_strip_along_guanghe(bm_gate_gray, -3.80, 5.18, off_g0, off_g1, 0.006, 0.052)
+    # Transverse gray paver divider bands forming crisp rectangular bays on driveway & school-sign sidewalk (final_step_30.png!)
+    for y_gb in (-2.05, 0.55, 2.95):
+        _add_strip_along_guanghe(bm_gate_gray, y_gb - 0.18, y_gb + 0.18, 0.54, 4.62, 0.006, 0.052)
+    # Gray paver border frame around School Sign Wall red-brick sidewalk (y=-14.8..-3.8, final_step_30.png bottom-right!)
+    _add_strip_along_guanghe(bm_gate_gray, -14.75, -3.95, 0.30, 0.62, 0.006, 0.138)
+    _add_strip_along_guanghe(bm_gate_gray, -14.75, -3.95, 3.35, 3.72, 0.006, 0.138)
+    for y_sb in (-13.2, -10.2, -7.2, -4.3):
+        _add_strip_along_guanghe(bm_gate_gray, y_sb - 0.18, y_sb + 0.18, 0.58, 3.40, 0.006, 0.138)
+    # Sliding iron gate dark metal ground track rail at gate threshold
+    _add_strip_along_guanghe(bm_gate_track, -3.65, 5.15, 4.92, 5.06, 0.008, 0.056)
+
     objs.append(su.create_mesh_object("Base_GateCurbExtension_RedBrick", bm_gate_ext, palette["paving_redbrick"], col, uv_scale=0.45))
+    objs.append(su.create_mesh_object("Base_GatePedestrian_StoneSlabs", bm_gate_ped, palette["gate_ped_slab"], col, uv_scale=0.42))
+    objs.append(su.create_mesh_object("Base_GateApron_GrayBands", bm_gate_gray, palette["walkway_gray_paver"], col, uv_scale=0.45))
+    objs.append(su.create_mesh_object("Base_GateThreshold_Track", bm_gate_track, palette["metal_dark"], col))
 
     # (d) West-South Gray Concrete Sidewalk (60 / 78 / 88 廣和街, y=-66.5..-31.0)
     _add_curved_sidewalk_with_fillet(
@@ -1007,7 +1060,7 @@ def build_base_roads_and_city(spec: dict, palette: Dict[str, bpy.types.Material]
     objs.append(su.create_mesh_object("Base_RectHandholeCovers", bm_rmh, palette["rect_manhole"], col, auto_uv=False))
 
     bm_drain = bmesh.new()
-    for dy_g in (-52.0, -34.0, -21.0, -11.5, -5.0, 9.2, 16.5, 23.0, 31.5):
+    for dy_g in (-52.0, -34.0, -21.0, -11.5, -5.0, 6.2, 8.2, 9.8, 16.5, 23.0, 31.5):
         _add_uv_quad_world(
             bm_drain,
             (curb_x(dy_g - 0.32) - 0.34, dy_g - 0.32, 0.016),
@@ -2056,8 +2109,7 @@ def build_courtyard_and_trees(spec: dict, palette: Dict[str, bpy.types.Material]
         (wall_x(31.8) + 1.8, 31.8, 14.2),
         (wall_x(26.8) + 1.8, 26.8, 13.4),
         (wall_x(21.8) + 1.8, 21.8, 13.0),
-        # Mid front row (27 廣和街 behind school sign & south grille fence!)
-        (wall_x(-5.5) + 1.9, -5.5, 12.8),
+        # Mid front row (27 廣和街 behind school sign & south grille fence! Clear of y=-5.5 gate sightline to South Connector stairs!)
         (wall_x(-9.5) + 1.9, -9.5, 13.4),
         (wall_x(-13.5) + 1.9, -13.5, 12.6),
         (wall_x(-18.5) + 1.9, -18.5, 13.2),
@@ -2172,6 +2224,27 @@ def build_courtyard_and_trees(spec: dict, palette: Dict[str, bpy.types.Material]
             v.co.x = cx + v.co.x * rx * n
             v.co.y = cy + v.co.y * ry * n
             v.co.z = cz + v.co.z * rz * n
+
+    # v12.11 27 廣和街 Forecourt South Garden Planter Topiary Ball Shrubs & Cloud-Pruned Podocarpus strictly NORTH of stair cheek wall (step_18_shot_1.png & final_step_30.png!)
+    for tx_g, ty_g, tz_g, rx_g, ry_g, rz_g, bm_g in [
+        (-59.6, -13.6, 1.05, 0.58, 0.58, 0.54, bm_fol_c),
+        (-58.2, -14.2, 1.12, 0.55, 0.55, 0.52, bm_fol_c),
+        (-56.6, -14.4, 1.08, 0.64, 0.62, 0.54, bm_fol_a),
+        (-55.0, -14.6, 1.18, 0.52, 0.52, 0.50, bm_fol_c),
+        (-57.6, -11.5, 2.35, 1.55, 1.45, 1.38, bm_fol_a),
+        (-55.2, -12.4, 2.55, 1.70, 1.60, 1.50, bm_fol_b),
+        (-53.2, -13.4, 2.35, 1.45, 1.40, 1.32, bm_fol_a),
+        # Cloud-pruned layered topiary tree right beside Chongqing 1F Library white-column portico (final_step_30.png right!)
+        (-52.4, -27.2, 1.45, 0.95, 0.72, 0.36, bm_fol_a),
+        (-51.8, -26.8, 2.15, 1.05, 0.78, 0.38, bm_fol_b),
+        (-52.2, -27.0, 2.78, 0.88, 0.68, 0.34, bm_fol_a),
+    ]:
+        _add_ruffled_shrub(bm_g, tx_g, ty_g, tz_g, rx_g, ry_g, rz_g)
+    # Wooden support props under forecourt garden trees (visible in step_18_shot_1.png!)
+    for px_pr, py_pr in [(-56.6, -14.4), (-55.0, -14.6)]:
+        gp.bm_cyl_p2p(bm_trunk, (px_pr - 0.45, py_pr - 0.35, 0.45), (px_pr, py_pr, 1.55), 0.045, 0.04, segments=6)
+        gp.bm_cyl_p2p(bm_trunk, (px_pr + 0.45, py_pr - 0.35, 0.45), (px_pr, py_pr, 1.55), 0.045, 0.04, segments=6)
+    gp.bm_cyl_p2p(bm_trunk, (-52.1, -27.0, 0.05), (-52.0, -26.9, 2.70), 0.14, 0.08, segments=8)
 
     # v9 South Guanghe St iconic continuous layered bright-green + dark-burgundy organic shrub beds (76/3/12 廣和街!)
     for sx_s in (-70.0, -69.1, -68.2):

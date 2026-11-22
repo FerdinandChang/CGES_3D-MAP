@@ -287,6 +287,10 @@ def build_palette() -> Dict[str, bpy.types.Material]:
         "brick_lattice_band": _make_tex_pbr("CGES_Brick_LatticeBand", t("tex_brick_lattice_band.png"), roughness=0.72, double_sided=True),
         "pillar_chunlian": _make_tex_pbr("CGES_Pillar_Chunlian", t("tex_pillar_chunlian.png"), roughness=0.70, double_sided=True),
         "ramp_green_antislip": _make_pbr("CGES_Ramp_GreenAntiSlip", (0.17, 0.34, 0.24, 1.0), roughness=0.82),
+        # v12.11 27 廣和街大門口前庭廣場方磚、行人斜坡大石板磚與重慶樓 1F 圖書室招牌材質
+        "forecourt_plaza": _make_tex_pbr("CGES_Forecourt_Plaza", t("tex_forecourt_plaza.png"), roughness=0.72),
+        "gate_ped_slab": _make_tex_pbr("CGES_Gate_PedSlab", t("tex_gate_ped_slab.png"), roughness=0.68),
+        "library_banner": _make_tex_pbr("CGES_Library_Banner", t("tex_library_banner.png"), roughness=0.46, double_sided=True),
         # 衛星校準底板
         "sat_ref": _make_tex_pbr("CGES_Sat_Ref", os.path.join(REFS_DIR, "sat_aligned_220m.png"), roughness=0.95),
     }

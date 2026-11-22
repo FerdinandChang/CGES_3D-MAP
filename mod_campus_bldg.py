@@ -1417,10 +1417,98 @@ def build_guanghe_connector_bridges(spec: dict, palette: Dict[str, bpy.types.Mat
     pier_mid_y = -16.05  # Continuous full-height 0.90m salmon rectangular pier!
     south_mid_y = -23.15  # Intermediate open corridor column splitting south half cleanly into 2 bays
 
-    # 1F Open Passageway & Thick Salmon Square Piers
+    # 1F Open Passageway & Thick Salmon Square Piers + v12.11 27 廣和街 Raised 1.15m Plinth Deck, Column Plinth Collars,
+    # 10-Step Forecourt Grand Staircase to Chongqing/South Connector, Sloped White-Tile Cheek Wall + Handrail & Chongqing 1F Library Portico!
+    s_plinth_h = 1.15
     for py_c, pw_c in [(-29.2, 0.62), (south_mid_y, 0.58), (pier_mid_y, 0.92), (-10.6, 0.62)]:
-        gp.bm_box(bm_s_salmon, (xw + 0.30, py_c, h1 * 0.5), (0.60, pw_c, h1))
-        gp.bm_box(bm_s_salmon, (xe - 0.30, py_c, h1 * 0.5), (0.60, pw_c, h1))
+        # Lower light-gray concrete column plinth collar (z=1.15..2.18m, exact final_step_30.png!)
+        gp.bm_box(bm_s_floor, (xw + 0.30, py_c, s_plinth_h + 0.52), (0.68, pw_c + 0.08, 1.04))
+        gp.bm_box(bm_s_floor, (xe - 0.30, py_c, s_plinth_h + 0.52), (0.68, pw_c + 0.08, 1.04))
+        # Upper salmon-brick column shaft (z=2.18..3.60m)
+        gp.bm_box(bm_s_salmon, (xw + 0.30, py_c, 2.18 + (h1 - 2.18) * 0.5), (0.60, pw_c, h1 - 2.18))
+        gp.bm_box(bm_s_salmon, (xe - 0.30, py_c, 2.18 + (h1 - 2.18) * 0.5), (0.60, pw_c, h1 - 2.18))
+
+    # Raised 1F Connector Plinth Deck (x=-51.2..-43.6, y=-29.6..-10.4, z=0..1.15m) + Walkable Terrazzo Top
+    gp.bm_box(bm_s_floor, (0.5 * (-51.2 + xe), syc, s_plinth_h * 0.5), (xe - (-51.2), slen_tot - 0.2, s_plinth_h))
+    gp.bm_box(bm_s_terrazzo, (0.5 * (-51.1 + xe), syc, s_plinth_h + 0.02), (xe - (-51.1) - 0.1, slen_tot - 0.3, 0.03))
+
+    # 10-Step Grand Staircase Ascending East (+X) from Forecourt Plaza (x=-56.4 -> -51.2, y=-26.8..-15.8, z=0..1.15m, exact final_step_30.png!)
+    st_x0, st_x1 = -56.40, -51.20
+    st_y0, st_y1 = -26.80, -15.80
+    st_yc = 0.5 * (st_y0 + st_y1)
+    st_wy = st_y1 - st_y0
+    n_st_s = 10
+    for si in range(n_st_s):
+        sh = s_plinth_h * (si + 1) / n_st_s
+        sd = (st_x1 - st_x0) / n_st_s
+        sx_c = st_x0 + (si + 0.5) * sd
+        gp.bm_box(bm_s_floor, (sx_c, st_yc, sh * 0.5), (sd + 0.04, st_wy, sh))
+
+    # Sloped White Square-Tile Cheek Wall along North Edge of Stairs (y=-15.80..-15.42) + Concrete Sloped Coping + Stainless Double Handrail!
+    chk_y0, chk_y1 = st_y1, st_y1 + 0.38
+    chk_yc = 0.5 * (chk_y0 + chk_y1)
+    chk_xz = [
+        (st_x0 - 0.15, 0.02),
+        (st_x1 + 0.20, 0.02),
+        (st_x1 + 0.20, s_plinth_h + 0.68),
+        (st_x0 - 0.15, 0.68),
+    ]
+    vs_c0 = [bm_s_cream.verts.new((px_v, chk_y0, pz_v)) for px_v, pz_v in chk_xz]
+    vs_c1 = [bm_s_cream.verts.new((px_v, chk_y1, pz_v)) for px_v, pz_v in chk_xz]
+    f_chk = [bm_s_cream.faces.new(vs_c0), bm_s_cream.faces.new(list(reversed(vs_c1)))]
+    for ii in range(4):
+        jj = (ii + 1) % 4
+        f_chk.append(bm_s_cream.faces.new((vs_c0[ii], vs_c1[ii], vs_c1[jj], vs_c0[jj])))
+    bmesh.ops.recalc_face_normals(bm_s_cream, faces=f_chk)
+    # Sloped gray concrete coping cap & stainless handrail above cheek wall
+    sl_dx = (st_x1 + 0.20) - (st_x0 - 0.15)
+    sl_dz = s_plinth_h
+    sl_len = math.hypot(sl_dx, sl_dz)
+    sl_ang = math.atan2(sl_dz, sl_dx)
+    gp.bm_box(
+        bm_s_floor,
+        (0.5 * (st_x0 - 0.15 + st_x1 + 0.20), chk_yc, 0.68 + s_plinth_h * 0.5 + 0.04),
+        (sl_len + 0.08, 0.46, 0.08),
+        rot_y=-sl_ang,
+    )
+    gp.bm_cyl_p2p(bm_s_steel, (st_x0 - 0.08, chk_yc, 1.06), (st_x1 + 0.15, chk_yc, s_plinth_h + 1.06), 0.028, 0.028, segments=8)
+    gp.bm_cyl_p2p(bm_s_steel, (st_x0 - 0.08, chk_yc, 0.88), (st_x1 + 0.15, chk_yc, s_plinth_h + 0.88), 0.020, 0.020, segments=6)
+    for k_p in range(5):
+        tk_p = k_p / 4.0
+        px_p = (st_x0 - 0.08) + ((st_x1 + 0.15) - (st_x0 - 0.08)) * tk_p
+        pz_p = 0.72 + s_plinth_h * tk_p
+        gp.bm_cyl_p2p(bm_s_steel, (px_p, chk_yc, pz_p), (px_p, chk_yc, pz_p + 0.35), 0.020, 0.020, segments=6)
+
+    # Forecourt South Garden White-Tile Low Planter Wall & Decorative Round Ceramic Planter Pot strictly NORTH of stair cheek wall (y=-15.42..-7.45, step_18_shot_1.png!)
+    gp.bm_box(bm_s_cream, (-58.6, -15.25, 0.34), (4.6, 0.36, 0.64))
+    gp.bm_box(bm_s_floor, (-58.6, -15.25, 0.68), (4.72, 0.44, 0.07))
+    gp.bm_box(bm_s_cream, (-60.8, -11.35, 0.38), (0.38, 7.8, 0.72))
+    gp.bm_box(bm_s_floor, (-60.8, -11.35, 0.76), (0.46, 7.9, 0.07))
+    # Sloped white-tile side cheek wall + silver handrail beside Guanghe south wing (visible behind '31' gate pier in step_18_shot_1.png!)
+    gp.bm_box(bm_s_cream, (-59.2, -7.45, 0.68), (4.2, 0.32, 0.82), rot_y=math.radians(-14.0))
+    gp.bm_cyl_p2p(bm_s_steel, (-61.2, -7.45, 0.96), (-57.1, -7.45, 1.98), 0.026, 0.026, segments=8)
+    # Large cream round planter pot seated on SW corner of garden retaining wall
+    gp.bm_cyl_p2p(bm_s_cream, (-60.4, -15.05, 0.68), (-60.4, -15.05, 1.16), 0.34, 0.46, segments=14)
+    gp.bm_cyl_axis(bm_s_floor, (-60.4, -15.05, 1.18), 0.48, 0.06, axis="Z", segments=14)
+
+    # Chongqing Bldg North 1F White Square-Tile Twin-Column Portico + Illustrated "圖書室 Library" Header Sign (right of grand stairs in final_step_30.png!)
+    lib_x0, lib_x1 = -58.6, -51.4
+    lib_xc = 0.5 * (lib_x0 + lib_x1)
+    lib_y = -27.55
+    for lx_p in (lib_x0 + 0.32, lib_x0 + 2.55, lib_x1 - 0.32):
+        gp.bm_box(bm_s_cream, (lx_p, lib_y, 2.05), (0.58, 0.58, 4.10))
+    gp.bm_box(bm_s_cream, (lib_xc, lib_y, 3.65), (lib_x1 - lib_x0 + 0.12, 0.62, 0.96))
+    gp.bm_box(bm_s_floor, (lib_xc, -28.5, s_plinth_h * 0.5), (lib_x1 - lib_x0 + 0.8, 2.2, s_plinth_h))
+    bm_lib_ban = bmesh.new()
+    # Facing WEST-NORTHWEST toward main gate (-X / +Y): viewer left is +Y/-X, right is -X
+    _add_plane_uv(
+        bm_lib_ban,
+        (lib_x1 - 0.05, lib_y + 0.33, 3.18),
+        (lib_x0 + 0.05, lib_y + 0.33, 3.18),
+        (lib_x0 + 0.05, lib_y + 0.33, 4.12),
+        (lib_x1 - 0.05, lib_y + 0.33, 4.12),
+    )
+    objs.append(su.create_mesh_object("Bldg_Guanghe_SouthBridge_LibraryBanner", bm_lib_ban, palette["library_banner"], "Bldg_Chongqing", auto_uv=False))
 
     # 2F - 5F South Connector Floors
     for fl in range(1, 5):
