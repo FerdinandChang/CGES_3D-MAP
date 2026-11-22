@@ -55,12 +55,18 @@ def main() -> int:
     assert glb_hash == meta["hash"], f"GLB hash mismatch: {glb_hash} != {meta['hash']}"
     assert glb_bytes < 8 * 1024 * 1024, f"Expected compressed GLB < 8MB, got {glb_bytes}"
 
-    # 4. Verify index.html & tour_app.js features (progress bar, deep-link share button, Single Source of Truth)
+    # 4. Verify index.html, favicons & tour_app.js features (progress bar, deep-link share button, Single Source of Truth)
+    for icon_file in ("favicon.ico", "favicon.png", "apple-touch-icon.png"):
+        assert os.path.exists(os.path.join(ROOT, icon_file)), f"Missing {icon_file}"
+
     html = open(os.path.join(ROOT, "index.html"), encoding="utf-8").read()
     for required in (
         'property="og:title"',
         'property="og:image"',
         'name="description"',
+        'href="./favicon.ico"',
+        'href="./favicon.png"',
+        'href="./apple-touch-icon.png"',
         'data-src="./refs/cges_115_map.jpg"',
         '"./vendor/three/build/three.module.js"',
         'id="statusBar"',

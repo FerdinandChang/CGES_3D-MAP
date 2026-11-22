@@ -18,6 +18,8 @@ const MIME = {
   ".webp": "image/webp",
   ".png": "image/png",
   ".jpg": "image/jpeg",
+  ".ico": "image/x-icon",
+  ".gif": "image/gif",
 };
 
 const server = http.createServer((req, res) => {
