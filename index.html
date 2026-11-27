@@ -67,8 +67,9 @@
       <div class="sidebar-tools" id="sidebarTools" aria-label="校園導覽工具列">
         <div class="tool-row">
           <button class="tool-btn tour-accent" id="btnStartTour" title="啟動／停止 7 站校園自動導覽">▶ 導覽</button>
+          <button class="tool-btn walk-accent desktop-only" id="btnWalk" title="桌機自由步行模式（可走進重慶樓教室、第一／第三人稱切換）">🚶 步行</button>
           <button class="tool-btn active" id="btnLabelMode" title="切換 3D 標牌：智慧 → 全校教室 → 隱藏">🏷 智慧</button>
-          <button class="tool-btn" id="btnOpenMap" title="開啟 115 學年度官方教室配置圖">🗺 配置圖</button>
+          <button class="tool-btn" id="btnOpenMap" title="開啟 115 學年度官方教室配置圖">🗺 配置</button>
           <button class="tool-btn" id="btnXray" title="剖開樓層天花板露出走廊／透視屋頂">🔪 剖層</button>
           <button class="tool-btn" id="btnRuler" title="點選場景任兩點量測實際公尺距離">📏 測距</button>
         </div>
@@ -222,12 +223,33 @@
       <div class="ri-actions">
         <button class="btn btn-sm" id="btnRoomPrev" title="同層上一間">◀</button>
         <button class="btn btn-sm" id="btnRoomNext" title="同層下一間">▶</button>
+        <button class="btn btn-sm desktop-only walk-accent-btn" id="btnRoomWalk" title="以第一／第三人稱直接走進這間重慶樓教室（示範棟）" hidden>🚶 進教室</button>
         <button class="btn btn-sm" id="btnRoomRoute" title="在左側欄展開前往此空間的詳細步行路線與走廊實境">🧭 怎麼走</button>
         <button class="btn btn-sm" id="btnRoomViewToggle" title="切換近距平視／棟別鳥瞰">🦅 鳥瞰</button>
         <button class="btn btn-sm" id="btnRoomShare" title="複製此空間或路線的 3D 分享連結">🔗 分享</button>
         <button class="icon-btn" id="btnCloseInspector" title="關閉定位">✕</button>
       </div>
     </div>
+
+    <!-- Desktop Free-Walk HUD (Chongqing Bldg Interior Demo) -->
+    <div class="walk-hud" id="walkHud" hidden>
+      <div class="walk-hud-row">
+        <span class="walk-info" id="walkInfo">📍 校園戶外</span>
+        <select class="route-select walk-spawn-select" id="walkSpawnSelect" title="快速傳送起點"></select>
+        <button class="btn btn-sm active" id="btnWalkView" title="切換第一人稱／第三人稱小人（快捷鍵 V）">👤 第三人稱</button>
+        <button class="btn btn-sm walk-exit-btn" id="btnWalkExit" title="退出自由步行（快捷鍵 Esc）">✕ 退出</button>
+      </div>
+      <div class="walk-hud-hints">
+        <span><kbd>WASD</kbd> 移動</span>
+        <span><kbd>Shift</kbd> 跑步</span>
+        <span>滑鼠拖曳／點畫面轉頭・滾輪調距</span>
+        <span><kbd>V</kbd> 切換人稱</span>
+        <span><kbd>E</kbd>/<kbd>Q</kbd> 梯口上下樓</span>
+        <span><kbd>Esc</kbd> 退出</span>
+      </div>
+    </div>
+    <div class="walk-prompt" id="walkPrompt" hidden></div>
+    <div class="walk-fade" id="walkFade" aria-hidden="true"></div>
 
     <!-- Bottom Guided Tour Narration Overlay -->
     <div class="tour-card" id="tourCard">

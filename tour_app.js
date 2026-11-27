@@ -10,6 +10,7 @@ import { CSS2DRenderer, CSS2DObject } from "three/addons/renderers/CSS2DRenderer
 import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
 import { computeCampusRoute, ROUTE_STARTS } from "./campus_routing.js";
 import { applyDynamicRoomPlaques } from "./dynamic_plaques.js";
+import { createWalkMode } from "./walk_mode.js";
 
 // Blender (X, Y, Z) -> Three.js (X, Z, -Y)
 const b2t = (x, y, z) => new THREE.Vector3(x, z, -y);
@@ -442,9 +443,10 @@ function hydrateAllRooms() {
   for (const z of ZONE_META) {
     const bSpec = state.spec?.buildings?.find((b) => b.id === z.id);
     const list = bSpec?.rooms_115_detailed || z.extraDetailed || [];
-    for (const r of list) {
+    list.forEach((r, idx) => {
       const rec = {
         uid: `r_${seq++}`,
+        specKey: bSpec ? `${z.id}:${idx}` : null,
         zoneId: z.id,
         zone: z,
         floor: r.floor,
@@ -459,7 +461,7 @@ function hydrateAllRooms() {
       };
       rec.haystack = buildSearchHaystack(rec, z);
       state.allRooms.push(rec);
-    }
+    });
   }
 }
 
@@ -1226,16 +1228,31 @@ function syncUrlHash() {
   }
 }
 
+let walkMode = null;
+let pendingWalkHash = null;
+
 function applyUrlHash() {
   const raw = (window.location.hash || "").replace(/^#/, "").trim();
   if (!raw) return;
   const params = new URLSearchParams(raw);
+  const walkQuery = (params.get("walk") || "").trim();
   const routeQuery = (params.get("route") || "").trim();
   const roomQuery = (params.get("room") || "").trim();
   const fromQuery = (params.get("from") || "").trim();
   const accQuery = (params.get("acc") || "").trim();
   const zoneQuery = (params.get("zone") || "").trim();
   const floorQuery = (params.get("floor") || "").trim();
+
+  if (walkQuery && !isMobileViewport()) {
+    if (walkMode) {
+      const targetRoom = findRoomBySlug(walkQuery);
+      if (targetRoom && walkMode.canWalkRoom(targetRoom)) walkMode.enterAtRoom(targetRoom);
+      else walkMode.enter({ key: walkQuery });
+    } else {
+      pendingWalkHash = walkQuery;
+    }
+    return;
+  }
 
   suppressHashSync = true;
   try {
@@ -1291,6 +1308,10 @@ function updateRoomInspector(room) {
   document.getElementById("riName").textContent = room.name;
   document.getElementById("riStairs").textContent = room.stairs ? `動線：${room.stairs}` : `位置：${room.zone.axisHint}`;
   document.getElementById("btnRoomViewToggle").textContent = state.roomViewAerial ? "🎯 平視" : "🦅 鳥瞰";
+  const walkRoomBtn = document.getElementById("btnRoomWalk");
+  if (walkRoomBtn) {
+    walkRoomBtn.hidden = !(room.zoneId === "Bldg_Chongqing" && !isMobileViewport());
+  }
   bar.hidden = false;
 }
 
@@ -1700,6 +1721,7 @@ renderer.domElement.addEventListener("pointerdown", (e) => {
 });
 
 renderer.domElement.addEventListener("pointerup", (e) => {
+  if (walkMode?.active) return;
   if (e.button !== 0) return;
   if (Math.hypot(e.clientX - downPos.x, e.clientY - downPos.y) > 5) return;
   const rect = renderer.domElement.getBoundingClientRect();
@@ -2122,6 +2144,7 @@ document.getElementById("btnCloseMapModal").addEventListener("click", closeMapMo
 document.getElementById("mapModalBackdrop").addEventListener("click", closeMapModal);
 mapModalImg.addEventListener("click", () => mapModalImg.classList.toggle("zoomed"));
 window.addEventListener("keydown", (e) => {
+  if (walkMode?.active) return;
   const tag = document.activeElement?.tagName;
   const isTyping = tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT";
   if (e.key === "Escape") {
@@ -2153,10 +2176,37 @@ window.addEventListener("keydown", (e) => {
 
 window.addEventListener("resize", () => {
   camera.aspect = window.innerWidth / window.innerHeight;
-  updateCameraViewportOffset();
+  if (walkMode?.active) {
+    camera.clearViewOffset();
+    camera.updateProjectionMatrix();
+  } else {
+    updateCameraViewportOffset();
+  }
   renderer.setSize(window.innerWidth, window.innerHeight);
   labelRenderer.setSize(window.innerWidth, window.innerHeight);
   requestRender(6);
+});
+
+document.getElementById("btnWalk")?.addEventListener("click", () => {
+  if (isMobileViewport() || !walkMode) return;
+  if (walkMode.active) {
+    walkMode.exit();
+  } else {
+    const curRoom = state.allRooms.find((r) => r.uid === state.activeRoomUid);
+    if (curRoom && walkMode.canWalkRoom(curRoom)) {
+      walkMode.enterAtRoom(curRoom);
+    } else {
+      walkMode.enter({ key: "cq2" });
+    }
+  }
+});
+
+document.getElementById("btnRoomWalk")?.addEventListener("click", () => {
+  if (isMobileViewport() || !walkMode) return;
+  const curRoom = state.allRooms.find((r) => r.uid === state.activeRoomUid);
+  if (curRoom && walkMode.canWalkRoom(curRoom)) {
+    walkMode.enterAtRoom(curRoom);
+  }
 });
 
 const GROUND_ONLY_RECEIVE_PATTERNS = [
@@ -2286,6 +2336,57 @@ async function init() {
       statusEl.remove();
       dracoLoader.dispose();
       requestShadowUpdate();
+
+      // Initialize desktop Free-Walk controller (Chongqing Bldg hollow classrooms & 1st/3rd-person avatar)
+      let preWalkSelectedZone = null;
+      walkMode = createWalkMode({
+        scene,
+        camera,
+        renderer,
+        controls,
+        getMeshes: () => state.allMeshes,
+        getRooms: () => state.allRooms,
+        spec: state.spec,
+        buildHash,
+        requestRender,
+        onEnter: () => {
+          stopTour();
+          stopRouteFlyAlong();
+          tweenPos = null;
+          tweenTgt = null;
+          preWalkSelectedZone = state.selectedZoneId;
+          state.selectedZoneId = null;
+          state.xrayOn = false;
+          updateSliceCutaway(null, "", true);
+          applyVisualModes();
+          zoneLabelsGroup.visible = false;
+          roomLabelsGroup.visible = false;
+          labelRenderer.domElement.style.visibility = "hidden";
+          setSidebarCollapsed(true);
+          document.body.classList.add("walk-active");
+          camera.clearViewOffset();
+          camera.updateProjectionMatrix();
+        },
+        onExit: () => {
+          document.body.classList.remove("walk-active");
+          labelRenderer.domElement.style.visibility = "visible";
+          state.selectedZoneId = preWalkSelectedZone;
+          applyVisualModes();
+          roomLabelsGroup.visible = true;
+          refresh3DLabels();
+          if (!isMobileViewport()) setSidebarCollapsed(false);
+          else updateCameraViewportOffset();
+        },
+      });
+
+      if (pendingWalkHash && !isMobileViewport()) {
+        const wq = pendingWalkHash;
+        pendingWalkHash = null;
+        const targetRoom = findRoomBySlug(wq);
+        if (targetRoom && walkMode.canWalkRoom(targetRoom)) walkMode.enterAtRoom(targetRoom);
+        else walkMode.enter({ key: wq });
+      }
+
       // Hot-render all 127 3D double-sided corridor plaques asynchronously after first paint (zero boot blocking!)
       setTimeout(() => {
         const res = applyDynamicRoomPlaques(gltf.scene, state.spec, { maxAniso, isMobile: isMobileViewport() });
@@ -2316,6 +2417,12 @@ function animate() {
   lastFrameTime = nowSec;
   let needsDraw = renderFramesLeft > 0;
   if (renderFramesLeft > 0) renderFramesLeft--;
+
+  if (walkMode?.active) {
+    walkMode.update(dt);
+    renderer.render(scene, camera);
+    return;
+  }
 
   if (activeRoomBox) {
     const fill = activeRoomBox.children[0];

@@ -181,18 +181,18 @@ body {
 
 .tool-row {
   display: grid;
-  grid-template-columns: repeat(5, 1fr);
-  gap: 5px;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 4px;
 }
 
 .tool-btn {
   border: 1px solid rgba(255, 255, 255, 0.12);
   background: rgba(255, 255, 255, 0.06);
   color: var(--text-secondary);
-  padding: 5px 3px;
+  padding: 5px 2px;
   border-radius: 9px;
   cursor: pointer;
-  font-size: 11px;
+  font-size: 10.5px;
   font-weight: 600;
   font-family: inherit;
   white-space: nowrap;
@@ -200,6 +200,29 @@ body {
   align-items: center;
   justify-content: center;
   transition: all 0.14s ease;
+}
+
+.tool-btn.walk-accent {
+  background: linear-gradient(135deg, rgba(16, 185, 129, 0.42), rgba(5, 150, 105, 0.45));
+  border-color: rgba(110, 231, 183, 0.55);
+  color: #ecfdf5;
+}
+
+.tool-btn.walk-accent.active {
+  background: linear-gradient(135deg, #10b981, #059669);
+  border-color: #a7f3d0;
+  color: #fff;
+}
+
+.walk-accent-btn {
+  background: linear-gradient(135deg, rgba(16, 185, 129, 0.45), rgba(5, 150, 105, 0.52));
+  border-color: rgba(110, 231, 183, 0.55);
+  color: #ecfdf5;
+}
+
+.walk-accent-btn:hover {
+  background: linear-gradient(135deg, #10b981, #059669);
+  border-color: #a7f3d0;
 }
 
 .tool-btn:hover {
@@ -1588,7 +1611,126 @@ body {
   display: none;
 }
 
+/* Desktop Free-Walk HUD Overlay */
+.walk-hud {
+  position: fixed;
+  top: 14px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 42;
+  background: rgba(13, 22, 39, 0.9);
+  border: 1px solid rgba(52, 211, 153, 0.55);
+  border-radius: 16px;
+  padding: 9px 14px;
+  backdrop-filter: blur(16px);
+  box-shadow: 0 14px 36px rgba(0, 0, 0, 0.46);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-width: calc(100vw - 32px);
+}
+
+.walk-hud-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: nowrap;
+}
+
+.walk-info {
+  font-size: 13px;
+  font-weight: 800;
+  color: #6ee7b7;
+  white-space: nowrap;
+  padding-right: 4px;
+}
+
+.walk-spawn-select {
+  width: 210px;
+  flex: 0 0 auto;
+}
+
+.walk-exit-btn {
+  background: rgba(239, 68, 68, 0.24);
+  border-color: rgba(248, 113, 113, 0.5);
+  color: #fecaca;
+}
+
+.walk-exit-btn:hover {
+  background: rgba(239, 68, 68, 0.5);
+  border-color: #fca5a5;
+  color: #fff;
+}
+
+.walk-hud-hints {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  font-size: 11px;
+  color: var(--text-muted);
+  align-items: center;
+}
+
+.walk-hud-hints kbd,
+.walk-prompt kbd {
+  display: inline-block;
+  padding: 1px 5px;
+  border-radius: 5px;
+  background: rgba(255, 255, 255, 0.14);
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  color: #f8fafc;
+  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+  font-size: 10.5px;
+  font-weight: 700;
+}
+
+.walk-prompt {
+  position: fixed;
+  bottom: 28px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 42;
+  background: rgba(13, 22, 39, 0.92);
+  border: 1px solid rgba(253, 224, 71, 0.72);
+  color: #fef08a;
+  padding: 9px 18px;
+  border-radius: 999px;
+  font-size: 13.5px;
+  font-weight: 800;
+  backdrop-filter: blur(14px);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.48);
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+.walk-fade {
+  position: fixed;
+  inset: 0;
+  background: #020617;
+  opacity: 0;
+  pointer-events: none;
+  z-index: 45;
+  transition: opacity 0.08s linear;
+}
+
+body.walk-active .sidebar-toggle,
+body.walk-active .room-inspector,
+body.walk-active .tour-card,
+body.walk-active .ruler-banner {
+  display: none !important;
+}
+
 @media (max-width: 900px) {
+  .desktop-only,
+  .walk-hud,
+  .walk-prompt {
+    display: none !important;
+  }
+
+  .tool-row {
+    grid-template-columns: repeat(5, 1fr);
+  }
+
   .mobile-only {
     display: inline-flex;
   }
