@@ -30,7 +30,7 @@ const SPAWNS = {
   wq1: { label: "🏫 五權樓 1F 西側中庭走廊", x: -5.8, y: -22.0, bldg: "Bldg_Wuquan", floor: 1, yaw: 0 },
   wq3: { label: "🏫 五權樓 3F 東側操場走廊", x: 5.3, y: -12.0, bldg: "Bldg_Wuquan", floor: 3, yaw: Math.PI },
   wq5: { label: "🏫 五權樓 5F 六年級走廊", x: 5.3, y: -20.5, bldg: "Bldg_Wuquan", floor: 5, yaw: Math.PI },
-  cq2: { label: "📚 重慶樓 2F 圖書室走廊", x: -58.288, y: -41.7, bldg: "Bldg_Chongqing", floor: 2, yaw: Math.PI / 2 },
+  cq2: { label: "📚 重慶樓 2F 圖書室走廊", x: -58.138, y: -41.7, bldg: "Bldg_Chongqing", floor: 2, yaw: Math.PI / 2 },
   cq3: { label: "🏫 重慶樓 3F 南側走廊", x: -27.8, y: -41.8, bldg: "Bldg_Chongqing", floor: 3, yaw: Math.PI / 2 },
   court: { label: "🏀 重慶樓南側雙籃球場", x: -38.0, y: -47.0, yaw: Math.PI / 2 },
   track: { label: "🏃 操場與升旗司令台大道", x: 16.0, y: -13.8, yaw: Math.PI },
@@ -150,56 +150,6 @@ function makeCanvasTex(canvas) {
   return tex;
 }
 
-function makeShirtTexture(side) {
-  const c = document.createElement("canvas");
-  c.width = 512;
-  c.height = 512;
-  const ctx = c.getContext("2d");
-
-  // 白色純棉運動服底色＋細緻布面微陰影
-  ctx.fillStyle = "#f5f6f3";
-  ctx.fillRect(0, 0, 512, 512);
-  const grad = ctx.createLinearGradient(0, 0, 0, 512);
-  grad.addColorStop(0, "rgba(255,255,255,0.22)");
-  grad.addColorStop(0.84, "rgba(210,218,212,0.06)");
-  grad.addColorStop(0.86, "rgba(180,190,184,0.28)");
-  grad.addColorStop(1, "rgba(235,238,234,0.18)");
-  ctx.fillStyle = grad;
-  ctx.fillRect(0, 0, 512, 512);
-
-  // 下擺羅紋收口車線
-  ctx.strokeStyle = "rgba(170,180,174,0.45)";
-  ctx.lineWidth = 3;
-  ctx.beginPath();
-  ctx.moveTo(0, 444);
-  ctx.lineTo(512, 444);
-  ctx.stroke();
-
-  if (side === "front") {
-    ctx.save();
-    ctx.beginPath();
-    ctx.ellipse(256, -4, 118, 84, 0, 0, Math.PI);
-    ctx.fillStyle = "#007443";
-    ctx.fill();
-    ctx.beginPath();
-    ctx.ellipse(256, -4, 88, 56, 0, 0, Math.PI);
-    ctx.fillStyle = "#e8bc97";
-    ctx.fill();
-    ctx.restore();
-    drawCgesCrest(ctx, 358, 194, 1.24);
-  } else if (side === "back") {
-    ctx.beginPath();
-    ctx.ellipse(256, -4, 114, 38, 0, 0, Math.PI);
-    ctx.fillStyle = "#007443";
-    ctx.fill();
-    ctx.beginPath();
-    ctx.ellipse(256, -4, 86, 18, 0, 0, Math.PI);
-    ctx.fillStyle = "#e8bc97";
-    ctx.fill();
-  }
-  return makeCanvasTex(c);
-}
-
 function fillGingham(ctx, x, y, w, h) {
   ctx.save();
   ctx.fillStyle = "#f4f8ff";
@@ -215,37 +165,146 @@ function fillGingham(ctx, x, y, w, h) {
   ctx.restore();
 }
 
-function makeBoyUniformShirtTexture(side) {
+// ---------- 去積木感圓潤 Q 版重慶小學生公仔貼圖與建模（運動服／男生制服／女生制服）----------
+function makeHeadFaceTexture() {
   const c = document.createElement("canvas");
   c.width = 512;
+  c.height = 256;
+  const ctx = c.getContext("2d");
+
+  const bg = ctx.createLinearGradient(0, 0, 0, 256);
+  bg.addColorStop(0, "#f6d2b0");
+  bg.addColorStop(0.7, "#f2c69e");
+  bg.addColorStop(1, "#e7b48a");
+  ctx.fillStyle = bg;
+  ctx.fillRect(0, 0, 512, 256);
+
+  // 頭頂柔順自然弧形碎劉海（直接貼合臉球曲面，無凸起條狀顆粒！）
+  ctx.fillStyle = "#2c1f16";
+  ctx.beginPath();
+  ctx.moveTo(0, 0);
+  ctx.lineTo(512, 0);
+  ctx.lineTo(512, 108);
+  ctx.lineTo(340, 108);
+  ctx.quadraticCurveTo(318, 92, 304, 106);
+  ctx.quadraticCurveTo(286, 86, 270, 105);
+  ctx.quadraticCurveTo(256, 84, 240, 105);
+  ctx.quadraticCurveTo(222, 88, 206, 106);
+  ctx.quadraticCurveTo(188, 92, 172, 108);
+  ctx.lineTo(0, 108);
+  ctx.closePath();
+  ctx.fill();
+
+  // SphereGeometry u=0.5 (x=256) 正對 +X 正面；曲面手繪可愛五官，徹底告別凸出黑方塊眼睛！
+  for (const sgn of [-1, 1]) {
+    const ex = 256 + sgn * 31;
+    ctx.strokeStyle = "#4b3426";
+    ctx.lineWidth = 4;
+    ctx.lineCap = "round";
+    ctx.beginPath();
+    ctx.moveTo(ex - 11, 118);
+    ctx.quadraticCurveTo(ex, 112, ex + 11, 118);
+    ctx.stroke();
+
+    ctx.beginPath();
+    ctx.ellipse(ex, 137, 10.5, 12, 0, 0, Math.PI * 2);
+    ctx.fillStyle = "#241812";
+    ctx.fill();
+    ctx.beginPath();
+    ctx.arc(ex - 3.5, 132.5, 3.6, 0, Math.PI * 2);
+    ctx.fillStyle = "#ffffff";
+    ctx.fill();
+    ctx.beginPath();
+    ctx.arc(ex + 3.2, 141.5, 1.8, 0, Math.PI * 2);
+    ctx.fillStyle = "rgba(255,255,255,0.75)";
+    ctx.fill();
+
+    const bx = 256 + sgn * 48;
+    const rg = ctx.createRadialGradient(bx, 152, 2, bx, 152, 16);
+    rg.addColorStop(0, "rgba(244, 128, 128, 0.42)");
+    rg.addColorStop(1, "rgba(244, 128, 128, 0)");
+    ctx.fillStyle = rg;
+    ctx.beginPath();
+    ctx.arc(bx, 152, 16, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  ctx.strokeStyle = "#c46256";
+  ctx.lineWidth = 4.2;
+  ctx.lineCap = "round";
+  ctx.beginPath();
+  ctx.moveTo(245, 159);
+  ctx.quadraticCurveTo(256, 169, 267, 159);
+  ctx.stroke();
+
+  return makeCanvasTex(c);
+}
+
+function makeWrapTorsoTexture(mode) {
+  // LatheGeometry 360° 環繞展開圖：u=0.25 (x=256) 正胸中心 +X，u=0.75 (x=768) 後背中心 -X
+  const c = document.createElement("canvas");
+  c.width = 1024;
   c.height = 512;
   const ctx = c.getContext("2d");
 
-  // 純白短袖襯衫底色
-  ctx.fillStyle = "#f7f8fa";
-  ctx.fillRect(0, 0, 512, 512);
-  const g = ctx.createLinearGradient(0, 0, 0, 512);
-  g.addColorStop(0, "rgba(255,255,255,0.2)");
-  g.addColorStop(1, "rgba(180,195,215,0.16)");
-  ctx.fillStyle = g;
-  ctx.fillRect(0, 0, 512, 512);
+  if (mode === "pe") {
+    ctx.fillStyle = "#f5f6f3";
+    ctx.fillRect(0, 0, 1024, 512);
+    const grad = ctx.createLinearGradient(0, 0, 0, 512);
+    grad.addColorStop(0, "rgba(255,255,255,0.2)");
+    grad.addColorStop(0.84, "rgba(200,210,204,0.06)");
+    grad.addColorStop(0.87, "rgba(170,182,175,0.28)");
+    grad.addColorStop(1, "rgba(230,235,230,0.16)");
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, 1024, 512);
+    ctx.strokeStyle = "rgba(165,175,170,0.45)";
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.moveTo(0, 446);
+    ctx.lineTo(1024, 446);
+    ctx.stroke();
 
-  if (side === "front") {
-    // 門襟與 4 顆鈕扣
+    ctx.fillStyle = "#007443";
+    ctx.fillRect(0, 0, 1024, 52);
+    ctx.beginPath();
+    ctx.ellipse(256, 46, 86, 76, 0, 0, Math.PI);
+    ctx.fill();
+    ctx.beginPath();
+    ctx.ellipse(768, 46, 82, 34, 0, 0, Math.PI);
+    ctx.fill();
+    ctx.fillStyle = "#e8bc97";
+    ctx.fillRect(0, 0, 1024, 24);
+    ctx.beginPath();
+    ctx.ellipse(256, 26, 60, 62, 0, 0, Math.PI);
+    ctx.fill();
+    ctx.beginPath();
+    ctx.ellipse(768, 26, 58, 24, 0, 0, Math.PI);
+    ctx.fill();
+
+    drawCgesCrest(ctx, 334, 224, 1.02);
+  } else if (mode === "boy") {
+    ctx.fillStyle = "#f7f8fa";
+    ctx.fillRect(0, 0, 1024, 512);
+    const g = ctx.createLinearGradient(0, 0, 0, 512);
+    g.addColorStop(0, "rgba(255,255,255,0.2)");
+    g.addColorStop(1, "rgba(180,196,216,0.18)");
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, 1024, 512);
+
     ctx.fillStyle = "rgba(220,228,238,0.55)";
-    ctx.fillRect(241, 126, 30, 386);
+    ctx.fillRect(244, 165, 24, 347);
     ctx.strokeStyle = "rgba(148,163,184,0.6)";
     ctx.lineWidth = 2.5;
     ctx.beginPath();
-    ctx.moveTo(241, 126);
-    ctx.lineTo(241, 512);
-    ctx.moveTo(271, 126);
-    ctx.lineTo(271, 512);
+    ctx.moveTo(244, 165);
+    ctx.lineTo(244, 512);
+    ctx.moveTo(268, 165);
+    ctx.lineTo(268, 512);
     ctx.stroke();
     for (let i = 0; i < 4; i++) {
-      const by = 188 + i * 86;
+      const by = 224 + i * 74;
       ctx.beginPath();
-      ctx.arc(256, by, 7.5, 0, Math.PI * 2);
+      ctx.arc(256, by, 6.5, 0, Math.PI * 2);
       ctx.fillStyle = "#ffffff";
       ctx.fill();
       ctx.lineWidth = 2;
@@ -253,161 +312,130 @@ function makeBoyUniformShirtTexture(side) {
       ctx.stroke();
     }
 
-    // 領口 V 字膚色開襟
+    ctx.save();
     ctx.beginPath();
-    ctx.moveTo(192, 0);
-    ctx.lineTo(320, 0);
-    ctx.lineTo(256, 132);
+    ctx.rect(0, 0, 1024, 58);
+    ctx.moveTo(646, 54);
+    ctx.lineTo(890, 54);
+    ctx.lineTo(874, 126);
+    ctx.quadraticCurveTo(768, 144, 662, 126);
+    ctx.closePath();
+    ctx.clip();
+    fillGingham(ctx, 0, 0, 1024, 150);
+    ctx.restore();
+    ctx.strokeStyle = "#2b4d82";
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.moveTo(646, 54);
+    ctx.lineTo(662, 126);
+    ctx.quadraticCurveTo(768, 144, 874, 126);
+    ctx.lineTo(890, 54);
+    ctx.stroke();
+
+    ctx.beginPath();
+    ctx.moveTo(206, 20);
+    ctx.lineTo(306, 20);
+    ctx.lineTo(256, 174);
     ctx.closePath();
     ctx.fillStyle = "#e8bc97";
     ctx.fill();
-
-    // 左右藍白細格紋開領翻領（重慶國小男生夏季制服標誌特色）
     const drawLapel = (pts) => {
       ctx.save();
       ctx.beginPath();
       pts.forEach(([px, py], idx) => (idx === 0 ? ctx.moveTo(px, py) : ctx.lineTo(px, py)));
       ctx.closePath();
       ctx.clip();
-      fillGingham(ctx, 90, 0, 340, 175);
+      fillGingham(ctx, 120, 20, 280, 170);
       ctx.restore();
       ctx.beginPath();
       pts.forEach(([px, py], idx) => (idx === 0 ? ctx.moveTo(px, py) : ctx.lineTo(px, py)));
       ctx.closePath();
       ctx.strokeStyle = "#2b4d82";
-      ctx.lineWidth = 3.5;
+      ctx.lineWidth = 3;
       ctx.stroke();
     };
     drawLapel([
-      [192, 0],
-      [118, 12],
-      [148, 134],
-      [252, 132],
+      [206, 36],
+      [148, 56],
+      [172, 170],
+      [252, 174],
     ]);
     drawLapel([
-      [320, 0],
-      [394, 12],
-      [364, 134],
-      [260, 132],
+      [306, 36],
+      [364, 56],
+      [340, 170],
+      [260, 174],
     ]);
 
-    // 左胸白襯衫口袋＋上方重慶盾牌校徽
-    ctx.strokeStyle = "rgba(148,163,184,0.75)";
-    ctx.lineWidth = 3;
+    ctx.strokeStyle = "rgba(148,163,184,0.8)";
+    ctx.lineWidth = 2.8;
     ctx.beginPath();
-    ctx.moveTo(316, 206);
-    ctx.lineTo(426, 206);
-    ctx.lineTo(426, 304);
-    ctx.quadraticCurveTo(371, 326, 316, 304);
+    ctx.moveTo(298, 224);
+    ctx.lineTo(382, 224);
+    ctx.lineTo(382, 304);
+    ctx.quadraticCurveTo(340, 322, 298, 304);
     ctx.closePath();
-    ctx.fillStyle = "rgba(255,255,255,0.75)";
+    ctx.fillStyle = "rgba(255,255,255,0.82)";
     ctx.fill();
     ctx.stroke();
-    drawCgesCrest(ctx, 371, 250, 0.82);
-  } else if (side === "back") {
-    // 背後藍白細格紋翻領
-    ctx.save();
+    drawCgesCrest(ctx, 340, 260, 0.66);
+  } else {
+    ctx.fillStyle = "#182644";
+    ctx.fillRect(0, 0, 1024, 512);
+    ctx.fillStyle = "#f7f8fa";
+    ctx.fillRect(0, 0, 1024, 56);
+    ctx.fillStyle = "rgba(8,14,28,0.42)";
+    ctx.fillRect(0, 466, 1024, 16);
+
     ctx.beginPath();
-    ctx.moveTo(116, 0);
-    ctx.lineTo(396, 0);
-    ctx.lineTo(382, 74);
-    ctx.quadraticCurveTo(256, 94, 130, 74);
-    ctx.closePath();
-    ctx.clip();
-    fillGingham(ctx, 100, 0, 320, 100);
-    ctx.restore();
-    ctx.beginPath();
-    ctx.moveTo(116, 0);
-    ctx.lineTo(396, 0);
-    ctx.lineTo(382, 74);
-    ctx.quadraticCurveTo(256, 94, 130, 74);
-    ctx.closePath();
-    ctx.strokeStyle = "#2b4d82";
-    ctx.lineWidth = 3.5;
-    ctx.stroke();
-  }
-  return makeCanvasTex(c);
-}
-
-function makeGirlUniformTopTexture(side) {
-  const c = document.createElement("canvas");
-  c.width = 512;
-  c.height = 512;
-  const ctx = c.getContext("2d");
-
-  // 深丈青連身吊帶背心裙上半身底色
-  ctx.fillStyle = "#182644";
-  ctx.fillRect(0, 0, 512, 512);
-  // 細微立體修身剪裁線
-  ctx.strokeStyle = "rgba(255,255,255,0.08)";
-  ctx.lineWidth = 3;
-  ctx.beginPath();
-  ctx.moveTo(120, 160);
-  ctx.lineTo(132, 512);
-  ctx.moveTo(392, 160);
-  ctx.lineTo(380, 512);
-  ctx.stroke();
-
-  // 腰部拼接線
-  ctx.fillStyle = "rgba(8,14,28,0.45)";
-  ctx.fillRect(0, 468, 512, 14);
-
-  if (side === "front") {
-    // 背心 U 領內的白色襯衫區塊
-    ctx.beginPath();
-    ctx.ellipse(256, 12, 128, 124, 0, 0, Math.PI);
+    ctx.ellipse(256, 56, 98, 106, 0, 0, Math.PI);
     ctx.fillStyle = "#f7f8fa";
     ctx.fill();
-
-    // 頸口露出一點膚色
     ctx.beginPath();
-    ctx.ellipse(256, -4, 72, 46, 0, 0, Math.PI);
+    ctx.ellipse(256, 34, 56, 48, 0, 0, Math.PI);
     ctx.fillStyle = "#e8bc97";
     ctx.fill();
 
-    // 經典圓弧白色娃娃領（Peter Pan Collar，左右兩瓣翻在深丈青背心上）
     const drawPeterPan = (sign) => {
       ctx.beginPath();
-      ctx.moveTo(256, 48);
-      ctx.quadraticCurveTo(256 + sign * 42, 144, 256 + sign * 144, 118);
-      ctx.quadraticCurveTo(256 + sign * 194, 96, 256 + sign * 176, 8);
-      ctx.lineTo(256 + sign * 70, 0);
-      ctx.quadraticCurveTo(256 + sign * 56, 44, 256, 48);
+      ctx.moveTo(256, 86);
+      ctx.quadraticCurveTo(256 + sign * 34, 168, 256 + sign * 116, 146);
+      ctx.quadraticCurveTo(256 + sign * 154, 126, 256 + sign * 140, 50);
+      ctx.lineTo(256 + sign * 58, 42);
+      ctx.quadraticCurveTo(256 + sign * 48, 82, 256, 86);
       ctx.closePath();
       ctx.fillStyle = "#ffffff";
       ctx.fill();
       ctx.strokeStyle = "#cbd5e1";
-      ctx.lineWidth = 3.5;
+      ctx.lineWidth = 3.2;
       ctx.stroke();
     };
     drawPeterPan(-1);
     drawPeterPan(1);
 
-    // 左胸精緻小名牌條＋校徽
-    ctx.fillStyle = "#f8fafc";
-    ctx.fillRect(322, 178, 86, 28);
-    ctx.strokeStyle = "#94a3b8";
-    ctx.lineWidth = 2;
-    ctx.strokeRect(322, 178, 86, 28);
-    ctx.fillStyle = "#0b5c38";
-    ctx.fillRect(330, 185, 16, 14);
-    ctx.fillStyle = "#334155";
-    ctx.fillRect(354, 189, 44, 6);
-  } else if (side === "back") {
-    // 背後圓弧純白後娃娃領
     ctx.beginPath();
-    ctx.moveTo(96, 0);
-    ctx.lineTo(416, 0);
-    ctx.quadraticCurveTo(426, 88, 336, 94);
-    ctx.quadraticCurveTo(278, 96, 256, 62);
-    ctx.quadraticCurveTo(234, 96, 176, 94);
-    ctx.quadraticCurveTo(86, 88, 96, 0);
+    ctx.moveTo(638, 44);
+    ctx.lineTo(898, 44);
+    ctx.quadraticCurveTo(908, 128, 832, 134);
+    ctx.quadraticCurveTo(786, 136, 768, 104);
+    ctx.quadraticCurveTo(750, 136, 704, 134);
+    ctx.quadraticCurveTo(628, 128, 638, 44);
     ctx.closePath();
     ctx.fillStyle = "#ffffff";
     ctx.fill();
     ctx.strokeStyle = "#cbd5e1";
-    ctx.lineWidth = 3.5;
+    ctx.lineWidth = 3.2;
     ctx.stroke();
+
+    ctx.fillStyle = "#f8fafc";
+    ctx.fillRect(302, 206, 72, 24);
+    ctx.strokeStyle = "#94a3b8";
+    ctx.lineWidth = 2;
+    ctx.strokeRect(302, 206, 72, 24);
+    ctx.fillStyle = "#0b5c38";
+    ctx.fillRect(308, 212, 13, 12);
+    ctx.fillStyle = "#334155";
+    ctx.fillRect(327, 215, 38, 5);
   }
   return makeCanvasTex(c);
 }
@@ -417,8 +445,6 @@ function makePleatedSkirtTexture() {
   c.width = 512;
   c.height = 256;
   const ctx = c.getContext("2d");
-
-  // 16 道深丈青立體百褶陰影
   const pleats = 16;
   const pw = 512 / pleats;
   for (let i = 0; i < pleats; i++) {
@@ -426,233 +452,313 @@ function makePleatedSkirtTexture() {
     const g = ctx.createLinearGradient(x0, 0, x0 + pw, 0);
     g.addColorStop(0.0, "#0e172a");
     g.addColorStop(0.22, "#1c2d50");
-    g.addColorStop(0.68, "#253963");
+    g.addColorStop(0.68, "#263c68");
     g.addColorStop(0.92, "#15223d");
     g.addColorStop(1.0, "#0c1424");
     ctx.fillStyle = g;
     ctx.fillRect(x0, 0, pw + 1, 256);
   }
-
-  // 裙襬底端雙條淺色細飾線（還原照片女生制服裙底細節）
-  ctx.fillStyle = "rgba(226, 232, 240, 0.52)";
+  ctx.fillStyle = "rgba(226, 232, 240, 0.58)";
   ctx.fillRect(0, 224, 512, 4);
   ctx.fillRect(0, 236, 512, 4);
   return makeCanvasTex(c);
 }
 
-function makeShortsLegTexture(isOuterSide) {
+function makeWrapShortsLegTexture(isRightLeg) {
+  // CylinderGeometry: u=0 (+Z 右腿外側), u=0.5 (-Z 左腿外側)
   const c = document.createElement("canvas");
-  c.width = 256;
+  c.width = 512;
   c.height = 256;
   const ctx = c.getContext("2d");
 
-  // 重慶夏季運動短褲鮮明飽滿翠綠（考量戶外日光與 ACES 色調映射稍微壓深飽和）
   ctx.fillStyle = "#00854e";
-  ctx.fillRect(0, 0, 256, 256);
-
-  const g = ctx.createLinearGradient(0, 0, 256, 0);
-  g.addColorStop(0, "rgba(0,0,0,0.08)");
-  g.addColorStop(0.5, "rgba(255,255,255,0.06)");
-  g.addColorStop(1, "rgba(0,0,0,0.08)");
-  ctx.fillStyle = g;
-  ctx.fillRect(0, 0, 256, 256);
-
+  ctx.fillRect(0, 0, 512, 256);
+  for (let i = 0; i < 8; i++) {
+    const x0 = i * 64;
+    const g = ctx.createLinearGradient(x0, 0, x0 + 64, 0);
+    g.addColorStop(0, "rgba(0,0,0,0.06)");
+    g.addColorStop(0.5, "rgba(255,255,255,0.05)");
+    g.addColorStop(1, "rgba(0,0,0,0.06)");
+    ctx.fillStyle = g;
+    ctx.fillRect(x0, 0, 64, 256);
+  }
   ctx.fillStyle = "#ffffff";
-  ctx.fillRect(0, 226, 256, 7);
+  ctx.fillRect(0, 226, 512, 7);
   ctx.fillStyle = "#0f172a";
-  ctx.fillRect(0, 233, 256, 23);
+  ctx.fillRect(0, 233, 512, 23);
 
-  if (isOuterSide) {
+  const drawStripeAt = (cx) => {
     ctx.fillStyle = "#ffffff";
-    ctx.fillRect(108, 0, 40, 233);
+    ctx.fillRect(cx - 20, 0, 40, 233);
     ctx.fillStyle = "#0f172a";
-    ctx.fillRect(114, 0, 28, 256);
-
+    ctx.fillRect(cx - 14, 0, 28, 256);
     ctx.strokeStyle = "#ffffff";
-    ctx.lineWidth = 7;
+    ctx.lineWidth = 6.5;
     ctx.beginPath();
-    ctx.moveTo(0, 230);
-    ctx.quadraticCurveTo(108, 228, 113, 198);
-    ctx.moveTo(256, 230);
-    ctx.quadraticCurveTo(148, 228, 143, 198);
+    ctx.moveTo(cx - 56, 230);
+    ctx.quadraticCurveTo(cx - 20, 228, cx - 16, 198);
+    ctx.moveTo(cx + 56, 230);
+    ctx.quadraticCurveTo(cx + 20, 228, cx + 16, 198);
     ctx.stroke();
-
     ctx.strokeStyle = "#0f172a";
-    ctx.lineWidth = 18;
+    ctx.lineWidth = 17;
     ctx.beginPath();
-    ctx.moveTo(0, 244);
-    ctx.quadraticCurveTo(116, 240, 128, 214);
-    ctx.quadraticCurveTo(140, 240, 256, 244);
+    ctx.moveTo(cx - 58, 244);
+    ctx.quadraticCurveTo(cx - 10, 240, cx, 214);
+    ctx.quadraticCurveTo(cx + 10, 240, cx + 58, 244);
     ctx.stroke();
+  };
+  if (isRightLeg) {
+    drawStripeAt(0);
+    drawStripeAt(512);
+  } else {
+    drawStripeAt(256);
   }
   return makeCanvasTex(c);
 }
 
 function buildAvatar(initialOutfit = "pe") {
   const g = new THREE.Group();
-  const M = (c, r = 0.78) => new THREE.MeshStandardMaterial({ color: c, roughness: r });
-  const shirtWhite = M(0xf4f5f2, 0.84);
-  const collarGreen = M(0x007443, 0.76);
-  const shortsGreen = M(0x00854e, 0.74);
-  const uniformNavy = M(0x182644, 0.76);
-  const trimNavy = M(0x0f172a, 0.7);
-  const trimWhite = M(0xffffff, 0.82);
-  const skin = M(0xf2c7a3, 0.56);
-  const hair = M(0x2a1f17, 0.9);
-  const sockWhite = M(0xf8fafc, 0.85);
-  const shoeUpper = M(0x1f2937, 0.72);
-  const shoeSole = M(0xf1f5f9, 0.8);
-  const dark = new THREE.MeshBasicMaterial({ color: 0x111827 });
+  const M = (c, r = 0.72) => new THREE.MeshStandardMaterial({ color: c, roughness: r });
+  const shirtWhite = M(0xf5f6f3, 0.8);
+  const collarGreen = M(0x007443, 0.72);
+  const shortsGreen = M(0x00854e, 0.72);
+  const uniformNavy = M(0x182644, 0.72);
+  const trimWhite = M(0xffffff, 0.8);
+  const skin = M(0xf2c7a0, 0.52);
+  const hair = M(0x2c1f16, 0.82);
+  const hairAccent = M(0x3b2a1e, 0.78);
+  const sockWhite = M(0xf8fafc, 0.82);
+  const shoeUpper = M(0x232d3f, 0.62);
+  const shoeSole = M(0xf3f5f8, 0.76);
+  const bowMat = M(0x1d3b66, 0.56);
 
-  const box = (mat, sx, sy, sz, x, y, z) => {
-    const m = new THREE.Mesh(new THREE.BoxGeometry(sx, sy, sz), mat);
-    m.position.set(x, y, z);
-    return m;
-  };
-
-  // 三套上衣材質快取（BoxGeometry 6 面：[+X 正, -X 背, +Y 頂, -Y 底, +Z 右, -Z 左]）
-  const peTorsoMats = [
-    new THREE.MeshStandardMaterial({ map: makeShirtTexture("front"), roughness: 0.84 }),
-    new THREE.MeshStandardMaterial({ map: makeShirtTexture("back"), roughness: 0.84 }),
-    shirtWhite,
-    shirtWhite,
-    shirtWhite,
-    shirtWhite,
+  // 1. 光滑圓潤流線衣身（LatheGeometry 32 段微橢圓曲面，徹底消滅 90° 方盒積木感！）
+  const torsoPts = [
+    new THREE.Vector2(0.008, -0.225),
+    new THREE.Vector2(0.155, -0.22),
+    new THREE.Vector2(0.168, -0.17),
+    new THREE.Vector2(0.161, -0.02),
+    new THREE.Vector2(0.167, 0.11),
+    new THREE.Vector2(0.156, 0.185),
+    new THREE.Vector2(0.118, 0.218),
+    new THREE.Vector2(0.068, 0.225),
+    new THREE.Vector2(0.008, 0.225),
   ];
-  const boyTorsoMats = [
-    new THREE.MeshStandardMaterial({ map: makeBoyUniformShirtTexture("front"), roughness: 0.82 }),
-    new THREE.MeshStandardMaterial({ map: makeBoyUniformShirtTexture("back"), roughness: 0.82 }),
-    shirtWhite,
-    shirtWhite,
-    shirtWhite,
-    shirtWhite,
-  ];
-  const girlTorsoMats = [
-    new THREE.MeshStandardMaterial({ map: makeGirlUniformTopTexture("front"), roughness: 0.8 }),
-    new THREE.MeshStandardMaterial({ map: makeGirlUniformTopTexture("back"), roughness: 0.8 }),
-    shirtWhite,
-    uniformNavy,
-    uniformNavy,
-    uniformNavy,
-  ];
-
-  const torso = new THREE.Mesh(new THREE.BoxGeometry(0.24, 0.45, 0.38), peTorsoMats);
+  const torsoGeo = new THREE.LatheGeometry(torsoPts, 32);
+  const peTorsoMat = new THREE.MeshStandardMaterial({ map: makeWrapTorsoTexture("pe"), roughness: 0.78 });
+  const boyTorsoMat = new THREE.MeshStandardMaterial({ map: makeWrapTorsoTexture("boy"), roughness: 0.76 });
+  const girlTorsoMat = new THREE.MeshStandardMaterial({ map: makeWrapTorsoTexture("girl"), roughness: 0.74 });
+  const torso = new THREE.Mesh(torsoGeo, peTorsoMat);
+  torso.scale.set(0.75, 1, 1.15);
   torso.position.set(0, 1.0, 0);
   g.add(torso);
 
-  // 膚色脖子＋運動服專屬翠綠圓領環
-  const neck = new THREE.Mesh(new THREE.CylinderGeometry(0.068, 0.074, 0.09, 16), skin);
-  neck.position.set(0, 1.25, 0);
+  // 光滑小脖子＋圓領柔滑微凸滾邊
+  const neck = new THREE.Mesh(new THREE.CylinderGeometry(0.062, 0.072, 0.1, 20), skin);
+  neck.position.set(0, 1.245, 0);
   g.add(neck);
-  const collarRing = new THREE.Mesh(new THREE.TorusGeometry(0.088, 0.016, 10, 22), collarGreen);
+  const collarRing = new THREE.Mesh(new THREE.TorusGeometry(0.078, 0.015, 12, 24), collarGreen);
   collarRing.rotation.x = Math.PI / 2;
-  collarRing.position.set(-0.015, 1.224, 0);
+  collarRing.position.set(0.002, 1.222, 0);
   g.add(collarRing);
 
-  // 骨盆／褲頭段＋運動服專屬側邊滾條
-  const pelvis = box(shortsGreen, 0.235, 0.14, 0.365, 0, 0.72, 0);
+  // 2. 光滑圓弧臀部骨盆（平滑扁橢球自然連接腰部與雙腿）
+  const pelvis = new THREE.Mesh(new THREE.SphereGeometry(0.168, 24, 16), shortsGreen);
+  pelvis.scale.set(0.74, 0.56, 1.14);
+  pelvis.position.set(0, 0.74, 0);
   g.add(pelvis);
-  const peHipTrims = new THREE.Group();
-  for (const sz of [0.184, -0.184]) {
-    peHipTrims.add(box(trimWhite, 0.056, 0.14, 0.006, 0, 0.72, sz));
-    peHipTrims.add(box(trimNavy, 0.036, 0.14, 0.01, 0, 0.72, sz));
-  }
-  g.add(peHipTrims);
 
-  // 女生制服專屬：立體 A 字深丈青百褶裙擺（橢圓截面自然貼合腰臀、底部露出膚色小腿）
+  // 3. 女生制服專屬：3D 微浪立體百褶裙（40 段波形摺皺＋百褶光影貼圖＋雙白飾線）
+  const skirtGeo = new THREE.CylinderGeometry(0.184, 0.295, 0.39, 40, 4, true);
+  const sPos = skirtGeo.attributes.position;
+  for (let i = 0; i < sPos.count; i++) {
+    const vx = sPos.getX(i);
+    const vy = sPos.getY(i);
+    const vz = sPos.getZ(i);
+    const ang = Math.atan2(vx, vz);
+    const tBot = (0.195 - vy) / 0.39;
+    const wave = 1 + 0.048 * Math.sin(16 * ang) * tBot;
+    sPos.setX(i, vx * wave);
+    sPos.setZ(i, vz * wave);
+  }
+  skirtGeo.computeVertexNormals();
   const skirtMat = new THREE.MeshStandardMaterial({
     map: makePleatedSkirtTexture(),
-    roughness: 0.76,
+    roughness: 0.72,
     side: THREE.DoubleSide,
   });
-  const skirt = new THREE.Mesh(new THREE.CylinderGeometry(0.19, 0.285, 0.38, 28, 1, true), skirtMat);
-  skirt.scale.set(0.84, 1, 1.1);
+  const skirt = new THREE.Mesh(skirtGeo, skirtMat);
+  skirt.scale.set(0.82, 1, 1.08);
   skirt.position.set(0, 0.59, 0);
   g.add(skirt);
 
-  // 頭部、短髮與五官
-  const head = new THREE.Mesh(new THREE.SphereGeometry(0.195, 18, 14), skin);
-  head.position.set(0, 1.435, 0);
+  // 4. 圓潤小學生頭部（光滑曲面手繪可愛五官＋圓小耳朵＋柔順弧形碎劉海，0 方塊！）
+  const headMat = new THREE.MeshStandardMaterial({ map: makeHeadFaceTexture(), roughness: 0.52 });
+  const head = new THREE.Mesh(new THREE.SphereGeometry(0.196, 32, 24), headMat);
+  head.scale.set(0.96, 1.02, 0.98);
+  head.position.set(0, 1.445, 0);
   g.add(head);
-  const cap = new THREE.Mesh(new THREE.SphereGeometry(0.208, 18, 10, 0, Math.PI * 2, 0, Math.PI * 0.49), hair);
-  cap.position.set(-0.012, 1.455, 0);
-  g.add(cap);
-  g.add(box(dark, 0.02, 0.038, 0.036, 0.19, 1.405, 0.068));
-  g.add(box(dark, 0.02, 0.038, 0.036, 0.19, 1.405, -0.068));
-  g.add(box(M(0xd97766, 0.6), 0.015, 0.014, 0.046, 0.188, 1.335, 0));
 
-  // 女生制服專屬：自然披肩長髮＋頭頂深藍蝴蝶結髮飾
+  for (const ez of [-0.186, 0.186]) {
+    const ear = new THREE.Mesh(new THREE.SphereGeometry(0.036, 14, 12), skin);
+    ear.scale.set(0.75, 1.15, 0.65);
+    ear.position.set(-0.01, 1.435, ez);
+    g.add(ear);
+  }
+
+  // 柔順貼頭圓潤髮冠＋細緻小鬢角（劉海以曲面貼圖無縫包覆，徹底消除塊狀或條狀突兀感！）
+  const hairCrown = new THREE.Mesh(new THREE.SphereGeometry(0.205, 32, 22, 0, Math.PI * 2, 0, Math.PI * 0.56), hair);
+  hairCrown.scale.set(0.98, 1.02, 1.0);
+  hairCrown.rotation.z = 0.28;
+  hairCrown.position.set(-0.014, 1.462, 0);
+  g.add(hairCrown);
+  for (const sz of [-0.168, 0.168]) {
+    const sideburn = new THREE.Mesh(new THREE.CapsuleGeometry(0.024, 0.068, 6, 10), hair);
+    sideburn.position.set(0.028, 1.45, sz);
+    g.add(sideburn);
+  }
+
+  // 女生制服專屬：柔順自然弧形披肩長髮束＋立體圓潤深藍蝴蝶結髮飾（0 方磚！）
   const girlHair = new THREE.Group();
-  girlHair.add(box(hair, 0.11, 0.36, 0.35, -0.155, 1.33, 0));
-  girlHair.add(box(hair, 0.11, 0.25, 0.065, -0.04, 1.36, 0.185));
-  girlHair.add(box(hair, 0.11, 0.25, 0.065, -0.04, 1.36, -0.185));
-  const bowMat = M(0x1e3a5f, 0.65);
-  girlHair.add(box(bowMat, 0.04, 0.055, 0.15, -0.02, 1.66, 0));
-  girlHair.add(box(trimWhite, 0.046, 0.035, 0.036, -0.02, 1.66, 0));
+  for (const [ang, zOff, yOff, len, rad] of [
+    [-0.65, -0.155, 1.33, 0.23, 0.056],
+    [-0.35, -0.105, 1.31, 0.25, 0.062],
+    [0.0, 0.0, 1.3, 0.26, 0.068],
+    [0.35, 0.105, 1.31, 0.25, 0.062],
+    [0.65, 0.155, 1.33, 0.23, 0.056],
+  ]) {
+    const lock = new THREE.Mesh(new THREE.CapsuleGeometry(rad, len, 8, 14), hair);
+    const xPos = -0.155 + Math.abs(ang) * 0.06;
+    lock.position.set(xPos, yOff, zOff);
+    lock.rotation.z = -0.16;
+    lock.rotation.x = -ang * 0.12;
+    girlHair.add(lock);
+  }
+  for (const sgn of [-1, 1]) {
+    const sideLock = new THREE.Mesh(new THREE.CapsuleGeometry(0.042, 0.18, 8, 12), hairAccent);
+    sideLock.position.set(-0.025, 1.355, sgn * 0.182);
+    sideLock.rotation.x = sgn * 0.12;
+    sideLock.rotation.z = -0.06;
+    girlHair.add(sideLock);
+  }
+  for (const sgn of [-1, 1]) {
+    const wing = new THREE.Mesh(new THREE.SphereGeometry(0.055, 16, 12), bowMat);
+    wing.scale.set(0.55, 0.72, 1.32);
+    wing.position.set(-0.045, 1.652, sgn * 0.064);
+    wing.rotation.x = sgn * 0.26;
+    wing.rotation.y = -sgn * 0.18;
+    girlHair.add(wing);
+    const tail = new THREE.Mesh(new THREE.CapsuleGeometry(0.014, 0.075, 6, 10), bowMat);
+    tail.position.set(-0.068, 1.605, sgn * 0.042);
+    tail.rotation.x = sgn * 0.45;
+    girlHair.add(tail);
+  }
+  const knot = new THREE.Mesh(new THREE.SphereGeometry(0.028, 14, 12), trimWhite);
+  knot.position.set(-0.042, 1.652, 0);
+  girlHair.add(knot);
   g.add(girlHair);
 
-  // 雙腿（短褲管材質支援一鍵切換：運動服翠綠滾邊／制服深丈青）
-  const shortsOuterMat = new THREE.MeshStandardMaterial({ map: makeShortsLegTexture(true), roughness: 0.74 });
-  const shortsPlainMat = new THREE.MeshStandardMaterial({ map: makeShortsLegTexture(false), roughness: 0.74 });
+  // 5. 雙腿：光滑圓柱短褲管＋柔順圓錐小腿＋圓筒白短襪＋流線圓頭運動鞋（0 方磚！）
+  const peLegMatR = new THREE.MeshStandardMaterial({ map: makeWrapShortsLegTexture(true), roughness: 0.72 });
+  const peLegMatL = new THREE.MeshStandardMaterial({ map: makeWrapShortsLegTexture(false), roughness: 0.72 });
   const shortLegMeshes = [];
   const mkLeg = (pz) => {
     const pivot = new THREE.Group();
     pivot.position.set(0, 0.68, pz);
-    const peLegMats = [
-      shortsPlainMat,
-      shortsPlainMat,
-      shortsGreen,
-      shortsGreen,
-      pz > 0 ? shortsOuterMat : shortsPlainMat,
-      pz < 0 ? shortsOuterMat : shortsPlainMat,
-    ];
-    const shortLeg = new THREE.Mesh(new THREE.BoxGeometry(0.185, 0.25, 0.178), peLegMats);
+    const peMat = pz > 0 ? peLegMatR : peLegMatL;
+    const shortLeg = new THREE.Mesh(new THREE.CylinderGeometry(0.084, 0.095, 0.245, 24), peMat);
     shortLeg.position.set(0, -0.115, 0);
-    shortLeg.userData.peLegMats = peLegMats;
+    shortLeg.userData.peMat = peMat;
     shortLegMeshes.push(shortLeg);
     pivot.add(shortLeg);
 
-    pivot.add(box(skin, 0.11, 0.24, 0.11, 0, -0.35, 0));
-    pivot.add(box(sockWhite, 0.118, 0.11, 0.118, 0, -0.525, 0));
-    pivot.add(box(shoeUpper, 0.19, 0.068, 0.132, 0.035, -0.612, 0));
-    pivot.add(box(shoeSole, 0.205, 0.028, 0.14, 0.038, -0.66, 0));
+    const calf = new THREE.Mesh(new THREE.CylinderGeometry(0.056, 0.046, 0.245, 18), skin);
+    calf.position.set(0, -0.35, 0);
+    pivot.add(calf);
+
+    const sock = new THREE.Mesh(new THREE.CylinderGeometry(0.049, 0.051, 0.115, 18), sockWhite);
+    sock.position.set(0, -0.525, 0);
+    pivot.add(sock);
+    const sockRim = new THREE.Mesh(new THREE.TorusGeometry(0.049, 0.008, 8, 18), sockWhite);
+    sockRim.rotation.x = Math.PI / 2;
+    sockRim.position.set(0, -0.468, 0);
+    pivot.add(sockRim);
+
+    const shoeTop = new THREE.Mesh(new THREE.CapsuleGeometry(0.054, 0.095, 8, 16), shoeUpper);
+    shoeTop.rotation.z = Math.PI / 2;
+    shoeTop.scale.set(0.78, 1, 1.05);
+    shoeTop.position.set(0.036, -0.618, 0);
+    pivot.add(shoeTop);
+
+    const sole = new THREE.Mesh(new THREE.CapsuleGeometry(0.058, 0.102, 8, 16), shoeSole);
+    sole.rotation.z = Math.PI / 2;
+    sole.scale.set(0.32, 1, 1.08);
+    sole.position.set(0.038, -0.654, 0);
+    pivot.add(sole);
+
+    const ankleCollar = new THREE.Mesh(new THREE.CylinderGeometry(0.052, 0.058, 0.045, 16), shoeUpper);
+    ankleCollar.position.set(-0.004, -0.59, 0);
+    pivot.add(ankleCollar);
+
     g.add(pivot);
     return pivot;
   };
-  const legL = mkLeg(0.098);
-  const legR = mkLeg(-0.098);
+  const legL = mkLeg(0.096);
+  const legR = mkLeg(-0.096);
 
-  // 雙臂：白色短袖 → 袖口滾邊（運動服為翠綠、制服為白襯衫袖口）→ 膚色前臂
+  // 6. 雙臂：自然垂肩球關節＋圓錐短袖＋平滑袖口環＋膠囊手臂＋圓球小手（無墊肩凸起）
   const cuffMeshes = [];
+  const sleeveMeshes = [];
   const mkArm = (pz) => {
     const pivot = new THREE.Group();
-    pivot.position.set(0, 1.19, pz);
-    pivot.add(box(shirtWhite, 0.14, 0.165, 0.135, 0, -0.075, 0));
-    const cuff = box(collarGreen, 0.146, 0.03, 0.141, 0, -0.168, 0);
+    pivot.position.set(0, 1.155, pz);
+    const sgn = pz > 0 ? 1 : -1;
+    const shoulder = new THREE.Mesh(new THREE.SphereGeometry(0.062, 16, 12), shirtWhite);
+    shoulder.position.set(0, -0.006, -sgn * 0.012);
+    pivot.add(shoulder);
+
+    const sleeve = new THREE.Mesh(new THREE.CylinderGeometry(0.058, 0.068, 0.145, 20), shirtWhite);
+    sleeve.position.set(0, -0.078, 0);
+    sleeveMeshes.push(sleeve);
+    pivot.add(sleeve);
+
+    const cuff = new THREE.Mesh(new THREE.TorusGeometry(0.066, 0.012, 10, 22), collarGreen);
+    cuff.rotation.x = Math.PI / 2;
+    cuff.position.set(0, -0.15, 0);
     cuffMeshes.push(cuff);
     pivot.add(cuff);
-    pivot.add(box(skin, 0.092, 0.24, 0.092, 0, -0.30, 0));
+
+    const forearm = new THREE.Mesh(new THREE.CapsuleGeometry(0.039, 0.155, 8, 16), skin);
+    forearm.position.set(0, -0.258, 0);
+    pivot.add(forearm);
+    const hand = new THREE.Mesh(new THREE.SphereGeometry(0.044, 14, 12), skin);
+    hand.position.set(0, -0.372, 0);
+    pivot.add(hand);
+
     g.add(pivot);
     return pivot;
   };
-  const armL = mkArm(0.255);
-  const armR = mkArm(-0.255);
+  const armL = mkArm(0.208);
+  const armR = mkArm(-0.208);
 
   const applyOutfit = (key) => {
     const k = OUTFITS.some((o) => o.key === key) ? key : "pe";
-    torso.material = k === "pe" ? peTorsoMats : k === "boy" ? boyTorsoMats : girlTorsoMats;
+    torso.material = k === "pe" ? peTorsoMat : k === "boy" ? boyTorsoMat : girlTorsoMat;
     collarRing.visible = k === "pe";
     pelvis.material = k === "pe" ? shortsGreen : uniformNavy;
-    peHipTrims.visible = k === "pe";
     skirt.visible = k === "girl";
     girlHair.visible = k === "girl";
     for (const m of shortLegMeshes) {
-      m.material = k === "pe" ? m.userData.peLegMats : uniformNavy;
-      // 男生制服短褲略長直筒；女生藏於百褶裙內稍窄避免擺腿穿裙
-      m.scale.set(k === "girl" ? 0.88 : 1, k === "boy" ? 1.12 : 1, k === "girl" ? 0.88 : 1);
+      m.material = k === "pe" ? m.userData.peMat : uniformNavy;
+      m.scale.set(k === "girl" ? 0.85 : 1, k === "boy" ? 1.12 : 1, k === "girl" ? 0.85 : 1);
+    }
+    for (const sl of sleeveMeshes) {
+      sl.scale.set(k === "girl" ? 1.12 : 1, 1, k === "girl" ? 1.12 : 1);
     }
     for (const c of cuffMeshes) {
       c.material = k === "pe" ? collarGreen : shirtWhite;
+      c.scale.set(k === "girl" ? 1.06 : 1, k === "girl" ? 1.06 : 1, 1);
     }
   };
   applyOutfit(initialOutfit);
@@ -665,8 +771,8 @@ function buildAvatar(initialOutfit = "pe") {
   });
 
   const blob = new THREE.Mesh(
-    new THREE.CircleGeometry(0.42, 20),
-    new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.26, depthWrite: false })
+    new THREE.CircleGeometry(0.42, 24),
+    new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.24, depthWrite: false })
   );
   blob.rotation.x = -Math.PI / 2;
   blob.position.y = 0.025;

@@ -561,6 +561,10 @@ def build_corridor_building(cfg: dict, palette: Dict[str, bpy.types.Material]) -
             "bm_dado": bm_dado,
             "bm_door": bm_door,
             "bm_light": bm_light,
+            "bm_glass": bm_glass,
+            "bm_frame": bm_frame,
+            "add_window_fn": _add_detailed_window,
+            "corridor_windows_2f": [],
             "colliders": [],
             "rooms": [],
             "floors": [],
@@ -608,7 +612,9 @@ def build_corridor_building(cfg: dict, palette: Dict[str, bpy.types.Material]) -
                     win_h = 1.48 if (not is_stair or is_cq_east_end) else 2.25
                     win_z = zf + fh * 0.58
                     for side_y, face_dir in ((c_y0 - 0.05, "S"), (c_y1 + 0.05, "N")):
-                        _add_detailed_window(bm_glass, bm_frame, (box_cx, side_y, win_z), win_w * 0.78 if not is_stair else win_w, win_h, axis="X", cols=3 if (is_stair or is_cq_east_end) else 4)
+                        # 中空教室之南側開門面鋁窗由 mod_walk_interior 依門洞裁切退縮統一建置，100% 避免門窗重疊
+                        if not (hollow_bay and face_dir == "S"):
+                            _add_detailed_window(bm_glass, bm_frame, (box_cx, side_y, win_z), win_w * 0.78 if not is_stair else win_w, win_h, axis="X", cols=3 if (is_stair or is_cq_east_end) else 4)
                         # D-02: Classroom corridor 1.2m lower light-gray tile dado + wooden sliding door (act_23.jpg!)
                         is_corr_face = (face_dir == "S" and "south" in corridor_sides) or (face_dir == "N" and "north" in corridor_sides)
                         sdir = -1.0 if face_dir == "S" else 1.0
@@ -703,7 +709,11 @@ def build_corridor_building(cfg: dict, palette: Dict[str, bpy.types.Material]) -
                             for sy_w in sub_centers:
                                 _add_detailed_window(bm_glass, bm_frame, (side_x, sy_w, zf + fh * 0.48), bay_len * 0.39, 1.42, axis="Y", cols=3)
                             continue
-                        _add_detailed_window(bm_glass, bm_frame, (side_x, bcy, win_z), win_w * 0.78 if not is_stair else win_w, win_h, axis="Y", cols=4 if not is_stair else 3)
+                        # 中空教室之開門側鋁窗由 mod_walk_interior 依門洞裁切退縮統一建置，100% 避免門窗重疊
+                        door_on_west = is_wq_south_solid or fl == 0
+                        skip_hollow_door_win = hollow_bay_y and ((door_on_west and face_dir == "W") or ((not door_on_west) and face_dir == "E"))
+                        if not skip_hollow_door_win:
+                            _add_detailed_window(bm_glass, bm_frame, (side_x, bcy, win_z), win_w * 0.78 if not is_stair else win_w, win_h, axis="Y", cols=4 if not is_stair else 3)
                         if hollow_bay_y:
                             pass  # 中空教室：腰帶與門洞改由 mod_walk_interior 依門洞切分建置
                         elif is_corr_face and not is_stair:
@@ -839,16 +849,9 @@ def build_corridor_building(cfg: dict, palette: Dict[str, bpy.types.Material]) -
     objs.append(su.create_mesh_object(f"{prefix}_CorridorTerrazzo", bm_terrazzo, palette["terrazzo_corridor"], col, uv_scale=0.45))
 
     if prefix == "Bldg_Chongqing":
-        # 收集 2F (fl=1) 門洞與窗洞，讓 2F 彩繪火車壁畫精準挖空門框與鋁窗，絕不封死門洞或與窗框穿模
+        # 收集 2F (fl=1) 實建避門窗洞與門洞，讓 2F 彩繪火車壁畫精準挖空門框與鋁窗，絕不封死門洞或與窗框穿模
         zf2 = h1
-        fh2 = hu
-        win_w2 = bay_len * 0.76 * 0.78
-        win_h2 = 1.48
-        win_z2 = zf2 + fh2 * 0.58
-        mural_openings = []
-        for b_m in range(bays):
-            bcx_m = x0 + (b_m + 0.5) * bay_len
-            mural_openings.append((bcx_m - win_w2 * 0.5 - 0.08, bcx_m + win_w2 * 0.5 + 0.08, win_z2 - win_h2 * 0.5 - 0.08, win_z2 + win_h2 * 0.5 + 0.08))
+        mural_openings = list(walk_ctx["corridor_windows_2f"]) if walk_ctx else []
         for rm_m in walk_ctx["rooms"]:
             if rm_m.get("floor") == 2 and rm_m.get("door"):
                 dx_m = rm_m["door"]["x"]

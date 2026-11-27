@@ -80,7 +80,7 @@ def wall_rects(ua: float, ub: float, openings: Sequence[Tuple[float, float, floa
 
 
 def pick_door_u(a: float, b: float, win_spans: Sequence[Tuple[float, float]], door_w: float = 1.1) -> float:
-    """在區間 [a, b] 內挑選最靠近中央、且不與窗洞重疊的門中心位置。"""
+    """在區間 [a, b] 內挑選門中心位置：優先避開既定窗洞；若整段皆在窗區內則貼近房間一側，留出完整大面積窗戶。"""
     c = 0.5 * (a + b)
     lo, hi = a + 0.55 + door_w * 0.5, b - 0.55 - door_w * 0.5
     if hi < lo:
@@ -94,9 +94,42 @@ def pick_door_u(a: float, b: float, win_spans: Sequence[Tuple[float, float]], do
                 cands.append(u)
         k += 1
     for u in cands:
-        if all(u + door_w * 0.5 + 0.10 <= w0 or u - door_w * 0.5 - 0.10 >= w1 for (w0, w1) in win_spans):
+        if all(u + door_w * 0.5 + 0.22 <= w0 or u - door_w * 0.5 - 0.22 >= w1 for (w0, w1) in win_spans):
             return u
-    return c
+    # 若整個房間段皆位於標準窗區內，將門置於靠牆邊緣（優先距最近窗邊緣較近側），讓另一側保有完整不中斷的大窗
+    edge_cands = [lo + 0.08, hi - 0.08]
+    return min(
+        edge_cands,
+        key=lambda u: min((abs(u - w0) + abs(u - w1) for (w0, w1) in win_spans), default=0.0),
+    )
+
+
+def clip_windows_by_doors(
+    raw_wins: Sequence[Tuple[float, float, float, float]],
+    door_us: Sequence[float],
+    door_margin: float = 0.86,
+    min_win_w: float = 1.05,
+) -> List[Tuple[float, float, float, float]]:
+    """將候選窗戶區段依所有門洞保護區 [du - door_margin, du + door_margin] 精準裁切，100% 杜絕門窗重疊。"""
+    clipped: List[Tuple[float, float, float, float]] = []
+    for w0, w1, z0, z1 in raw_wins:
+        pieces = [(w0, w1)]
+        for du in door_us:
+            da, db = du - door_margin, du + door_margin
+            nxt = []
+            for pa, pb in pieces:
+                if db <= pa or da >= pb:
+                    nxt.append((pa, pb))
+                else:
+                    if da > pa:
+                        nxt.append((pa, da))
+                    if db < pb:
+                        nxt.append((db, pb))
+            pieces = nxt
+        for pa, pb in pieces:
+            if pb - pa >= min_win_w:
+                clipped.append((pa, pb, z0, z1))
+    return clipped
 
 
 def floor_rooms_along(cfg: dict, fl: int, axis: str, exclude_faces: Optional[set] = None) -> List[Dict[str, Any]]:
@@ -259,25 +292,42 @@ def build_corridor_floor_interior_x(ctx: dict, fl: int, zf: float, fh: float) ->
     ya, yb = core_y0 + t_o + t_i, core_y1 - t_o - t_i
     bm_outer = ctx["bm_cream"] if prefix == "Bldg_Heping" else ctx["bm_salmon"]
     bm_cream, bm_dado, bm_door, bm_light = ctx["bm_cream"], ctx["bm_dado"], ctx["bm_door"], ctx["bm_light"]
+    bm_glass, bm_frame, add_win_fn = ctx.get("bm_glass"), ctx.get("bm_frame"), ctx.get("add_window_fn")
     cand_rooms = floor_rooms_along(cfg, fl, "X", exclude_faces={"N"})
 
     for ba, bb in intervals:
         xa = x0 + ba * bay_len
         xb = x0 + (bb + 1) * bay_len
         segs = plan_interval_rooms(xa, xb, cand_rooms)
-        window_open = []
+        raw_south_wins = []
+        north_wins = []
         for b in range(ba, bb + 1):
             bcx = x0 + (b + 0.5) * bay_len
-            window_open.append((bcx - open_w * 0.5, bcx + open_w * 0.5, win_z - open_h * 0.5, win_z + open_h * 0.5))
+            w_rect = (bcx - open_w * 0.5, bcx + open_w * 0.5, win_z - open_h * 0.5, win_z + open_h * 0.5)
+            raw_south_wins.append(w_rect)
+            north_wins.append(w_rect)
 
         door_open = []
+        door_us = []
         for s in segs:
             s["door_x"] = pick_door_u(s["a"], s["b"], win_spans)
+            door_us.append(s["door_x"])
             door_open.append((s["door_x"] - 0.55, s["door_x"] + 0.55, z_lo - 0.2, zf + 2.25))
 
-        for a, b, za, zb in wall_rects(xa, xb, window_open + door_open, z_lo, z_hi):
+        # 走廊側（開門面）窗洞與鋁窗依所有門洞保護區精準裁切，100% 杜絕窗壓在門上！
+        south_wins = clip_windows_by_doors(raw_south_wins, door_us)
+        if bm_glass is not None and bm_frame is not None and add_win_fn is not None:
+            for wa, wb, wz0, wz1 in south_wins:
+                w_span = (wb - wa) + 0.10
+                w_cols = max(1, min(4, int(round(w_span / 1.45))))
+                add_win_fn(bm_glass, bm_frame, (0.5 * (wa + wb), core_y0 - 0.05, win_z), w_span, win_h, axis="X", cols=w_cols)
+        if fl == 1 and "corridor_windows_2f" in ctx:
+            for wa, wb, wz0, wz1 in south_wins:
+                ctx["corridor_windows_2f"].append((wa - 0.10, wb + 0.10, win_z - win_h * 0.5 - 0.08, win_z + win_h * 0.5 + 0.08))
+
+        for a, b, za, zb in wall_rects(xa, xb, south_wins + door_open, z_lo, z_hi):
             _add_wall_segment_x(bm_outer, bm_cream, a, b, za, zb, core_y0, +1.0, t_o, t_i, cols)
-        for a, b, za, zb in wall_rects(xa, xb, window_open, z_lo, z_hi):
+        for a, b, za, zb in wall_rects(xa, xb, north_wins, z_lo, z_hi):
             _add_wall_segment_x(bm_outer, bm_cream, a, b, za, zb, core_y1, -1.0, t_o, t_i, cols)
 
         # 走廊側磁磚腰帶（門洞處斷開）與木門框
@@ -384,6 +434,7 @@ def build_wuquan_floor_interior(ctx: dict, fl: int, zf: float, fh: float) -> Non
                     cols.append((edge_x - 0.12, edge_x + 0.12, bcy - (bay_len - 0.48) * 0.5, bcy + (bay_len - 0.48) * 0.5, zf + 0.08, zf + 1.04))
 
     bm_salmon, bm_cream, bm_dado, bm_door, bm_light = ctx["bm_salmon"], ctx["bm_cream"], ctx["bm_dado"], ctx["bm_door"], ctx["bm_light"]
+    bm_glass, bm_frame, add_win_fn = ctx.get("bm_glass"), ctx.get("bm_frame"), ctx.get("add_window_fn")
     cand_rooms = floor_rooms_along(cfg, fl, "Y")
 
     # 區段分組：南翼 b=0..4 一段，中北翼 b=5..10（1F 扣掉穿堂 b=6, 8）分段
@@ -433,9 +484,27 @@ def build_wuquan_floor_interior(ctx: dict, fl: int, zf: float, fh: float) -> Non
 
             door_win_spans = [(w[0] - 0.06, w[1] + 0.06) for w in (west_wins if door_side == "W" else east_wins)]
             door_open = []
+            door_us = []
             for s in segs:
                 s["door_y"] = pick_door_u(s["a"], s["b"], door_win_spans)
+                door_us.append(s["door_y"])
                 door_open.append((s["door_y"] - 0.55, s["door_y"] + 0.55, z_lo - 0.2, zf + 2.25))
+
+            # 開門面窗洞與鋁窗依所有門洞保護區精準裁切，100% 杜絕門窗重疊！
+            if door_side == "W":
+                west_wins = clip_windows_by_doors(west_wins, door_us)
+                if bm_glass is not None and bm_frame is not None and add_win_fn is not None:
+                    for wa, wb, wz0, wz1 in west_wins:
+                        w_span = (wb - wa) + 0.10
+                        w_cols = max(1, min(4, int(round(w_span / 1.45))))
+                        add_win_fn(bm_glass, bm_frame, (cx0 - 0.05, 0.5 * (wa + wb), win_z), w_span, win_h, axis="Y", cols=w_cols)
+            else:
+                east_wins = clip_windows_by_doors(east_wins, door_us)
+                if bm_glass is not None and bm_frame is not None and add_win_fn is not None:
+                    for wa, wb, wz0, wz1 in east_wins:
+                        w_span = (wb - wa) + 0.10
+                        w_cols = max(1, min(4, int(round(w_span / 1.45))))
+                        add_win_fn(bm_glass, bm_frame, (cx1 + 0.05, 0.5 * (wa + wb), win_z), w_span, win_h, axis="Y", cols=w_cols)
 
             # 西牆與東牆
             w_opens = west_wins + (door_open if door_side == "W" else [])
@@ -694,11 +763,11 @@ def build_guanghe_interiors(
         e_wins_2f = []
         for s in segs:
             s["door_u"] = pick_door_u(s["a"], s["b"], [])
-            if s["b"] - s["a"] > 3.4:
-                wa, wb = (s["door_u"] + 0.72, s["b"] - 0.35) if (s["b"] - s["door_u"]) >= (s["door_u"] - s["a"]) else (s["a"] + 0.35, s["door_u"] - 0.72)
+            if s["b"] - s["a"] > 3.5:
+                wa, wb = (s["door_u"] + 0.86, s["b"] - 0.35) if (s["b"] - s["door_u"]) >= (s["door_u"] - s["a"]) else (s["a"] + 0.35, s["door_u"] - 0.86)
                 if wb - wa > 1.0:
                     e_wins_2f.append((wa, wb, z2 + 1.32, z2 + 2.68))
-                    add_window_fn(bm_glass, bm_frame, (core_x1 + 0.04, 0.5 * (wa + wb), z2 + 2.0), wb - wa, 1.38, axis="Y", cols=max(2, int((wb - wa) // 1.1)))
+                    add_window_fn(bm_glass, bm_frame, (core_x1 + 0.04, 0.5 * (wa + wb), z2 + 2.0), wb - wa, 1.38, axis="Y", cols=max(1, int(round((wb - wa) / 1.35))))
         _add_gh_room_shell(1, z2, hu, z2 + 0.30, rx0_w, core_x1, wy0, wy1, "E", 0.0, w_wins, [], [], e_wins_2f, segs)
 
     # --- 3F ~ 5F (fl=2, 3, 4): 全寬中空處室與教室 + 東走廊 ---
@@ -725,16 +794,16 @@ def build_guanghe_interiors(
         east_wins = []
         for s in segs:
             s["door_u"] = pick_door_u(s["a"], s["b"], [])
-            # 在每間處室東側留一段與門錯開的走廊窗洞＋實際鋁窗
+            # 在每間處室東側留一段與門錯開 >=0.86m 之走廊窗洞＋實際鋁窗，杜絕門窗重疊
             room_len = s["b"] - s["a"]
-            if room_len > 3.2:
+            if room_len > 3.4:
                 if (s["b"] - s["door_u"]) >= (s["door_u"] - s["a"]):
-                    wa, wb = s["door_u"] + 0.72, s["b"] - 0.35
+                    wa, wb = s["door_u"] + 0.86, s["b"] - 0.35
                 else:
-                    wa, wb = s["a"] + 0.35, s["door_u"] - 0.72
-                if wb - wa > 0.9:
+                    wa, wb = s["a"] + 0.35, s["door_u"] - 0.86
+                if wb - wa > 0.95:
                     east_wins.append((wa, wb, zf + 1.32, zf + 2.68))
-                    add_window_fn(bm_glass, bm_frame, (core_x1 + 0.04, 0.5 * (wa + wb), zf + 2.0), wb - wa, 1.38, axis="Y", cols=max(2, int((wb - wa) // 1.1)))
+                    add_window_fn(bm_glass, bm_frame, (core_x1 + 0.04, 0.5 * (wa + wb), zf + 2.0), wb - wa, 1.38, axis="Y", cols=max(1, int(round((wb - wa) / 1.35))))
 
         _add_gh_room_shell(fl, zf, hu, zf + 0.27, x0, core_x1, y0, y1, "E", 0.0, w_wins, flank_wins, flank_wins, east_wins, segs)
 
