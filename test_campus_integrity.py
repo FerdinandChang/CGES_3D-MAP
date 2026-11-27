@@ -55,9 +55,15 @@ def main() -> int:
     assert glb_hash == meta["hash"], f"GLB hash mismatch: {glb_hash} != {meta['hash']}"
     assert glb_bytes < 8 * 1024 * 1024, f"Expected compressed GLB < 8MB, got {glb_bytes}"
 
-    # 4. Verify index.html, favicons, routing, dynamic plaques & free-walk modules
-    for req_file in ("favicon.ico", "favicon.png", "apple-touch-icon.png", "campus_routing.js", "dynamic_plaques.js", "walk_mode.js", "walk_data_chongqing.json"):
+    # 4. Verify index.html, favicons, routing, dynamic plaques & 4-building free-walk modules
+    for req_file in ("favicon.ico", "favicon.png", "apple-touch-icon.png", "campus_routing.js", "dynamic_plaques.js", "walk_mode.js", "walk_data_campus.json"):
         assert os.path.exists(os.path.join(ROOT, req_file)), f"Missing {req_file}"
+
+    with open(os.path.join(ROOT, "walk_data_campus.json"), encoding="utf-8") as wf:
+        walk_data = json.load(wf)
+    for bldg_id in ("Bldg_Guanghe", "Bldg_Heping", "Bldg_Wuquan", "Bldg_Chongqing"):
+        assert bldg_id in walk_data.get("buildings", {}), f"walk_data_campus.json missing {bldg_id}"
+    assert len(walk_data.get("rooms", [])) >= 100, f"Expected >= 100 hollow rooms, got {len(walk_data.get('rooms', []))}"
 
     html = open(os.path.join(ROOT, "index.html"), encoding="utf-8").read()
     for required in (

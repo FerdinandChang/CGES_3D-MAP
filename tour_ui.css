@@ -1703,6 +1703,20 @@ body {
   pointer-events: none;
 }
 
+.walk-crosshair {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  width: 8px;
+  height: 8px;
+  transform: translate(-50%, -50%);
+  border-radius: 50%;
+  border: 2px solid rgba(255, 255, 255, 0.85);
+  box-shadow: 0 0 6px rgba(0, 0, 0, 0.75);
+  pointer-events: none;
+  z-index: 43;
+}
+
 .walk-fade {
   position: fixed;
   inset: 0;

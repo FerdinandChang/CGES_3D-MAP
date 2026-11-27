@@ -1310,7 +1310,10 @@ function updateRoomInspector(room) {
   document.getElementById("btnRoomViewToggle").textContent = state.roomViewAerial ? "🎯 平視" : "🦅 鳥瞰";
   const walkRoomBtn = document.getElementById("btnRoomWalk");
   if (walkRoomBtn) {
-    walkRoomBtn.hidden = !(room.zoneId === "Bldg_Chongqing" && !isMobileViewport());
+    const canWalk = walkMode
+      ? walkMode.canWalkRoom(room)
+      : ["Bldg_Guanghe", "Bldg_Heping", "Bldg_Wuquan", "Bldg_Chongqing"].includes(room.zoneId);
+    walkRoomBtn.hidden = !(canWalk && !isMobileViewport());
   }
   bar.hidden = false;
 }

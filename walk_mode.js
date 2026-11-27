@@ -1,8 +1,10 @@
 /**
- * 重慶國小 3D 校園「自由步行」模式（桌機）
- * - 第一人稱／第三人稱小人切換（V）、WASD／方向鍵移動、Shift 跑、拖曳或指標鎖定轉向
- * - 碰撞：圓柱體 vs. Blender 輸出的牆／隔間／欄杆碰撞盒（walk_data_chongqing.json）＋其他校舍外框；地面高度以射線取樣真實樓板、階梯與廣場
- * - 重慶樓（示範棟）：中空教室＋黑板、課桌椅（前端依 campus_cges.json 動態生成），走廊梯口按 E／Q 自動爬升至上／下一層
+ * 重慶國小 3D 校園「全校四棟自由步行」模式（桌機）
+ * - 涵蓋廣和樓、和平樓、五權樓、重慶樓全部中空教室（1F–5F）與戶外操場／球場／中庭
+ * - 第一人稱／第三人稱紅書包小人切換（V）、WASD／方向鍵移動、Shift 跑步、滑鼠拖曳／PointerLock 轉向
+ * - 互動橫拉教室木門：點擊門板或走近按 F 鍵觸發平滑滑動開關動畫＋動態門板碰撞
+ * - 全校 1 梯～9 梯與廣和樓無障礙電梯：走近梯口按 E 上樓／Q 下樓自動爬升轉場
+ * - 室內家具：依 campus_cges.json 以 InstancedMesh 動態鋪設黑板、講桌、課桌椅、書架、辦公桌與視聽中心座位
  */
 import * as THREE from "three";
 
@@ -16,16 +18,22 @@ const BOUNDS = { x0: -78, x1: 72, y0: -72, y1: 48 };
 const BODY_R = 0.26;
 const WALK_SPEED = 3.6;
 const RUN_SPEED = 6.5;
-const CQ_FOOTPRINT = { x0: -74.4, x1: -6.6, y0: -43.6, y1: -29.0 };
+const WALKABLE_BLDGS = new Set(["Bldg_Guanghe", "Bldg_Heping", "Bldg_Wuquan", "Bldg_Chongqing"]);
 
 const SPAWNS = {
-  gate: { label: "🏫 校門前庭（廣和街 31 號）", x: -63.5, y: 2.5, yaw: 0 },
-  court: { label: "🏀 重慶樓南側球場", x: -38.0, y: -47.0, yaw: Math.PI / 2 },
-  cq1: { label: "🏢 重慶樓 1F 穿堂", x: -27.8, y: -41.8, floor: 1, yaw: Math.PI / 2 },
-  cq2: { label: "🏢 重慶樓 2F 走廊", x: -27.8, y: -41.8, floor: 2, yaw: Math.PI },
-  cq3: { label: "🏢 重慶樓 3F 走廊", x: -27.8, y: -41.8, floor: 3, yaw: Math.PI },
-  cq4: { label: "🏢 重慶樓 4F 走廊", x: -27.8, y: -41.8, floor: 4, yaw: Math.PI },
-  cq5: { label: "🏢 重慶樓 5F 走廊", x: -27.8, y: -41.8, floor: 5, yaw: Math.PI },
+  gate: { label: "🏫 廣和街 31 號主校門前庭", x: -63.5, y: 2.5, yaw: 0 },
+  gh1: { label: "🏛 廣和樓 1F 彩繪穿堂", x: -46.0, y: 0.5, bldg: "Bldg_Guanghe", floor: 1, yaw: 0 },
+  gh3: { label: "🏛 廣和樓 3F 行政區（校長室）", x: -32.75, y: -2.0, bldg: "Bldg_Guanghe", floor: 3, yaw: Math.PI },
+  gh5: { label: "🏛 廣和樓 5F 視聽中心走廊", x: -32.75, y: 0.5, bldg: "Bldg_Guanghe", floor: 5, yaw: Math.PI },
+  hp2: { label: "🏫 和平樓 2F 南側走廊", x: -36.8, y: 26.75, bldg: "Bldg_Heping", floor: 2, yaw: Math.PI / 2 },
+  hp5: { label: "🏫 和平樓 5F 六年級走廊", x: -36.8, y: 26.75, bldg: "Bldg_Heping", floor: 5, yaw: Math.PI / 2 },
+  wq1: { label: "🏫 五權樓 1F 西側中庭走廊", x: -5.8, y: -22.0, bldg: "Bldg_Wuquan", floor: 1, yaw: 0 },
+  wq3: { label: "🏫 五權樓 3F 東側操場走廊", x: 5.3, y: -12.0, bldg: "Bldg_Wuquan", floor: 3, yaw: Math.PI },
+  wq5: { label: "🏫 五權樓 5F 六年級走廊", x: 5.3, y: -20.5, bldg: "Bldg_Wuquan", floor: 5, yaw: Math.PI },
+  cq2: { label: "📚 重慶樓 2F 圖書室走廊", x: -55.0, y: -41.8, bldg: "Bldg_Chongqing", floor: 2, yaw: Math.PI / 2 },
+  cq3: { label: "🏫 重慶樓 3F 南側走廊", x: -27.8, y: -41.8, bldg: "Bldg_Chongqing", floor: 3, yaw: Math.PI / 2 },
+  court: { label: "🏀 重慶樓南側雙籃球場", x: -38.0, y: -47.0, yaw: Math.PI / 2 },
+  track: { label: "🏃 操場與升旗司令台大道", x: 16.0, y: -13.8, yaw: Math.PI },
 };
 
 class InstBox {
@@ -34,7 +42,6 @@ class InstBox {
     this.items = [];
     this.opts = opts;
   }
-  /** 以 Blender 座標 (x, y, z) 與尺寸 (sx, sy, sz) 加入一個長方體；yaw 為繞 Blender Z 軸旋轉 */
   add(bx, by, bz, sx, sy, sz, yaw = 0, color = null) {
     this.items.push([bx, by, bz, sx, sy, sz, yaw, color]);
   }
@@ -93,7 +100,6 @@ function buildAvatar() {
     return m;
   };
 
-  // 前方為 +X；側向為 Z
   g.add(box(shirt, 0.24, 0.48, 0.38, 0, 0.98, 0));
   g.add(box(bag, 0.14, 0.34, 0.3, -0.18, 1.0, 0));
   const head = new THREE.Mesh(new THREE.SphereGeometry(0.2, 18, 14), skin);
@@ -148,9 +154,13 @@ export function createWalkMode(opts) {
     loaded: false,
     loading: null,
     data: null,
+    buildings: {},
     colliders: [],
     groundMeshes: [],
     interior: null,
+    doorsGroup: null,
+    doors: [],
+    doorPickMeshes: [],
     avatar: null,
     light: null,
     view: "third",
@@ -169,18 +179,19 @@ export function createWalkMode(opts) {
     hudTimer: 0,
     saved: null,
     abort: null,
-    fade: 0,
   };
 
   const raycaster = new THREE.Raycaster();
   const rayDir = new THREE.Vector3(0, -1, 0);
   const rayOrg = new THREE.Vector3();
+  const pickNdc = new THREE.Vector2();
 
   const el = {
     hud: () => document.getElementById("walkHud"),
     info: () => document.getElementById("walkInfo"),
     prompt: () => document.getElementById("walkPrompt"),
     fade: () => document.getElementById("walkFade"),
+    crosshair: () => document.getElementById("walkCrosshair"),
     viewBtn: () => document.getElementById("btnWalkView"),
     spawn: () => document.getElementById("walkSpawnSelect"),
     exit: () => document.getElementById("btnWalkExit"),
@@ -193,24 +204,23 @@ export function createWalkMode(opts) {
     if (S.loading) return S.loading;
     S.loading = (async () => {
       try {
-        const res = await fetch(`./walk_data_chongqing.json?v=${buildHash || "1"}`);
+        const res = await fetch(`./walk_data_campus.json?v=${buildHash || "2"}`);
         if (!res.ok) throw new Error(`walk data HTTP ${res.status}`);
         S.data = await res.json();
       } catch (e) {
-        console.warn("walk data load failed", e);
+        console.warn("walk_data_campus.json load failed", e);
         S.loading = null;
         return false;
       }
-      // 碰撞盒：重慶樓詳細碰撞 + 其他校舍外框（不可進入）
+      S.buildings = S.data.buildings || {};
       const cols = [];
-      for (const c of S.data.colliders) cols.push(c);
-      for (const b of spec?.buildings || []) {
-        if (b.id === "Bldg_Chongqing") continue;
-        cols.push([b.x_min, b.x_max, b.y_min, b.y_max, -5, 60]);
-      }
+      for (const c of S.data.colliders || []) cols.push(c);
+      // 尚未中空化之其他建物（運動中心）保留外框碰撞
+      const gym = spec?.gym_and_skybridge?.gym;
+      if (gym) cols.push([gym.x_min, gym.x_max, gym.y_min, gym.y_max, -5, 40]);
       S.colliders = cols;
-      S.floors = S.data.floors;
       buildInterior();
+      buildDoors();
       S.loaded = true;
       return true;
     })();
@@ -226,11 +236,184 @@ export function createWalkMode(opts) {
     S.groundMeshes = out;
   }
 
-  // ---------- 室內物件（黑板、課桌椅、書架）----------
+  // ---------- 動態互動木拉門（可點擊／按 F 鍵滑動開關＋門板碰撞）----------
+  function buildDoors() {
+    const grp = new THREE.Group();
+    grp.name = "WalkInteractiveDoors";
+    const woodMat = new THREE.MeshStandardMaterial({ color: 0xb07d4f, roughness: 0.62, metalness: 0.05 });
+    const trimMat = new THREE.MeshStandardMaterial({ color: 0x7a502d, roughness: 0.72 });
+    const glassMat = new THREE.MeshStandardMaterial({
+      color: 0xbfe2ff,
+      roughness: 0.15,
+      metalness: 0.1,
+      transparent: true,
+      opacity: 0.42,
+    });
+    const handleMat = new THREE.MeshStandardMaterial({ color: 0xd1d5db, roughness: 0.25, metalness: 0.85 });
+
+    // 共用幾何（標準門寬沿 X、厚度沿 Z、高度沿 Y；若門沿 Blender Y 軸則將群組旋轉 90°）
+    // 採台灣小學外掛吊軌拉門：門寬 1.18m 完整覆蓋 1.10m 門洞，沿走廊外牆平滑橫移 1.08m 不插牆
+    const topBarGeo = new THREE.BoxGeometry(1.18, 0.22, 0.055);
+    const botPanelGeo = new THREE.BoxGeometry(1.18, 1.04, 0.055);
+    const stileGeo = new THREE.BoxGeometry(0.24, 0.86, 0.055);
+    const glassGeo = new THREE.BoxGeometry(0.7, 0.86, 0.022);
+    const handleGeo = new THREE.BoxGeometry(0.035, 0.34, 0.11);
+    const railGeo = new THREE.BoxGeometry(2.3, 0.07, 0.08);
+
+    const roomsInfo = getRooms ? getRooms() : [];
+    const bySpecKey = new Map();
+    for (const r of roomsInfo) if (r.specKey) bySpecKey.set(r.specKey, r);
+
+    S.doors = [];
+    S.doorPickMeshes = [];
+
+    for (const rm of S.data.rooms || []) {
+      const dr = rm.door;
+      if (!dr) continue;
+      const idx = S.doors.length;
+      const info = rm.key ? bySpecKey.get(rm.key) : null;
+      const label = info ? info.short || info.name : rm.kind === "stair" ? "梯間" : "教室";
+      const [nx, ny] = dr.normal || [0, -1];
+
+      // 依樓層門洞實際淨空縮放門高，貼齊門框頂樑不穿模
+      const bMeta = S.buildings[rm.bldg];
+      const flMeta = bMeta?.floors?.find((f) => f.floor === rm.floor);
+      const openH = flMeta ? Math.max(1.86, Math.min(2.14, flMeta.zf + 2.25 - dr.z)) : 2.0;
+
+      const pivot = new THREE.Group();
+      const leaf = new THREE.Group();
+
+      // 門板構成（標準高度 0 .. 2.12m，再依 openH 精準縮放）
+      const bot = new THREE.Mesh(botPanelGeo, woodMat);
+      bot.position.set(0, 0.52, 0);
+      const top = new THREE.Mesh(topBarGeo, woodMat);
+      top.position.set(0, 2.01, 0);
+      const stL = new THREE.Mesh(stileGeo, woodMat);
+      stL.position.set(-0.47, 1.47, 0);
+      const stR = new THREE.Mesh(stileGeo, woodMat);
+      stR.position.set(0.47, 1.47, 0);
+      const gl = new THREE.Mesh(glassGeo, glassMat);
+      gl.position.set(0, 1.47, 0);
+      const hd = new THREE.Mesh(handleGeo, handleMat);
+      hd.position.set(dr.slide > 0 ? -0.46 : 0.46, 1.02, 0);
+
+      for (const m of [bot, top, stL, stR, gl, hd]) {
+        m.userData.doorIdx = idx;
+        S.doorPickMeshes.push(m);
+        leaf.add(m);
+      }
+
+      // 固定吊軌（外掛於門框走廊側上方，不隨門板移動）
+      const rail = new THREE.Mesh(railGeo, trimMat);
+      rail.position.set(dr.slide * 0.52, 2.13, 0);
+      pivot.add(rail);
+      pivot.add(leaf);
+      pivot.scale.y = openH / 2.12;
+
+      // 外推 0.19m 貼齊走廊牆面（避免門板開門滑動時插進旁邊實心牆體）
+      pivot.position.copy(b2t(dr.x + nx * 0.19, dr.y + ny * 0.19, dr.z));
+      // axis === "X"：門寬沿 Three.js +X；axis === "Y"：門寬沿 Three.js -Z（對應 Blender +Y，旋轉 +PI/2）
+      if (dr.axis === "Y") {
+        pivot.rotation.y = Math.PI / 2;
+      }
+
+      grp.add(pivot);
+      S.doors.push({
+        idx,
+        bldg: rm.bldg,
+        floor: rm.floor,
+        key: rm.key,
+        label,
+        x: dr.x,
+        y: dr.y,
+        z: dr.z,
+        axis: dr.axis,
+        normal: dr.normal || [0, -1],
+        width: dr.width || 1.1,
+        slide: dr.slide || 1,
+        leaf,
+        open: false,
+        anim: 0,
+      });
+    }
+
+    grp.visible = false;
+    scene.add(grp);
+    S.doorsGroup = grp;
+  }
+
+  function setDoorOpen(door, isOpen, instant = false) {
+    if (!door) return;
+    door.open = Boolean(isOpen);
+    if (instant) {
+      door.anim = door.open ? 1 : 0;
+      door.leaf.position.x = door.slide * 1.08 * door.anim;
+    }
+    requestRender(8);
+  }
+
+  function toggleDoor(door) {
+    if (!door) return;
+    setDoorOpen(door, !door.open, false);
+  }
+
+  function updateDoors(dt) {
+    let anyMoving = false;
+    for (const d of S.doors) {
+      const tgt = d.open ? 1 : 0;
+      if (Math.abs(d.anim - tgt) > 0.002) {
+        const step = dt * 4.6;
+        d.anim = d.anim < tgt ? Math.min(tgt, d.anim + step) : Math.max(tgt, d.anim - step);
+        const eased = d.anim * d.anim * (3 - 2 * d.anim);
+        d.leaf.position.x = d.slide * 1.08 * eased;
+        anyMoving = true;
+      }
+    }
+    if (anyMoving) requestRender(2);
+  }
+
+  function nearestDoor(maxDist = 2.6) {
+    let best = null;
+    let bestD = maxDist;
+    for (const d of S.doors) {
+      if (Math.abs(d.z - S.P.z) > 1.3) continue;
+      const dist = Math.hypot(S.P.x - d.x, S.P.y - d.y);
+      if (dist < bestD) {
+        bestD = dist;
+        best = d;
+      }
+    }
+    return best;
+  }
+
+  function raycastDoor(clientX = null, clientY = null) {
+    if (!S.doorPickMeshes.length) return null;
+    if (document.pointerLockElement === canvas || clientX === null) {
+      pickNdc.set(0, 0);
+    } else {
+      const rect = canvas.getBoundingClientRect();
+      pickNdc.x = ((clientX - rect.left) / rect.width) * 2 - 1;
+      pickNdc.y = -((clientY - rect.top) / rect.height) * 2 + 1;
+    }
+    raycaster.setFromCamera(pickNdc, camera);
+    raycaster.near = 0.1;
+    raycaster.far = 7.5;
+    const hits = raycaster.intersectObjects(S.doorPickMeshes, false);
+    if (!hits.length) return null;
+    const idx = hits[0].object.userData.doorIdx;
+    const door = S.doors[idx];
+    if (!door) return null;
+    // 限制玩家與門的實際步行距離 <= 5.5m 才允許開關，避免隔空誤觸對面棟
+    if (Math.hypot(S.P.x - door.x, S.P.y - door.y) > 5.8 || Math.abs(S.P.z - door.z) > 2.2) return null;
+    return door;
+  }
+
+  // ---------- 全校 4 棟動態室內家具（黑板、講桌、課桌椅、書架、辦公室、視聽中心）----------
   function buildInterior() {
     const wood = new InstBox(0xc79a62, { roughness: 0.7 });
     const metal = new InstBox(0x6b7280, { roughness: 0.5, metalness: 0.4 });
     const chair = new InstBox(0x3b82f6, { roughness: 0.6 });
+    const seatRed = new InstBox(0xb91c1c, { roughness: 0.75 });
     const board = new InstBox(0x1f4d3a, { roughness: 0.9 });
     const white = new InstBox(0xf1f5f9, { roughness: 0.6 });
     const books = new InstBox(0xffffff, { perInstance: true, roughness: 0.8 });
@@ -245,7 +428,6 @@ export function createWalkMode(opts) {
     let pi = 0;
 
     const addDesk = (x, y, z, yaw = 0) => {
-      // 學生課桌：長邊沿 Y（面向西側黑板）
       const c = Math.cos(yaw);
       const s = Math.sin(yaw);
       const rot = (dx, dy) => [x + dx * c - dy * s, y + dx * s + dy * c];
@@ -260,7 +442,6 @@ export function createWalkMode(opts) {
         const [px, py] = rot(lx, ly);
         metal.add(px, py, z + 0.355, 0.035, 0.035, 0.7, yaw);
       }
-      // 椅子（在桌子後方 +X）
       const [cx, cy] = rot(0.62, 0);
       chair.add(cx, cy, z + 0.44, 0.4, 0.4, 0.04, yaw);
       const [bx, by] = rot(0.8, 0);
@@ -276,84 +457,129 @@ export function createWalkMode(opts) {
       }
     };
 
-    for (const rm of S.data.rooms) {
+    for (const rm of S.data.rooms || []) {
+      if (rm.kind !== "room") continue;
       const info = rm.key ? bySpecKey.get(rm.key) : null;
       const name = info?.name || "";
       const cat = info?.cat || "";
-      if (rm.kind !== "room") continue;
-      const width = rm.x1 - rm.x0;
-      const depth = rm.y1 - rm.y0;
-      const zf = rm.z_floor;
-      const cy = 0.5 * (rm.y0 + rm.y1);
-      let layout = "classroom";
-      if (name.includes("廁")) layout = "toilet";
-      else if (name.includes("圖書")) layout = "library";
-      else if (cat === "admin" || /辦公室|資料室|諮商/.test(name)) layout = "office";
-      else if (name.includes("唱遊") || cat === "kinder") layout = "hall";
-      if (layout === "toilet") continue;
+      const wx = rm.x1 - rm.x0;
+      const wy = rm.y1 - rm.y0;
+      if (wx < 1.8 || wy < 1.8) continue;
 
-      if (layout === "classroom" || layout === "hall") {
-        // 西側隔間牆黑板
-        const bw = Math.min(4.4, depth * 0.55);
-        board.add(rm.x0 + 0.14, cy, zf + 1.6, 0.03, bw, 1.15);
-        wood.add(rm.x0 + 0.13, cy, zf + 1.6, 0.025, bw + 0.14, 1.29);
-        wood.add(rm.x0 + 0.2, cy, zf + 0.98, 0.14, bw, 0.04);
-      }
-      if (layout === "classroom") {
-        // 講桌
-        wood.add(rm.x0 + 0.95, cy - 1.4, zf + 0.75, 0.6, 1.3, 0.05);
-        wood.add(rm.x0 + 0.95, cy - 1.4, zf + 0.37, 0.5, 1.2, 0.7);
-        // 學生課桌椅
-        const gx0 = rm.x0 + 2.4;
-        const gx1 = rm.x1 - 1.0;
-        const gy0 = rm.y0 + 0.95;
-        const gy1 = rm.y1 - 0.95;
-        const rows = Math.max(1, Math.floor((gx1 - gx0) / 1.35) + 1);
-        const colsN = Math.max(1, Math.min(6, Math.floor((gy1 - gy0) / 1.4) + 1));
-        for (let i = 0; i < rows; i++) {
-          const x = rows === 1 ? 0.5 * (gx0 + gx1) : gx0 + (i * (gx1 - gx0 - 0.9)) / Math.max(1, rows - 1);
-          for (let j = 0; j < colsN; j++) {
-            const y = colsN === 1 ? cy : gy0 + (j * (gy1 - gy0)) / (colsN - 1);
-            addDesk(x, y, zf);
+      const zf = rm.z_floor;
+      const cx = 0.5 * (rm.x0 + rm.x1);
+      const cy = 0.5 * (rm.y0 + rm.y1);
+      const alongY = rm.bldg === "Bldg_Wuquan" || rm.bldg === "Bldg_Guanghe";
+
+      let layout = "classroom";
+      if (name.includes("廁") || name.includes("廚房")) layout = "empty";
+      else if (name.includes("圖書")) layout = "library";
+      else if (name.includes("視聽")) layout = "auditorium";
+      else if (cat === "admin" || /辦公室|資料室|諮商|處|室/.test(name) && !/教室|唱遊/.test(name)) layout = "office";
+      else if (name.includes("唱遊") || cat === "kinder") layout = "hall";
+      if (layout === "empty") continue;
+
+      if (layout === "auditorium") {
+        // 505 視聽中心：西牆大銀幕＋多排紅色階梯式劇院座椅
+        white.add(rm.x0 + 0.18, cy, zf + 1.85, 0.05, Math.min(5.2, wy * 0.68), 2.1);
+        wood.add(rm.x0 + 1.1, cy, zf + 0.14, 1.8, wy - 0.8, 0.28);
+        const rows = Math.max(2, Math.min(6, Math.floor((wx - 3.6) / 1.35)));
+        const cols = Math.max(3, Math.min(8, Math.floor((wy - 1.6) / 0.8)));
+        for (let r = 0; r < rows; r++) {
+          const sx = rm.x0 + 3.1 + r * 1.35;
+          for (let c = 0; c < cols; c++) {
+            const sy = rm.y0 + 0.9 + (c * (wy - 1.8)) / Math.max(1, cols - 1);
+            seatRed.add(sx, sy, zf + 0.44, 0.46, 0.5, 0.1);
+            seatRed.add(sx + 0.2, sy, zf + 0.72, 0.1, 0.5, 0.52);
           }
         }
-        // 後方置物櫃
-        shelf.add(rm.x1 - 0.35, cy, zf + 0.5, 0.4, Math.min(5.5, depth * 0.7), 1.0);
       } else if (layout === "library") {
-        const nShelf = Math.max(2, Math.floor((width - 0.8) / 1.15));
+        const nShelf = Math.max(2, Math.floor((wx - 0.8) / 1.15));
         for (let i = 0; i < nShelf; i++) {
-          const x = rm.x0 + 0.7 + i * ((width - 1.4) / Math.max(1, nShelf - 1));
+          const x = rm.x0 + 0.7 + i * ((wx - 1.4) / Math.max(1, nShelf - 1));
           const y = rm.y1 - 0.45;
           shelf.add(x, y, zf + 0.95, 0.9, 0.34, 1.9);
           for (let k = 0; k < 4; k++) {
-            books.add(x, y - 0.18, zf + 0.35 + k * 0.45, 0.82, 0.03, 0.34, 0, palette[(pi++) % palette.length]);
+            books.add(x, y - 0.18, zf + 0.35 + k * 0.45, 0.82, 0.03, 0.34, 0, palette[pi++ % palette.length]);
           }
         }
         for (let t = 0; t < 2; t++) {
-          const x = rm.x0 + width * (0.3 + 0.4 * t);
+          const x = rm.x0 + wx * (0.3 + 0.4 * t);
           wood.add(x, cy - 0.6, zf + 0.74, 2.2, 1.0, 0.05);
           metal.add(x, cy - 0.6, zf + 0.37, 2.0, 0.8, 0.7);
           chair.add(x - 0.6, cy - 1.35, zf + 0.44, 0.4, 0.4, 0.04);
           chair.add(x + 0.6, cy - 1.35, zf + 0.44, 0.4, 0.4, 0.04);
         }
       } else if (layout === "office") {
-        const nDesk = Math.max(1, Math.floor(width / 2.2));
-        for (let i = 0; i < nDesk; i++) {
-          const x = rm.x0 + (width * (i + 0.5)) / nDesk;
-          wood.add(x, cy + 0.6, zf + 0.74, 1.4, 0.7, 0.05);
-          metal.add(x, cy + 0.6, zf + 0.37, 1.3, 0.6, 0.7);
-          chair.add(x, cy - 0.1, zf + 0.46, 0.45, 0.45, 0.05);
-          white.add(x, cy + 0.7, zf + 0.9, 0.35, 0.03, 0.25);
+        // 行政處室／辦公室：依房間長寬自動排辦公桌＋螢幕＋檔案櫃
+        const nX = Math.max(1, Math.min(3, Math.floor((wx - 1.4) / 2.6)));
+        const nY = Math.max(1, Math.min(3, Math.floor((wy - 1.4) / 2.2)));
+        for (let i = 0; i < nX; i++) {
+          const ox = nX === 1 ? cx : rm.x0 + 1.4 + (i * (wx - 2.8)) / (nX - 1);
+          for (let j = 0; j < nY; j++) {
+            const oy = nY === 1 ? cy : rm.y0 + 1.2 + (j * (wy - 2.4)) / (nY - 1);
+            wood.add(ox, oy, zf + 0.74, 1.35, 0.68, 0.05);
+            metal.add(ox, oy, zf + 0.37, 1.25, 0.58, 0.7);
+            chair.add(ox, oy - 0.56, zf + 0.46, 0.44, 0.44, 0.05);
+            white.add(ox, oy + 0.14, zf + 0.92, 0.38, 0.03, 0.26);
+          }
         }
-        shelf.add(rm.x1 - 0.35, cy, zf + 0.95, 0.4, Math.min(4.5, depth * 0.55), 1.9);
+        shelf.add(rm.x0 + 0.35, cy, zf + 0.95, 0.4, Math.min(4.2, wy * 0.55), 1.9);
+      } else if (!alongY) {
+        // 沿 X 軸教室（和平樓、重慶樓）：黑板掛西側隔間牆，課桌面向西（yaw = 0）
+        const bw = Math.min(4.4, wy * 0.55);
+        board.add(rm.x0 + 0.14, cy, zf + 1.6, 0.03, bw, 1.15);
+        wood.add(rm.x0 + 0.13, cy, zf + 1.6, 0.025, bw + 0.14, 1.29);
+        wood.add(rm.x0 + 0.2, cy, zf + 0.98, 0.14, bw, 0.04);
+        if (layout === "classroom") {
+          wood.add(rm.x0 + 0.95, cy - 1.2, zf + 0.75, 0.6, 1.3, 0.05);
+          wood.add(rm.x0 + 0.95, cy - 1.2, zf + 0.37, 0.5, 1.2, 0.7);
+          const gx0 = rm.x0 + 2.3;
+          const gx1 = rm.x1 - 1.0;
+          const gy0 = rm.y0 + 0.95;
+          const gy1 = rm.y1 - 0.95;
+          const rows = Math.max(1, Math.min(4, Math.floor((gx1 - gx0) / 1.35) + 1));
+          const colsN = Math.max(1, Math.min(5, Math.floor((gy1 - gy0) / 1.4) + 1));
+          for (let i = 0; i < rows; i++) {
+            const x = rows === 1 ? 0.5 * (gx0 + gx1) : gx0 + (i * (gx1 - gx0 - 0.8)) / (rows - 1);
+            for (let j = 0; j < colsN; j++) {
+              const y = colsN === 1 ? cy : gy0 + (j * (gy1 - gy0)) / (colsN - 1);
+              addDesk(x, y, zf, 0);
+            }
+          }
+          shelf.add(rm.x1 - 0.35, cy, zf + 0.5, 0.4, Math.min(5.2, wy * 0.65), 1.0);
+        }
+      } else {
+        // 沿 Y 軸教室（五權樓、廣和樓）：黑板掛北側隔間牆，課桌面向北（yaw = -PI/2）
+        const bw = Math.min(4.4, wx * 0.55);
+        board.add(cx, rm.y1 - 0.14, zf + 1.6, bw, 0.03, 1.15);
+        wood.add(cx, rm.y1 - 0.13, zf + 1.6, bw + 0.14, 0.025, 1.29);
+        wood.add(cx, rm.y1 - 0.2, zf + 0.98, bw, 0.14, 0.04);
+        if (layout === "classroom") {
+          wood.add(cx - 1.2, rm.y1 - 0.95, zf + 0.75, 1.3, 0.6, 0.05);
+          wood.add(cx - 1.2, rm.y1 - 0.95, zf + 0.37, 1.2, 0.5, 0.7);
+          const gy1 = rm.y1 - 2.3;
+          const gy0 = rm.y0 + 1.0;
+          const gx0 = rm.x0 + 0.95;
+          const gx1 = rm.x1 - 0.95;
+          const rows = Math.max(1, Math.min(4, Math.floor((gy1 - gy0) / 1.35) + 1));
+          const colsN = Math.max(1, Math.min(5, Math.floor((gx1 - gx0) / 1.4) + 1));
+          for (let i = 0; i < rows; i++) {
+            const y = rows === 1 ? 0.5 * (gy0 + gy1) : gy1 - (i * (gy1 - gy0 - 0.8)) / (rows - 1);
+            for (let j = 0; j < colsN; j++) {
+              const x = colsN === 1 ? cx : gx0 + (j * (gx1 - gx0)) / (colsN - 1);
+              addDesk(x, y, zf, -Math.PI / 2);
+            }
+          }
+          shelf.add(cx, rm.y0 + 0.35, zf + 0.5, Math.min(5.2, wx * 0.65), 0.4, 1.0);
+        }
       }
-      // 天花燈已由 GLB 提供；補一組室內補光面板感
-      lamp.add(0.5 * (rm.x0 + rm.x1), cy, rm.z_ceil - 0.05, Math.min(1.6, width * 0.3), 0.3, 0.04);
+      lamp.add(cx, cy, rm.z_ceil - 0.05, Math.min(1.5, wx * 0.25), 0.28, 0.04);
     }
 
     const group = new THREE.Group();
     group.name = "WalkInterior";
-    for (const b of [wood, metal, chair, board, white, books, lamp, shelf]) {
+    for (const b of [wood, metal, chair, seatRed, board, white, books, lamp, shelf]) {
       const m = b.build();
       if (m) group.add(m);
     }
@@ -362,41 +588,58 @@ export function createWalkMode(opts) {
     S.interior = group;
   }
 
-  // ---------- 碰撞與地面 ----------
+  // ---------- 碰撞（靜態牆＋關閉中之動態門板）與地面 ----------
   function resolveCollisions(x, y, z) {
     const zlo = z + 0.4;
     const zhi = z + 1.65;
     const r = BODY_R;
     const cols = S.colliders;
+
+    const pushOutBox = (c0, c1, c2, c3) => {
+      if (x < c0 - r || x > c1 + r || y < c2 - r || y > c3 + r) return false;
+      const cx = x < c0 ? c0 : x > c1 ? c1 : x;
+      const cy = y < c2 ? c2 : y > c3 ? c3 : y;
+      const dx = x - cx;
+      const dy = y - cy;
+      const d2 = dx * dx + dy * dy;
+      if (d2 >= r * r) return false;
+      if (d2 > 1e-9) {
+        const d = Math.sqrt(d2);
+        const push = r - d;
+        x += (dx / d) * push;
+        y += (dy / d) * push;
+      } else {
+        const pl = x - c0 + r;
+        const pr = c1 - x + r;
+        const pb = y - c2 + r;
+        const pt = c3 - y + r;
+        const m = Math.min(pl, pr, pb, pt);
+        if (m === pl) x = c0 - r;
+        else if (m === pr) x = c1 + r;
+        else if (m === pb) y = c2 - r;
+        else y = c3 + r;
+      }
+      return true;
+    };
+
     for (let iter = 0; iter < 3; iter++) {
       let moved = false;
       for (let i = 0; i < cols.length; i++) {
         const c = cols[i];
         if (c[5] <= zlo || c[4] >= zhi) continue;
-        if (x < c[0] - r || x > c[1] + r || y < c[2] - r || y > c[3] + r) continue;
-        const cx = x < c[0] ? c[0] : x > c[1] ? c[1] : x;
-        const cy = y < c[2] ? c[2] : y > c[3] ? c[3] : y;
-        const dx = x - cx;
-        const dy = y - cy;
-        const d2 = dx * dx + dy * dy;
-        if (d2 >= r * r) continue;
-        if (d2 > 1e-9) {
-          const d = Math.sqrt(d2);
-          const push = r - d;
-          x += (dx / d) * push;
-          y += (dy / d) * push;
+        if (pushOutBox(c[0], c[1], c[2], c[3])) moved = true;
+      }
+      // 關閉中的教室木拉門動態碰撞（門打開超過 55% 即完全通行）
+      for (let i = 0; i < S.doors.length; i++) {
+        const d = S.doors[i];
+        if (d.anim >= 0.55) continue;
+        if (d.z + 2.15 <= zlo || d.z >= zhi) continue;
+        const hw = d.width * 0.5;
+        if (d.axis === "X") {
+          if (pushOutBox(d.x - hw, d.x + hw, d.y - 0.1, d.y + 0.1)) moved = true;
         } else {
-          const pl = x - c[0] + r;
-          const pr = c[1] - x + r;
-          const pb = y - c[2] + r;
-          const pt = c[3] - y + r;
-          const m = Math.min(pl, pr, pb, pt);
-          if (m === pl) x = c[0] - r;
-          else if (m === pr) x = c[1] + r;
-          else if (m === pb) y = c[2] - r;
-          else y = c[3] + r;
+          if (pushOutBox(d.x - 0.1, d.x + 0.1, d.y - hw, d.y + hw)) moved = true;
         }
-        moved = true;
       }
       if (!moved) break;
     }
@@ -416,7 +659,7 @@ export function createWalkMode(opts) {
   }
 
   function groundAt(x, y, z) {
-    rayOrg.set(x, z + 0.8, -y);
+    rayOrg.set(x, z + 0.85, -y);
     raycaster.set(rayOrg, rayDir);
     raycaster.near = 0;
     raycaster.far = 2.6;
@@ -425,57 +668,61 @@ export function createWalkMode(opts) {
     return hits[0].point.y;
   }
 
-  // ---------- 房間／樓層判定 ----------
-  function floorAtZ(z) {
-    if (!S.floors) return null;
+  // ---------- 所在校舍／樓層／房間判定 ----------
+  function currentBuilding(x = S.P.x, y = S.P.y) {
+    for (const [id, meta] of Object.entries(S.buildings)) {
+      const [bx0, bx1, by0, by1] = meta.bounds;
+      if (x >= bx0 && x <= bx1 && y >= by0 && y <= by1) return { id, meta };
+    }
+    return null;
+  }
+
+  function floorForBuilding(meta, z) {
+    if (!meta?.floors?.length) return null;
     let best = null;
     let bd = 1e9;
-    for (const f of S.floors) {
+    for (const f of meta.floors) {
       const d = Math.abs(z - f.z_top);
       if (d < bd) {
         bd = d;
         best = f;
       }
     }
-    return bd < 1.8 ? best : null;
-  }
-
-  function inChongqing(x, y) {
-    return x > CQ_FOOTPRINT.x0 && x < CQ_FOOTPRINT.x1 && y > CQ_FOOTPRINT.y0 && y < CQ_FOOTPRINT.y1;
+    return bd < 1.9 ? best : null;
   }
 
   function describeLocation() {
     const { x, y, z } = S.P;
-    if (!inChongqing(x, y)) return "校園戶外";
-    const fl = floorAtZ(z);
-    if (!fl) return "重慶樓";
-    const rooms = S.data.rooms;
+    const curB = currentBuilding(x, y);
+    if (!curB) return "校園戶外";
+    const fl = floorForBuilding(curB.meta, z);
+    if (!fl) return curB.meta.name;
+
     const infoList = getRooms ? getRooms() : [];
-    for (const r of rooms) {
-      if (r.floor !== fl.floor) continue;
+    for (const r of S.data.rooms || []) {
+      if (r.bldg !== curB.id || r.floor !== fl.floor) continue;
       if (x >= r.x0 && x <= r.x1 && y >= r.y0 && y <= r.y1) {
         if (r.key) {
           const info = infoList.find((i) => i.specKey === r.key);
-          if (info) return `重慶樓 ${fl.floor}F・${info.short || info.name}`;
+          if (info) return `${curB.meta.name} ${fl.floor}F・${info.short || info.name}`;
         }
-        if (r.kind === "stair") return `重慶樓 ${fl.floor}F・6梯 梯間`;
-        return `重慶樓 ${fl.floor}F・儲藏空間`;
+        if (r.kind === "stair") return `${curB.meta.name} ${fl.floor}F・梯間`;
+        return `${curB.meta.name} ${fl.floor}F・室內空間`;
       }
     }
-    if (y <= S.data.corridor_y + 1.4 && y >= -43.4) return `重慶樓 ${fl.floor}F・南側走廊`;
-    if (y >= -32.2) return `重慶樓 ${fl.floor}F・北側走廊`;
-    return `重慶樓 ${fl.floor}F`;
+    return `${curB.meta.name} ${fl.floor}F・走廊`;
   }
 
   function nearStair() {
-    if (!S.data || !inChongqing(S.P.x, S.P.y)) return null;
-    for (const s of S.data.stairs) {
-      if (Math.hypot(S.P.x - s.x, S.P.y - s.y) <= s.r) return s;
+    const curB = currentBuilding();
+    if (!curB) return null;
+    for (const s of curB.meta.stairs || []) {
+      if (Math.hypot(S.P.x - s.x, S.P.y - s.y) <= s.r) return { ...s, bldg: curB };
     }
     return null;
   }
 
-  // ---------- 輸入 ----------
+  // ---------- 輸入與互動 ----------
   function isTyping() {
     const t = document.activeElement?.tagName;
     return t === "INPUT" || t === "TEXTAREA" || t === "SELECT";
@@ -484,9 +731,10 @@ export function createWalkMode(opts) {
   function startRide(dir) {
     if (S.riding) return;
     const st = nearStair();
-    const fl = floorAtZ(S.P.z);
-    if (!st || !fl) return;
-    const target = S.floors.find((f) => f.floor === fl.floor + dir);
+    if (!st) return;
+    const fl = floorForBuilding(st.bldg.meta, S.P.z);
+    if (!fl) return;
+    const target = st.bldg.meta.floors.find((f) => f.floor === fl.floor + dir);
     if (!target) return;
     S.riding = {
       t: 0,
@@ -497,8 +745,7 @@ export function createWalkMode(opts) {
       y0: S.P.y,
       x1: st.x,
       y1: st.y,
-      switched: false,
-      label: `${st.name} ${dir > 0 ? "上樓" : "下樓"} → ${target.floor}F`,
+      label: `${st.bldg.meta.name} ${st.name} ${dir > 0 ? "上樓" : "下樓"} → ${target.floor}F`,
     };
     S.walkPhase = 0;
   }
@@ -511,6 +758,9 @@ export function createWalkMode(opts) {
       e.preventDefault();
     } else if (code === "KeyV") {
       toggleView();
+    } else if (code === "KeyF") {
+      const dr = raycastDoor() || nearestDoor(2.7);
+      if (dr) toggleDoor(dr);
     } else if (code === "KeyE") {
       startRide(+1);
     } else if (code === "KeyQ") {
@@ -525,6 +775,10 @@ export function createWalkMode(opts) {
   function onBlur() {
     S.keys.clear();
     S.dragging = false;
+  }
+  function onPointerLockChange() {
+    const ch = el.crosshair();
+    if (ch) ch.hidden = !(S.active && document.pointerLockElement === canvas);
   }
 
   function look(dx, dy) {
@@ -545,18 +799,30 @@ export function createWalkMode(opts) {
     } else if (S.dragging) {
       S.dragMoved += Math.abs(e.movementX || 0) + Math.abs(e.movementY || 0);
       look(e.movementX || 0, e.movementY || 0);
+    } else {
+      const hoverDoor = raycastDoor(e.clientX, e.clientY);
+      canvas.style.cursor = hoverDoor ? "pointer" : "";
     }
   }
-  function onPointerUp() {
+  function onPointerUp(e) {
     if (!S.active) return;
-    const wasClick = S.dragging && S.dragMoved < 4;
+    const wasClick = S.dragging && S.dragMoved < 5;
     S.dragging = false;
-    if (wasClick && document.pointerLockElement !== canvas && canvas.requestPointerLock) {
+    if (!wasClick) return;
+
+    // 優先檢測是否點擊到教室門板 -> 立即開／關門動畫！
+    const hitDoor = raycastDoor(e.clientX, e.clientY);
+    if (hitDoor) {
+      toggleDoor(hitDoor);
+      return;
+    }
+    // 否則進入滑鼠鎖定視角
+    if (document.pointerLockElement !== canvas && canvas.requestPointerLock) {
       try {
         const p = canvas.requestPointerLock();
         if (p && p.catch) p.catch(() => {});
       } catch (_) {
-        // pointer lock unavailable: keep drag-look only
+        // pointer lock unavailable
       }
     }
   }
@@ -574,6 +840,7 @@ export function createWalkMode(opts) {
     window.addEventListener("keydown", onKeyDown, sig);
     window.addEventListener("keyup", onKeyUp, sig);
     window.addEventListener("blur", onBlur, sig);
+    document.addEventListener("pointerlockchange", onPointerLockChange, sig);
     canvas.addEventListener("pointerdown", onPointerDown, sig);
     window.addEventListener("pointermove", onPointerMove, sig);
     window.addEventListener("pointerup", onPointerUp, sig);
@@ -583,16 +850,20 @@ export function createWalkMode(opts) {
     S.abort?.abort();
     S.abort = null;
     S.keys.clear();
+    canvas.style.cursor = "";
+    const ch = el.crosshair();
+    if (ch) ch.hidden = true;
     if (document.pointerLockElement === canvas && document.exitPointerLock) document.exitPointerLock();
   }
 
-  // ---------- 生成點 ----------
-  function placeAt(x, y, floorNo, yaw) {
+  // ---------- 傳送點與進入教室 ----------
+  function placeAt(x, y, bldgId, floorNo, yaw) {
     S.P.x = x;
     S.P.y = y;
     let z = 0.45;
-    if (floorNo && S.floors) {
-      const f = S.floors.find((fl) => fl.floor === floorNo);
+    const bMeta = bldgId ? S.buildings[bldgId] : null;
+    if (floorNo && bMeta?.floors) {
+      const f = bMeta.floors.find((fl) => fl.floor === floorNo);
       if (f) z = f.z_top;
     }
     S.P.z = z;
@@ -608,24 +879,37 @@ export function createWalkMode(opts) {
   }
 
   function spawnByKey(key) {
-    const sp = SPAWNS[key] || SPAWNS.court;
-    placeAt(sp.x, sp.y, sp.floor || 0, sp.yaw);
+    const sp = SPAWNS[key] || SPAWNS.cq2;
+    placeAt(sp.x, sp.y, sp.bldg || null, sp.floor || 0, sp.yaw);
   }
 
   function roomEntry(roomRec) {
-    // roomRec：tour_app 的 allRooms 紀錄（含 specKey、floor）
-    if (!S.data) return null;
-    const rm = S.data.rooms.find((r) => r.key === roomRec.specKey);
+    if (!S.data || !roomRec) return null;
+    const rm = (S.data.rooms || []).find((r) => r.key === roomRec.specKey);
+    if (rm?.door) {
+      const [nx, ny] = rm.door.normal || [0, -1];
+      // 站在門外走廊 1.25m 處正面對教室門
+      return {
+        x: rm.door.x + nx * 1.25,
+        y: rm.door.y + ny * 1.25,
+        bldg: rm.bldg,
+        floor: rm.floor,
+        yaw: Math.atan2(-ny, -nx),
+        doorKey: rm.key,
+      };
+    }
+    const bMeta = S.buildings[roomRec.zoneId];
     const flNum = parseInt(String(roomRec.floor), 10);
-    if (rm) return { x: rm.door_x, y: S.data.corridor_y, floor: rm.floor, yaw: Math.PI / 2 };
-    if (!Number.isNaN(flNum)) {
-      const x = Math.max(-72, Math.min(-9, roomRec.pos?.[0] ?? -27.8));
-      return { x, y: S.data.corridor_y, floor: flNum, yaw: Math.PI / 2 };
+    if (bMeta && !Number.isNaN(flNum)) {
+      if (bMeta.corridor_axis === "X") {
+        return { x: roomRec.pos?.[0] ?? -35, y: bMeta.corridor_val, bldg: roomRec.zoneId, floor: flNum, yaw: Math.PI / 2 };
+      }
+      return { x: bMeta.corridor_val, y: roomRec.pos?.[1] ?? 0, bldg: roomRec.zoneId, floor: flNum, yaw: Math.PI };
     }
     return null;
   }
 
-  // ---------- 進出 ----------
+  // ---------- 進出控制 ----------
   function showHud(on) {
     const hud = el.hud();
     if (hud) hud.hidden = !on;
@@ -669,15 +953,17 @@ export function createWalkMode(opts) {
     camera.near = 0.15;
     camera.clearViewOffset();
     camera.updateProjectionMatrix();
-    if (spec2?.x !== undefined) placeAt(spec2.x, spec2.y, spec2.floor || 0, spec2.yaw);
-    else spawnByKey(spec2?.key || "court");
+    if (spec2?.x !== undefined) placeAt(spec2.x, spec2.y, spec2.bldg || null, spec2.floor || 0, spec2.yaw);
+    else spawnByKey(spec2?.key || "cq2");
+
     if (S.interior) S.interior.visible = true;
+    if (S.doorsGroup) S.doorsGroup.visible = true;
     if (S.light) S.light.visible = true;
     S.avatar.visible = S.view === "third";
     showHud(true);
     refreshViewBtn();
     const sel = el.spawn();
-    if (sel && spec2?.key) sel.value = spec2.key;
+    if (sel && spec2?.key && SPAWNS[spec2.key]) sel.value = spec2.key;
     onEnter?.();
     requestRender(4);
     return true;
@@ -689,12 +975,12 @@ export function createWalkMode(opts) {
     unbindInput();
     showHud(false);
     if (S.interior) S.interior.visible = false;
+    if (S.doorsGroup) S.doorsGroup.visible = false;
     if (S.avatar) S.avatar.visible = false;
     if (S.light) S.light.visible = false;
     controls.enabled = S.saved?.controlsEnabled ?? true;
     camera.near = S.saved?.near ?? 0.5;
     camera.updateProjectionMatrix();
-    // 回到鳥瞰：以玩家所在位置為中心的環視角
     const p = b2t(S.P.x, S.P.y, S.P.z + 1);
     controls.target.copy(p);
     camera.position.set(p.x - 26, p.y + 22, p.z + 30);
@@ -719,7 +1005,6 @@ export function createWalkMode(opts) {
     S.gz = S.P.z;
     S.moving = 1;
     S.walkPhase += dt * 9;
-    // 轉場淡出入
     let fade = 0;
     if (t >= 0.3 && t <= 0.52) fade = Math.min(1, (t - 0.3) / 0.14);
     else if (t > 0.52 && t < 0.92) fade = Math.max(0, 1 - (t - 0.52) / 0.34);
@@ -759,14 +1044,13 @@ export function createWalkMode(opts) {
         const [rx, ry] = resolveCollisions(tx, ty, S.P.z);
         const g = groundAt(rx, ry, S.P.z);
         if (g === null) return false;
-        if (g - S.P.z > 0.52 || S.P.z - g > 1.1) return false;
+        if (g - S.P.z > 0.55 || S.P.z - g > 1.2) return false;
         S.P.x = rx;
         S.P.y = ry;
         S.gz = g;
         return true;
       };
       if (attempt(nx, ny) || attempt(nx, S.P.y) || attempt(S.P.x, ny)) moving = 1;
-      // 第三人稱：小人面向移動方向
       const target = Math.atan2(dy, dx);
       let diff = target - S.avatarYaw;
       while (diff > Math.PI) diff -= Math.PI * 2;
@@ -775,8 +1059,7 @@ export function createWalkMode(opts) {
       S.walkPhase += dt * (speed / WALK_SPEED) * 7.5;
     }
     S.moving += (moving - S.moving) * Math.min(1, dt * 10);
-    // 垂直吸附（上樓梯平順、下階緩降）
-    if (S.gz > S.P.z) S.P.z = Math.min(S.gz, S.P.z + dt * 4.5);
+    if (S.gz > S.P.z) S.P.z = Math.min(S.gz, S.P.z + dt * 4.8);
     else if (S.gz < S.P.z) S.P.z = Math.max(S.gz, S.P.z - dt * 9);
   }
 
@@ -807,7 +1090,6 @@ export function createWalkMode(opts) {
       camera.lookAt(head.x + _dir.x, head.y + _dir.y, head.z + _dir.z);
     } else {
       const pivotZ = S.P.z + 1.3;
-      // 相機沿視線反方向退後，碰到牆就縮短距離
       let dist = S.camDist;
       for (let t = 0.3; t <= S.camDist; t += 0.2) {
         const px = S.P.x - lx * t;
@@ -827,32 +1109,44 @@ export function createWalkMode(opts) {
       if (S.avatar) S.avatar.visible = dist > 0.9;
     }
     if (S.light) {
-      const lp = b2t(S.P.x, S.P.y, S.P.z + 2.6);
-      S.light.position.copy(lp);
+      S.light.position.copy(b2t(S.P.x, S.P.y, S.P.z + 2.6));
     }
   }
 
   function updateHud(dt) {
     S.hudTimer -= dt;
     if (S.hudTimer > 0) return;
-    S.hudTimer = 0.15;
+    S.hudTimer = 0.14;
     const info = el.info();
     if (info) info.textContent = `📍 ${describeLocation()}`;
     const pr = el.prompt();
     if (!pr) return;
+
     if (S.riding) {
       pr.hidden = false;
       pr.textContent = `🪜 ${S.riding.label}…`;
       return;
     }
+
+    const parts = [];
+    const dr = nearestDoor(2.6);
+    if (dr) {
+      parts.push(`🚪 ${dr.label}　<kbd>F</kbd> ${dr.open ? "關門" : "開門"}（或點擊門板）`);
+    }
     const st = nearStair();
-    const fl = floorAtZ(S.P.z);
-    if (st && fl) {
-      const parts = [];
-      if (S.floors.some((f) => f.floor === fl.floor + 1)) parts.push(`<kbd>E</kbd> 上樓 ▲ ${fl.floor + 1}F`);
-      if (S.floors.some((f) => f.floor === fl.floor - 1)) parts.push(`<kbd>Q</kbd> 下樓 ▼ ${fl.floor - 1}F`);
+    if (st) {
+      const fl = floorForBuilding(st.bldg.meta, S.P.z);
+      if (fl) {
+        const sp = [];
+        if (st.bldg.meta.floors.some((f) => f.floor === fl.floor + 1)) sp.push(`<kbd>E</kbd> 上樓 ▲ ${fl.floor + 1}F`);
+        if (st.bldg.meta.floors.some((f) => f.floor === fl.floor - 1)) sp.push(`<kbd>Q</kbd> 下樓 ▼ ${fl.floor - 1}F`);
+        if (sp.length) parts.push(`🪜 ${st.name}　${sp.join("　")}`);
+      }
+    }
+
+    if (parts.length > 0) {
       pr.hidden = false;
-      pr.innerHTML = `🪜 ${st.name}　${parts.join("　")}`;
+      pr.innerHTML = parts.join("　｜　");
     } else {
       pr.hidden = true;
     }
@@ -861,6 +1155,7 @@ export function createWalkMode(opts) {
   function update(dt) {
     if (!S.active) return;
     dt = Math.min(dt, 0.05);
+    updateDoors(dt);
     if (S.riding) updateRide(dt);
     else updateMove(dt);
     updateAvatar();
@@ -879,7 +1174,7 @@ export function createWalkMode(opts) {
         o.textContent = v.label;
         sel.appendChild(o);
       }
-      sel.value = "court";
+      sel.value = "cq2";
       sel.addEventListener("change", () => {
         if (S.active) {
           spawnByKey(sel.value);
@@ -911,10 +1206,13 @@ export function createWalkMode(opts) {
       if (!ok) return false;
       const ent = roomEntry(roomRec);
       if (!ent) return false;
-      return enter({ x: ent.x, y: ent.y, floor: ent.floor, yaw: ent.yaw });
+      return enter({ x: ent.x, y: ent.y, bldg: ent.bldg, floor: ent.floor, yaw: ent.yaw });
     },
     canWalkRoom(roomRec) {
-      return roomRec?.zoneId === "Bldg_Chongqing";
+      return Boolean(roomRec && WALKABLE_BLDGS.has(roomRec.zoneId));
+    },
+    get doorsCount() {
+      return S.doors.length;
     },
   };
 }

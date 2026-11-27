@@ -12,7 +12,11 @@
   - 指定班級：https://ferdinandchang.github.io/CGES_3D-MAP/#room=六年7班
   - **校門出發無障礙路線分享**：https://ferdinandchang.github.io/CGES_3D-MAP/#route=408&from=gate_main&acc=1
   - **教室 ➔ 教室點對點路線分享**：https://ferdinandchang.github.io/CGES_3D-MAP/#route=208&from=305&acc=0
-  - **重慶樓 3D 自由步行示範（桌機）**：https://ferdinandchang.github.io/CGES_3D-MAP/#walk=cq2
+  - **全校四棟 3D 自由步行＋點擊開關門（桌機）**：
+    - 廣和樓 3F 校長室門口：https://ferdinandchang.github.io/CGES_3D-MAP/#walk=305
+    - 和平樓 5F 六年 2 班門口：https://ferdinandchang.github.io/CGES_3D-MAP/#walk=502
+    - 五權樓 5F 六年 7 班門口：https://ferdinandchang.github.io/CGES_3D-MAP/#walk=516
+    - 重慶樓 2F 圖書室走廊：https://ferdinandchang.github.io/CGES_3D-MAP/#walk=cq2
   - 指定樓棟樓層：https://ferdinandchang.github.io/CGES_3D-MAP/#zone=Bldg_Wuquan&floor=3F
 - **GitHub 專案儲存庫**：https://github.com/FerdinandChang/CGES_3D-MAP
 - **學校官網參考基準**：https://www.cges.ntpc.edu.tw/（站點圖示 `favicon.ico` 與官網同步）
@@ -27,9 +31,10 @@
   - **點對點教室導航（3 校門 + 全校 148 處空間任選起點）**：支援任一教室出發前往另一教室、`⇅` 一鍵起終點互換、**♿ 無障礙電梯優先模式**、`1梯～9梯／電梯` 精確左右轉分步文字，以及 **`🔗 分享路線`**（`#route=<終點>&from=<起點>&acc=<0|1>`）。
   - **分棟獨立剖視（Per-Building Cutaway）＋ 流動方向箭頭光帶**：導航或點擊單一步驟時，僅剖開路線所經之目標棟樓板，其餘未經過校舍保留完整屋頂天際線；3D 路徑以動態流動白色箭頭光帶呈現方向，並提供 **`▶ 走廊實境` 進度拖曳條與 `0.5x / 1x / 2x` 倍速控制**。
   - **3D 畫布直點單室＋行動端 RWD 底部抽屜**：拉近或剖層時可直接點擊 3D 走廊上的單一教室鎖定；手機版（`≤ 900px`）支援觸控拖曳高度切換與頂部極薄迷你步驟條，保留 84%+ 3D 視野；桌機支援 `/` 搜尋、`Esc` 退出、`←`/`→` 切換步驟與最近搜尋紀錄。
-- **🚶 重慶樓自由步行進出示範（桌機限定，`walk_mode.js`）**：
-  - **真中空教室與門洞**：重慶樓 1F–5F 開間由實心盒改造為可進入的空腔教室（含真實門洞、窗洞、隔間牆、門框、天花燈與 `463` 個精確牆／欄杆碰撞盒），前端透過 `InstancedMesh` 依 `campus_cges.json` 動態鋪設黑板、講桌、課桌椅、書架與辦公桌。
-  - **第一／第三人稱小人自由漫遊**：點左側 `🚶 步行` 或選重慶樓教室按 `🚶 進教室` 進入；支援 `WASD`／方向鍵移動、`Shift` 跑步、滑鼠拖曳或點擊鎖定轉頭、滾輪縮放跟拍距離、`V` 鍵即時切換第一人稱／第三人稱小人，以及於 5/6/7 梯口按 `E`/`Q` 自動爬升轉場切換樓層。
+- **🚶 全校四棟自由步行進出＋互動開關教室門板（桌機限定，`walk_mode.js`）**：
+  - **四棟全面中空化**：廣和樓、和平樓、五權樓、重慶樓 1F–5F 共 **163 處室內開間與門洞**（涵蓋全校 127 間教室／行政處室與梯間）皆以 `mod_walk_interior.py` 建為真實中空室體（含門洞、窗洞、隔間牆、木門框、天花燈與 **1,831** 個牆體／欄杆碰撞盒），前端透過 `InstancedMesh` 依 `campus_cges.json` 動態鋪設沿 X／Y 雙向黑板、講桌、課桌椅、圖書室書架、行政處室辦公桌與 505 視聽中心大銀幕紅椅。
+  - **互動外掛吊軌橫拉木門**：全校 163 扇教室／處室門皆配備獨立互動木框玻璃拉門與門頂滑軌；**滑鼠直接點擊門板**或走近按 **`F` 鍵**即可觸發平滑橫向滑動開關動畫（外掛走廊牆面不插牆），關門時具動態碰撞阻擋、開門即順暢走入。
+  - **第一／第三人稱小人與全校梯口自動上下樓**：點左側 `🚶 步行` 或於四棟任一教室卡片按 `🚶 進教室` 進入；提供 13 個全校快速傳送點，支援 `WASD`／方向鍵移動、`Shift` 跑步、滑鼠拖曳／PointerLock 準心轉頭、滾輪縮放、`V` 鍵切換第一／第三人稱紅書包小人，以及全校 **1 梯～9 梯＋廣和樓電梯**梯口按 `E` 上樓／`Q` 下樓自動爬升轉場。
 - **🔄 免開 Blender 前端動態門牌熱更新（`dynamic_plaques.js`）**：前端載入 GLB 後於背景非同步依 `campus_cges.json` 即時重繪全校 **127 面走廊 3D 雙面門牌貼圖**並熱替換至 `Campus_CorridorRoomPlaques`（桌機 2048²／手機 1024²），未來跨學年度異動班級只需修改 `campus_cges.json`，免重跑 Blender 與 GLB 即刻同步更新。
 - **URL Hash 深層連結＆一鍵分享（`🔗 分享`）**：點選任一教室即更新網址 Hash（支援瀏覽器上一頁／下一頁與 RWD 響應式版面），並可一鍵複製直達該教室的 3D 導覽連結。
 
@@ -48,7 +53,7 @@
   - 和平樓北側半圓弧陽台塔、B1 雙鐵捲門與 147B 操場側門、藍色海豚彩繪跨路人行天橋與重慶國小綜合運動中心玻璃金字塔天窗。
 
 ### 3. 前端效能與自給自足架構
-- **Draco (Level 6) + WebP (q88) 壓縮 GLB**：全校 **386 個 3D 物件**壓縮至 **5.28 MB**（gzip 傳輸低於 5 MB），載入畫面具備即時進度條與 Gzip Chunked 精準百分比回退。
+- **Draco (Level 6) + WebP (q88) 壓縮 GLB**：全校 **388 個 3D 物件**（含四棟中空室內與門框）壓縮至 **5.51 MB**，載入畫面具備即時進度條與 Gzip Chunked 精準百分比回退。
 - **完全自託管資源**：Three.js r187 核心、Addons 與 Draco WASM 解碼器完整打包於 `vendor/three/`，全站採用相對路徑，無外部 CDN 單點故障。
 - **按需渲染（On-Demand Rendering）＋ 靜態 4096² 陰影圖**：視角靜止時停止重繪以節省電力與 GPU 資源。
 
@@ -62,13 +67,13 @@
 | `tour_app.js` / `tour_ui.css` | Three.js 導覽核心、115 學年度分類篩選、URL Hash 深層連結分享、載入進度條、3D 樓層高亮、測距尺與三時段日照切換 |
 | `campus_routing.js` | 全校 148 處空間跨棟跨樓層點對點步行導引引擎（3 校門 + 148 空間任選起點、狀態擴展 Dijkstra、`1梯～9梯／電梯` 與無障礙模式） |
 | `dynamic_plaques.js` | 免開 Blender 前端動態 3D 走廊雙面門牌熱更新引擎（依 `campus_cges.json` 背景重繪 8×16 UV Atlas 並熱替換貼圖） |
-| `walk_mode.js` / `walk_data_chongqing.json` | 桌機自由步行控制器（第一／第三人稱小人、碰撞解析、地面射線高度、梯口 `E`/`Q` 自動上下樓與 InstancedMesh 教室黑板桌椅）及 Blender 輸出之重慶樓房間／碰撞資料 |
+| `walk_mode.js` / `walk_data_campus.json` | 桌機全校四棟自由步行控制器（第一／第三人稱紅書包小人、外掛吊軌拉門點擊／`F` 鍵開關動畫與門板碰撞、全校 1–9 梯／電梯 `E`/`Q` 自動上下樓、InstancedMesh 黑板桌椅／視聽中心家具）及 Blender 輸出之全校 163 房間與 1,831 碰撞盒資料 |
 | `campus_cges.json` | 單一真相來源資料庫（4 棟建築幾何規格、6 大分區邊界鏡頭＋全校 148 處空間 3D 座標） |
-| `exports/cges_campus.glb` | Draco + WebP 壓縮後之全校 3D 模型（5.28 MB，386 物件） |
+| `exports/cges_campus.glb` | Draco + WebP 壓縮後之全校 3D 模型（5.51 MB，388 物件） |
 | `build_meta.json` | 建置版本、檔案位元組與 MD5 雜湊（供前端進度條與快取驗證） |
 | `coords.py` / `geom_primitives.py` | 四面街道斜率基準線、校園座標常數與共用 `bmesh` 幾何／UV 原語 |
 | `gen_cges_textures.py` / `materials_cges.py` | 程式化 PBR 貼圖產生器（含 4K 班級門牌 Atlas、校徽馬賽克、雙籃球場、前庭廣場與招牌）與 Blender 材質庫 |
-| `mod_campus_bldg.py` | 四棟教學／行政大樓、雙圓洞連廊與前庭通往重慶樓大階梯建模模組 |
+| `mod_campus_bldg.py` / `mod_walk_interior.py` | 四棟教學／行政大樓、雙圓洞連廊、前庭大階梯，以及全校 4 棟中空教室開洞、門框與步行碰撞匯出模組 |
 | `mod_campus_grounds.py` | 四周道路與雙色地磚廣場、200m+100m 跑道、司令台、南北雙籃球場、體健器材、中庭生態池與植栽模組 |
 | `mod_campus_landmarks.py` | 主校門警衛室、馬賽克圍牆、運動中心、海豚天橋與重慶／和平半圓弧陽台塔模組 |
 | `mod_campus_street_details.py` | 雙面走廊門牌、街道標誌、汽機車與公車候車亭細節模組 |
@@ -98,5 +103,6 @@ python gen_cges_textures.py
 python test_campus_integrity.py
 node --check campus_routing.js
 node --check dynamic_plaques.js
+node --check walk_mode.js
 node --check tour_app.js
 ```

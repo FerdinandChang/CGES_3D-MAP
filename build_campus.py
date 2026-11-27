@@ -16,6 +16,7 @@ import mod_campus_bldg as mb  # noqa: E402
 import mod_campus_grounds as mg  # noqa: E402
 import mod_campus_landmarks as ml  # noqa: E402
 import mod_campus_street_details as ms  # noqa: E402
+import mod_walk_interior as wi  # noqa: E402
 import studio_utils as su  # noqa: E402
 
 
@@ -26,6 +27,7 @@ def load_spec() -> dict:
 
 def assemble_campus(show_sat_ref: bool = False, use_nishita: bool = False) -> list[bpy.types.Object]:
     su.reset_scene()
+    wi.reset_walk_registry()
     spec = load_spec()
     palette = mc.build_palette()
 
@@ -48,6 +50,7 @@ def assemble_campus(show_sat_ref: bool = False, use_nishita: bool = False) -> li
     objs.extend(ms.build_building_signs_and_room_plaques(spec, palette))
 
     mc.setup_daylight(center=(-10.0, -5.0, 8.0), use_nishita=use_nishita)
+    wi.export_walk_data(ROOT_DIR)
     return objs
 
 

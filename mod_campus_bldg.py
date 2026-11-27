@@ -8,6 +8,7 @@ import bmesh
 import bpy
 
 import geom_primitives as gp
+import mod_walk_interior as wi
 import studio_utils as su
 
 _add_plane_uv = gp.add_plane_uv
@@ -204,12 +205,11 @@ def build_guanghe_building(cfg: dict, palette: Dict[str, bpy.types.Material]) ->
         gp.bm_cyl_axis(bm_steel, (x0 - 0.1, ry, plinth_h + 0.48), 0.025, 0.95, axis="Z", segments=6)
     gp.bm_box(bm_floor, (cx, cy, plinth_h * 0.5), (wx, wy, plinth_h))
 
-    # 2. 1F 結構：中央開放大穿堂＋兩翼（附細鋁窗）＋ 穿堂天花板日光燈
+    # 2. 1F 結構：中央開放大穿堂＋中空南北兩翼（附細鋁窗）＋ 穿堂天花板日光燈
     breezeway_half = 5.3
     wing_y_n = (cy + breezeway_half, y1)
     wing_y_s = (y0, cy - breezeway_half)
     for wy0, wy1 in (wing_y_n, wing_y_s):
-        gp.bm_box(bm_wall, (cx, (wy0 + wy1) * 0.5, plinth_h + (h1 - plinth_h) * 0.5), (wx - 0.4, wy1 - wy0, h1 - plinth_h))
         _add_detailed_window(bm_glass, bm_frame, (x0 - 0.05, (wy0 + wy1) * 0.5, plinth_h + 1.65), (wy1 - wy0) * 0.68, 1.48, axis="Y", cols=3)
 
     # 挑高 1-2F 川堂門廳 4 根厚實列柱 ＋ 穿堂內部柱列（外擴微偏移防 Cycles 共面黑塊！）＋ 馬賽克柱基（act_06.jpg）
@@ -263,12 +263,11 @@ def build_guanghe_building(cfg: dict, palette: Dict[str, bpy.types.Material]) ->
         for ly in (cy - 3.6, cy + 3.6):
             gp.bm_box(bm_light, (lx, ly, h1 - 0.16), (2.2, 0.16, 0.06))
 
-    # 3. 2F（中央門廳退縮雙層挑空 + 陽台女兒牆 + 兩翼與深框 LED 螢幕）
+    # 3. 2F（中央門廳退縮雙層挑空 + 陽台女兒牆 + 中空兩翼與退縮中段）
     z2 = h1
     gp.bm_box(bm_floor, (cx + 1.8, cy, z2 + 0.15), (wx - 3.6, wy, 0.30))
     for wy0, wy1 in (wing_y_n, wing_y_s):
-        gp.bm_box(bm_wall, (cx, (wy0 + wy1) * 0.5, z2 + hu * 0.5), (wx, wy1 - wy0, hu))
-    gp.bm_box(bm_wall, (cx + 2.6, cy, z2 + hu * 0.5), (wx - 5.2, breezeway_half * 2.0, hu))
+        gp.bm_box(bm_floor, (cx, (wy0 + wy1) * 0.5, z2 + 0.15), (wx - 0.16, wy1 - wy0, 0.30))
     gp.bm_box(bm_brick, (x0 + 2.4, cy, z2 + 0.55), (0.24, breezeway_half * 2.0, 1.0))
     gp.bm_box(bm_rail, (x0 + 2.4, cy, z2 + 1.15), (0.07, breezeway_half * 2.0, 0.07))
     # 2F north wing detailed window
@@ -276,14 +275,15 @@ def build_guanghe_building(cfg: dict, palette: Dict[str, bpy.types.Material]) ->
 
     bm_salmon_gh = bmesh.new()
     bm_dark_gh = bmesh.new()
+    bm_door_gh = bmesh.new()
+    bm_corr_terrazzo_gh = bmesh.new()
 
-    # 4. 3F ~ 5F 主體（深凹鋁框細格窗＋磚紅水平飾帶＋雨庇＋東側半開放走廊）
+    # 4. 3F ~ 5F 主體（中空處室＋深凹鋁框細格窗＋磚紅水平飾帶＋雨庇＋東側半開放走廊）
     corridor_w = 2.5
     core_x1 = x1 - corridor_w
     for fl in range(2, floors):
         zf = h1 + (fl - 1) * hu
         gp.bm_box(bm_floor, (cx, cy, zf + 0.14), (wx - 0.16, wy - 0.16, 0.26))
-        gp.bm_box(bm_wall, ((x0 + core_x1) * 0.5, cy, zf + hu * 0.5), (core_x1 - x0, wy, hu))
         win_z = zf + 2.02
         win_h = 1.48
         if fl < 4:
@@ -323,7 +323,13 @@ def build_guanghe_building(cfg: dict, palette: Dict[str, bpy.types.Material]) ->
         for ci in range(5):
             py = y0 + 0.6 + ci * ((wy - 1.2) / 4.0)
             gp.bm_box(bm_wall, (x1 - 0.25, py, zf + hu * 0.5), (0.48, 0.48, hu))
-        _add_detailed_window(bm_glass, bm_frame, (core_x1 + 0.04, cy, win_z), wy - 3.0, 1.42, axis="Y", cols=10)
+
+    # 廣和樓 1F–5F 中空處室、門洞、門框、東走廊窗洞與碰撞資料
+    wi.build_guanghe_interiors(
+        cfg, x0, x1, y0, y1, h1, hu, plinth_h, breezeway_half, corridor_w,
+        bm_wall, bm_door_gh, bm_light, bm_corr_terrazzo_gh, bm_brick, bm_rail,
+        bm_glass, bm_frame, _add_detailed_window,
+    )
 
     # 5. 屋頂四周女兒牆與兩翼階梯抬升女兒牆 ＋ 1:1 27 廣和街純白方磚校徽山牆＆淡粉紅磚矩形截面半圓鏤空拱圈
     gp.bm_box(bm_floor, (cx, cy, z_roof + 0.15), (wx, wy, 0.30))
@@ -437,6 +443,8 @@ def build_guanghe_building(cfg: dict, palette: Dict[str, bpy.types.Material]) ->
     objs.append(su.create_mesh_object(f"{prefix}_Railings", bm_rail, palette["railing_white"], col, uv_scale=0.5))
     objs.append(su.create_mesh_object(f"{prefix}_Handrails", bm_steel, palette["steel_silver"], col))
     objs.append(su.create_mesh_object(f"{prefix}_Lights", bm_light, palette["corridor_light"], col))
+    objs.append(su.create_mesh_object(f"{prefix}_ClassroomDoors", bm_door_gh, palette["classroom_door"], col))
+    objs.append(su.create_mesh_object(f"{prefix}_CorridorTerrazzo", bm_corr_terrazzo_gh, palette["terrazzo_corridor"], col, uv_scale=0.45))
 
     # Emblem, 3F-5F banners & breezeway header
     bm_emb = bmesh.new()
@@ -466,246 +474,8 @@ def build_guanghe_building(cfg: dict, palette: Dict[str, bpy.types.Material]) ->
     return objs
 
 
-def _wall_rects(xa: float, xb: float, openings: list, z_lo: float, z_hi: float) -> list:
-    """沿 X 軸將牆切成「實心矩形」：openings = [(x0, x1, z0, z1)]，回傳合併後的 (x0, x1, z0, z1) 矩形。"""
-    xs = {xa, xb}
-    for o in openings:
-        xs.add(min(max(o[0], xa), xb))
-        xs.add(min(max(o[1], xa), xb))
-    xs_sorted = sorted(xs)
-    segs = []
-    for i in range(len(xs_sorted) - 1):
-        s0, s1 = xs_sorted[i], xs_sorted[i + 1]
-        if s1 - s0 < 1e-4:
-            continue
-        mid = 0.5 * (s0 + s1)
-        opens = sorted((o[2], o[3]) for o in openings if o[0] <= mid <= o[1])
-        zs = []
-        cur = z_lo
-        for a, b in opens:
-            if a > cur:
-                zs.append((cur, min(a, z_hi)))
-            cur = max(cur, b)
-        if cur < z_hi:
-            zs.append((cur, z_hi))
-        segs.append((s0, s1, tuple((round(a, 4), round(b, 4)) for a, b in zs)))
-    merged = []
-    for s0, s1, zs in segs:
-        if merged and merged[-1][2] == zs and abs(merged[-1][1] - s0) < 1e-4:
-            merged[-1] = (merged[-1][0], s1, zs)
-        else:
-            merged.append((s0, s1, zs))
-    rects = []
-    for s0, s1, zs in merged:
-        for a, b in zs:
-            if b - a > 1e-3:
-                rects.append((s0, s1, a, b))
-    return rects
-
-
-def _pick_door_x(a: float, b: float, win_spans: list, door_w: float = 1.1) -> float:
-    """在教室 [a, b] 內挑一個不與窗洞重疊、且最接近教室中線的門位置。"""
-    c = 0.5 * (a + b)
-    lo, hi = a + 0.55 + door_w * 0.5, b - 0.55 - door_w * 0.5
-    if hi < lo:
-        return c
-    cands = [c]
-    k = 1
-    while c + k * 0.15 <= hi or c - k * 0.15 >= lo:
-        for s in (1.0, -1.0):
-            x = c + s * k * 0.15
-            if lo <= x <= hi:
-                cands.append(x)
-        k += 1
-    for x in cands:
-        if all(x + door_w * 0.5 + 0.12 <= w0 or x - door_w * 0.5 - 0.12 >= w1 for (w0, w1) in win_spans):
-            return x
-    return c
-
-
-def _cq_floor_rooms(cfg: dict, fl: int) -> list:
-    out = []
-    for idx, rm in enumerate(cfg.get("rooms_115_detailed", [])):
-        try:
-            f = int(str(rm.get("floor", "")).rstrip("Ff"))
-        except ValueError:
-            continue
-        if f != fl + 1:
-            continue
-        px = rm["pos"][0]
-        w = (rm.get("size") or [5.2])[0]
-        out.append({"idx": idx, "x0": px - w * 0.5, "x1": px + w * 0.5, "cx": px})
-    return sorted(out, key=lambda r: r["cx"])
-
-
-def _plan_interval_rooms(xa: float, xb: float, cands: list) -> list:
-    """把一段連續的可進入開間依 115 學年度教室位置切成房間；較大的空隙獨立成無名房間（梯間／儲藏）。"""
-    items = []
-    for r in cands:
-        a, b = max(r["x0"], xa), min(r["x1"], xb)
-        if b - a >= 2.0:
-            items.append({"idx": r["idx"], "a": a, "b": b})
-    if not items:
-        return [{"idx": None, "a": xa, "b": xb}]
-    segs = []
-    first = items[0]
-    if first["a"] - xa > 1.5:
-        segs.append({"idx": None, "a": xa, "b": first["a"]})
-    else:
-        first["a"] = xa
-    for i, it in enumerate(items):
-        if i > 0:
-            prev = items[i - 1]
-            gap = it["a"] - prev["b"]
-            if gap <= 1.5:
-                mid = 0.5 * (it["a"] + prev["b"])
-                prev["b"] = mid
-                it["a"] = mid
-            else:
-                segs.append({"idx": None, "a": prev["b"], "b": it["a"]})
-        segs.append(it)
-    last = items[-1]
-    if xb - last["b"] > 1.5:
-        segs.append({"idx": None, "a": last["b"], "b": xb})
-    else:
-        last["b"] = xb
-    return segs
-
-
-def _cq_is_hollow_bay(b: int, fl: int, ctx: dict) -> bool:
-    return b not in ctx["solid_bays"] and not (fl == 0 and b in ctx["breezeways"])
-
-
-def _cq_floor_interior(ctx: dict, fl: int, zf: float, fh: int) -> None:
-    """重慶樓（可步行示範棟）單層：中空教室外牆（含門洞／窗洞）、教室隔間牆、天花燈、走廊欄杆／柱碰撞，並輸出房間與碰撞資料。"""
-    cfg = ctx["cfg"]
-    bays, bay_len, x0 = ctx["bays"], ctx["bay_len"], ctx["x0"]
-    y0, y1 = ctx["y0"], ctx["y1"]
-    core_y0, core_y1 = ctx["core_y0"], ctx["core_y1"]
-    cols = ctx["colliders"]
-    t_o, t_i = 0.14, 0.16
-    z_lo, z_hi = zf + 0.15, zf + fh + 0.04
-    z_floor = zf + (0.36 if fl == 0 else 0.27)
-    z_corr = zf + (0.385 if fl == 0 else 0.315)
-    ctx["floors"].append({"floor": fl + 1, "zf": round(zf, 3), "z_floor": round(z_floor, 3), "z_top": round(z_corr, 3), "fh": round(fh, 3)})
-
-    # --- 走廊外緣柱與女兒牆碰撞（供步行時不會掉出走廊）---
-    for b in range(bays):
-        bx0 = x0 + b * bay_len
-        bcx = bx0 + 0.5 * bay_len
-        for edge_y, side in ((y0 + 0.16, "south"), (y1 - 0.16, "north")):
-            cols.append((bx0 + 0.25 - 0.26, bx0 + 0.25 + 0.26, edge_y - 0.26, edge_y + 0.26, zf, zf + fh))
-            if b == bays - 1:
-                cols.append((bx0 + bay_len - 0.25 - 0.26, bx0 + bay_len - 0.25 + 0.26, edge_y - 0.26, edge_y + 0.26, zf, zf + fh))
-            if fl >= 1:
-                has_parapet = (side == "north") or (b not in ctx["solid_bays"])
-                if has_parapet:
-                    cols.append((bcx - (bay_len - 0.48) * 0.5, bcx + (bay_len - 0.48) * 0.5, edge_y - 0.12, edge_y + 0.12, zf + 0.08, zf + 1.04))
-
-    hollow_bays = [b for b in range(bays) if _cq_is_hollow_bay(b, fl, ctx)]
-    if not hollow_bays:
-        return
-    intervals = []
-    for b in hollow_bays:
-        if intervals and intervals[-1][1] == b - 1:
-            intervals[-1][1] = b
-        else:
-            intervals.append([b, b])
-
-    win_w = bay_len * 0.76 * 0.78
-    win_h = 1.48
-    win_z = zf + fh * 0.58
-    open_w, open_h = win_w - 0.12, win_h - 0.08
-    win_spans = []
-    for b in hollow_bays:
-        bcx = x0 + (b + 0.5) * bay_len
-        win_spans.append((bcx - win_w * 0.5, bcx + win_w * 0.5))
-
-    ya, yb = core_y0 + t_o + t_i, core_y1 - t_o - t_i
-    bm_salmon, bm_cream, bm_dado, bm_door, bm_light = ctx["bm_salmon"], ctx["bm_cream"], ctx["bm_dado"], ctx["bm_door"], ctx["bm_light"]
-    cand_rooms = _cq_floor_rooms(cfg, fl)
-
-    for ba, bb in intervals:
-        xa = x0 + ba * bay_len
-        xb = x0 + (bb + 1) * bay_len
-        segs = _plan_interval_rooms(xa, xb, cand_rooms)
-        window_open = []
-        for b in range(ba, bb + 1):
-            bcx = x0 + (b + 0.5) * bay_len
-            window_open.append((bcx - open_w * 0.5, bcx + open_w * 0.5, win_z - open_h * 0.5, win_z + open_h * 0.5))
-
-        door_open = []
-        for s in segs:
-            s["door_x"] = _pick_door_x(s["a"], s["b"], win_spans)
-            door_open.append((s["door_x"] - 0.55, s["door_x"] + 0.55, z_lo - 0.2, zf + 2.25))
-
-        # 南牆（走廊側，含門洞＋窗洞）與北牆（窗洞）：外層鮭魚紅磚＋內層奶油白
-        south_rects = _wall_rects(xa, xb, window_open + door_open, z_lo, z_hi)
-        north_rects = _wall_rects(xa, xb, window_open, z_lo, z_hi)
-        for a, b, za, zb in south_rects:
-            gp.bm_box(bm_salmon, (0.5 * (a + b), core_y0 + t_o * 0.5, 0.5 * (za + zb)), (b - a, t_o, zb - za))
-            gp.bm_box(bm_cream, (0.5 * (a + b), core_y0 + t_o + t_i * 0.5, 0.5 * (za + zb)), (b - a, t_i, zb - za))
-            cols.append((a, b, core_y0, core_y0 + t_o + t_i, za, zb))
-        for a, b, za, zb in north_rects:
-            gp.bm_box(bm_salmon, (0.5 * (a + b), core_y1 - t_o * 0.5, 0.5 * (za + zb)), (b - a, t_o, zb - za))
-            gp.bm_box(bm_cream, (0.5 * (a + b), core_y1 - t_o - t_i * 0.5, 0.5 * (za + zb)), (b - a, t_i, zb - za))
-            cols.append((a, b, core_y1 - t_o - t_i, core_y1, za, zb))
-
-        # 走廊側 1.2m 淺灰磁磚腰帶（門洞處斷開）與門框
-        for a, b, za, zb in _wall_rects(xa, xb, door_open, zf + 0.03, zf + 1.21):
-            gp.bm_box(bm_dado, (0.5 * (a + b), core_y0 - 0.03, 0.5 * (za + zb)), (b - a, 0.06, zb - za))
-        for a, b, za, zb in _wall_rects(xa, xb, [], zf + 0.03, zf + 1.21):
-            gp.bm_box(bm_dado, (0.5 * (a + b), core_y1 + 0.03, 0.5 * (za + zb)), (b - a, 0.06, zb - za))
-        for s in segs:
-            dx = s["door_x"]
-            wall_c = core_y0 + 0.5 * (t_o + t_i)
-            for jx in (dx - 0.55 - 0.03, dx + 0.55 + 0.03):
-                gp.bm_box(bm_door, (jx, wall_c, zf + 1.28), (0.06, t_o + t_i + 0.04, 2.16))
-            gp.bm_box(bm_door, (dx, wall_c, zf + 2.28), (1.18, t_o + t_i + 0.04, 0.06))
-
-        # 教室隔間牆（奶油白、無門；教室僅由南側走廊進出）
-        boundaries = [s["b"] for s in segs[:-1]]
-        if ba - 1 >= 0 and ba - 1 not in ctx["solid_bays"]:
-            boundaries.append(xa)
-        if bb + 1 < bays and bb + 1 not in ctx["solid_bays"]:
-            boundaries.append(xb)
-        for px in boundaries:
-            gp.bm_box(bm_cream, (px, 0.5 * (ya + yb), 0.5 * (z_lo + z_hi)), (0.2, yb - ya, z_hi - z_lo))
-            cols.append((px - 0.1, px + 0.1, ya, yb, z_lo, z_hi))
-
-        # 房間資料、天花燈
-        for s in segs:
-            width = s["b"] - s["a"]
-            if s["idx"] is not None:
-                kind = "room"
-            elif s["a"] - 0.2 <= ctx["stair6_x"] <= s["b"] + 0.2:
-                kind = "stair"
-            else:
-                kind = "void"
-            ctx["rooms"].append(
-                {
-                    "key": f"{cfg['id']}:{s['idx']}" if s["idx"] is not None else None,
-                    "kind": kind,
-                    "floor": fl + 1,
-                    "x0": round(s["a"], 3),
-                    "x1": round(s["b"], 3),
-                    "y0": round(ya, 3),
-                    "y1": round(yb, 3),
-                    "z_floor": round(z_floor, 3),
-                    "z_ceil": round(zf + fh + 0.01, 3),
-                    "door_x": round(s["door_x"], 3),
-                }
-            )
-            if width >= 2.5:
-                nx = 2 if width > 4.2 else 1
-                for i in range(nx):
-                    lx = s["a"] + width * (i + 1) / (nx + 1)
-                    for ly in (ya + (yb - ya) * 0.3, ya + (yb - ya) * 0.7):
-                        gp.bm_box(bm_light, (lx, ly, zf + fh - 0.035), (1.3, 0.28, 0.05))
-
-
 def build_corridor_building(cfg: dict, palette: Dict[str, bpy.types.Material]) -> List[bpy.types.Object]:
-    """建置高細節 5F 半開放走廊教學棟（含細鋁框橫拉窗、冷氣室外機群、走廊花台綠植、天花板燈具與屋頂太陽能板）。"""
+    """建置高細節 5F 半開放走廊教學棟（重慶樓、和平樓、五權樓全面支援中空教室、門洞、隔間牆與碰撞輸出）。"""
     prefix = cfg["id"]
     col = prefix
     x0, x1 = cfg["x_min"], cfg["x_max"]
@@ -723,9 +493,21 @@ def build_corridor_building(cfg: dict, palette: Dict[str, bpy.types.Material]) -
     bays = cfg.get("bays", 8)
     breezeways = set(cfg.get("breezeway_bay_indices", []))
     stairs = set(cfg.get("stair_bays", []))
-    # 重慶樓為可步行示範棟：4 號開間（原梯間盒）改為一般中空開間，走廊貫通；梯間保留於西端 5 梯與東端 7 梯
-    hollow = prefix == "Bldg_Chongqing" and along_x
-    solid_stairs = (stairs - {4}) if hollow else stairs
+
+    # 全校走廊校舍（重慶、和平、五權）皆啟用中空教室
+    hollow = prefix in ("Bldg_Chongqing", "Bldg_Heping", "Bldg_Wuquan")
+    if prefix == "Bldg_Chongqing":
+        solid_stairs = stairs - {4}
+        solid_bays = set(solid_stairs) | {0, bays - 1}
+    elif prefix == "Bldg_Heping":
+        solid_stairs = {0}
+        solid_bays = {0}
+    elif prefix == "Bldg_Wuquan":
+        solid_stairs = set()
+        solid_bays = {11, 12}
+    else:
+        solid_stairs = stairs
+        solid_bays = set(stairs)
 
     z_roof = h1 + (floors - 1) * hu
 
@@ -756,20 +538,24 @@ def build_corridor_building(cfg: dict, palette: Dict[str, bpy.types.Material]) -
     span_len = wx if along_x else wy
     bay_len = span_len / bays
 
-    cq_walk = None
+    walk_ctx = None
     if hollow:
-        cq_walk = {
+        walk_ctx = {
             "cfg": cfg,
             "bays": bays,
             "bay_len": bay_len,
             "x0": x0,
+            "x1": x1,
             "y0": y0,
             "y1": y1,
+            "core_x0": core_x0,
+            "core_x1": core_x1,
             "core_y0": core_y0,
             "core_y1": core_y1,
-            "solid_bays": set(solid_stairs) | {0, bays - 1},
+            "corridor_sides": corridor_sides,
+            "solid_bays": solid_bays,
             "breezeways": breezeways,
-            "stair6_x": -42.5,
+            "stair_mid_x": -42.5 if prefix == "Bldg_Chongqing" else None,
             "bm_salmon": bm_salmon,
             "bm_cream": bm_cream,
             "bm_dado": bm_dado,
@@ -813,11 +599,11 @@ def build_corridor_building(cfg: dict, palette: Dict[str, bpy.types.Material]) -
                     box_x1 = (bx1 - 2.75) if is_cq_east_end else bx1
                     box_w = (box_x1 - box_x0) - 0.08
                     box_cx = 0.5 * (box_x0 + box_x1)
-                    hollow_bay = hollow and (b not in cq_walk["solid_bays"])
+                    hollow_bay = hollow and (b not in walk_ctx["solid_bays"])
                     if not hollow_bay:
                         gp.bm_box(wall_bm, (box_cx, (c_y0 + c_y1) * 0.5, zf + fh * 0.5), (box_w, c_y1 - c_y0, fh))
                         if hollow:
-                            cq_walk["colliders"].append((box_cx - box_w * 0.5, box_cx + box_w * 0.5, c_y0, c_y1, zf, zf + fh))
+                            walk_ctx["colliders"].append((box_cx - box_w * 0.5, box_cx + box_w * 0.5, c_y0, c_y1, zf, zf + fh))
                     win_w = (box_w * 0.78) if is_cq_east_end else (bay_len * 0.76)
                     win_h = 1.48 if (not is_stair or is_cq_east_end) else 2.25
                     win_z = zf + fh * 0.58
@@ -897,7 +683,11 @@ def build_corridor_building(cfg: dict, palette: Dict[str, bpy.types.Material]) -
                     else:
                         c_x0, c_x1 = (x0, x1) if is_stair else (core_x0, core_x1)
                     body_bm = bm_cream if is_wq_south_solid else bm_salmon
-                    gp.bm_box(body_bm, ((c_x0 + c_x1) * 0.5, bcy, zf + fh * 0.5), (c_x1 - c_x0, bay_len - 0.08, fh))
+                    hollow_bay_y = hollow and (b not in walk_ctx["solid_bays"])
+                    if not hollow_bay_y:
+                        gp.bm_box(body_bm, ((c_x0 + c_x1) * 0.5, bcy, zf + fh * 0.5), (c_x1 - c_x0, bay_len - 0.08, fh))
+                        if hollow:
+                            walk_ctx["colliders"].append((c_x0, c_x1, by0 + 0.04, by1 - 0.04, zf, zf + fh))
                     win_w = bay_len * 0.76
                     win_h = 1.48 if not is_stair else 2.25
                     win_z = zf + fh * 0.58
@@ -914,7 +704,9 @@ def build_corridor_building(cfg: dict, palette: Dict[str, bpy.types.Material]) -
                                 _add_detailed_window(bm_glass, bm_frame, (side_x, sy_w, zf + fh * 0.48), bay_len * 0.39, 1.42, axis="Y", cols=3)
                             continue
                         _add_detailed_window(bm_glass, bm_frame, (side_x, bcy, win_z), win_w * 0.78 if not is_stair else win_w, win_h, axis="Y", cols=4 if not is_stair else 3)
-                        if is_corr_face and not is_stair:
+                        if hollow_bay_y:
+                            pass  # 中空教室：腰帶與門洞改由 mod_walk_interior 依門洞切分建置
+                        elif is_corr_face and not is_stair:
                             gp.bm_box(bm_dado, (side_x + sdir * 0.03, bcy, zf + 0.62), (0.06, bay_len - 0.16, 1.18))
                             gp.bm_box(bm_door, (side_x + sdir * 0.05, by0 + 0.88, zf + 1.15), (0.08, 1.05, 2.15))
                         elif not is_stair:
@@ -984,8 +776,11 @@ def build_corridor_building(cfg: dict, palette: Dict[str, bpy.types.Material]) -
                     elif fl == 0:
                         gp.bm_box(bm_salmon, (edge_x, bcy, zf + fh - 0.24), (0.42, bay_len, 0.48))
 
-        if hollow and along_x:
-            _cq_floor_interior(cq_walk, fl, zf, fh)
+        if hollow and walk_ctx is not None:
+            if along_x:
+                wi.build_corridor_floor_interior_x(walk_ctx, fl, zf, fh)
+            else:
+                wi.build_wuquan_floor_interior(walk_ctx, fl, zf, fh)
 
     # Roof slab, parapet walls & stair towers
     gp.bm_box(bm_floor, (cx, cy, z_roof + 0.15), (wx, wy, 0.30))
@@ -1072,25 +867,53 @@ def build_corridor_building(cfg: dict, palette: Dict[str, bpy.types.Material]) -
     if tank_pts:
         objs.extend(_build_roof_water_tanks(prefix, tank_pts, z_roof + 0.28, palette, col))
 
-    if hollow and cq_walk is not None:
-        corridor_y = y0 + corridor_w * 0.5
-        walk_data = {
-            "version": 1,
-            "building": prefix,
-            "corridor_y": round(corridor_y, 3),
-            "bay_len": round(bay_len, 4),
-            "floors": cq_walk["floors"],
-            "rooms": cq_walk["rooms"],
-            "stairs": [
-                {"name": "5梯", "x": round(x0 + bay_len + 0.9, 3), "y": round(corridor_y, 3), "r": 3.4},
-                {"name": "6梯", "x": -44.15, "y": round(corridor_y, 3), "r": 3.4},
-                {"name": "7梯", "x": round(x0 + 7 * bay_len - 1.0, 3), "y": round(corridor_y, 3), "r": 3.4},
-            ],
-            "colliders": [[round(v, 3) for v in c] for c in cq_walk["colliders"]],
-        }
-        walk_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "walk_data_chongqing.json")
-        with open(walk_path, "w", encoding="utf-8") as wf:
-            json.dump(walk_data, wf, ensure_ascii=False, separators=(",", ":"))
+    if hollow and walk_ctx is not None:
+        if prefix == "Bldg_Chongqing":
+            corr_y = round(y0 + corridor_w * 0.5, 3)
+            meta = {
+                "name": "重慶樓",
+                "bounds": [x0 - 0.5, x1 + 0.5, y0 - 0.5, y1 + 0.5],
+                "corridor_axis": "X",
+                "corridor_val": corr_y,
+                "floors": walk_ctx["floors"],
+                "stairs": [
+                    {"name": "5梯", "x": round(x0 + bay_len + 0.9, 3), "y": corr_y, "r": 3.4},
+                    {"name": "6梯", "x": -44.15, "y": corr_y, "r": 3.4},
+                    {"name": "7梯", "x": round(x0 + 7 * bay_len - 1.0, 3), "y": corr_y, "r": 3.4},
+                ],
+            }
+        elif prefix == "Bldg_Heping":
+            corr_y = round(y0 + corridor_w * 0.5, 3)
+            meta = {
+                "name": "和平樓",
+                "bounds": [x0 - 0.5, x1 + 0.5, y0 - 0.5, y1 + 0.5],
+                "corridor_axis": "X",
+                "corridor_val": corr_y,
+                "floors": walk_ctx["floors"],
+                "stairs": [
+                    {"name": "2梯", "x": -52.0, "y": corr_y, "r": 3.4},
+                    {"name": "1梯", "x": -23.0, "y": corr_y, "r": 3.4},
+                ],
+            }
+        else:  # Bldg_Wuquan
+            corr_e = round(x1 - corridor_w * 0.5, 3)
+            corr_w = round(x0 + corridor_w * 0.5, 3)
+            meta = {
+                "name": "五權樓",
+                "bounds": [x0 - 0.5, x1 + 0.5, y0 - 0.5, y1 + 0.5],
+                "corridor_axis": "Y",
+                "corridor_val": corr_e,
+                "corridor_alt": corr_w,
+                "floors": walk_ctx["floors"],
+                "stairs": [
+                    {"name": "8梯（西廊）", "x": corr_w, "y": -62.5, "r": 3.6},
+                    {"name": "7梯（西廊）", "x": corr_w, "y": -42.5, "r": 3.6},
+                    {"name": "7梯（東廊）", "x": corr_e, "y": -24.0, "r": 3.6},
+                    {"name": "9梯（東廊）", "x": corr_e, "y": 24.5, "r": 3.6},
+                    {"name": "9梯（西廊）", "x": corr_w, "y": 24.5, "r": 3.6},
+                ],
+            }
+        wi.register_building_walk_data(prefix, meta, walk_ctx["rooms"], walk_ctx["colliders"])
 
     return objs
 
