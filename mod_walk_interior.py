@@ -104,6 +104,31 @@ def pick_door_u(a: float, b: float, win_spans: Sequence[Tuple[float, float]], do
     )
 
 
+def cut_spans(a: float, b: float, cuts: Sequence[Tuple[float, float]], min_len: float = 0.25) -> List[Tuple[float, float]]:
+    """將 1D 區間 [a, b] 扣除所有開口區段 cuts=[(c0, c1)]，回傳剩餘可建欄杆／碰撞盒之實心區段。"""
+    segs = [(a, b)]
+    for c0, c1 in cuts:
+        nxt = []
+        for s0, s1 in segs:
+            if c1 <= s0 or c0 >= s1:
+                nxt.append((s0, s1))
+            else:
+                if c0 > s0:
+                    nxt.append((s0, c0))
+                if c1 < s1:
+                    nxt.append((c1, s1))
+        segs = nxt
+    return [(s0, s1) for (s0, s1) in segs if s1 - s0 >= min_len]
+
+
+# 全校跨棟連廊與轉角通道淨空開口常數（視覺欄杆與步行碰撞盒共用單一真相來源！）
+BRIDGE_X_CUTS = [(-49.05, -43.75)]  # 廣和↔和平（北空橋）與 廣和↔重慶（南空橋）接入寬度
+WUQUAN_WEST_CUTS = [
+    (-43.05, -29.45),  # 重慶樓南走廊＋東端 L 型轉角廳＋北走廊接五權樓西走廊
+    (25.45, 39.20),    # 和平樓南走廊接五權樓西走廊（並移除貼靠和平樓東山牆之重複欄杆與花台）
+]
+
+
 def clip_windows_by_doors(
     raw_wins: Sequence[Tuple[float, float, float, float]],
     door_us: Sequence[float],
@@ -255,7 +280,7 @@ def build_corridor_floor_interior_x(ctx: dict, fl: int, zf: float, fh: float) ->
     z_corr = zf + (0.385 if fl == 0 else 0.315)
     ctx["floors"].append({"floor": fl + 1, "zf": round(zf, 3), "z_floor": round(z_floor, 3), "z_top": round(z_corr, 3), "fh": round(fh, 3)})
 
-    # 走廊外緣結構柱與女兒牆碰撞
+    # 走廊外緣結構柱與女兒牆碰撞（依跨棟空橋開口精準切開，絕不阻擋連廊通行！）
     for b in range(bays):
         bx0 = x0 + b * bay_len
         bcx = bx0 + 0.5 * bay_len
@@ -263,14 +288,23 @@ def build_corridor_floor_interior_x(ctx: dict, fl: int, zf: float, fh: float) ->
             if side not in corridor_sides:
                 continue
             edge_y = (y0 + 0.16) if side == "south" else (y1 - 0.16)
-            cols.append((bx0 + 0.25 - 0.26, bx0 + 0.25 + 0.26, edge_y - 0.26, edge_y + 0.26, zf, zf + fh))
-            if b == bays - 1:
-                cols.append((bx0 + bay_len - 0.25 - 0.26, bx0 + bay_len - 0.25 + 0.26, edge_y - 0.26, edge_y + 0.26, zf, zf + fh))
+            # 和平南走廊（接北空橋）與重慶北走廊（接南空橋）扣除空橋接入區段
+            has_bridge_cut = (prefix == "Bldg_Heping" and side == "south") or (prefix == "Bldg_Chongqing" and side == "north")
+            cuts = BRIDGE_X_CUTS if has_bridge_cut else []
+            col_xs = [bx0 + 0.25] + ([bx0 + bay_len - 0.25] if b == bays - 1 else [])
+            for cx_p in col_xs:
+                if not any(c0 + 0.1 <= cx_p <= c1 - 0.1 for (c0, c1) in cuts):
+                    cols.append((cx_p - 0.26, cx_p + 0.26, edge_y - 0.26, edge_y + 0.26, zf, zf + fh))
             if fl >= 1:
                 is_solid = b in ctx["solid_bays"]
                 has_parapet = (side == "north") or (not is_solid)
                 if has_parapet:
-                    cols.append((bcx - (bay_len - 0.48) * 0.5, bcx + (bay_len - 0.48) * 0.5, edge_y - 0.12, edge_y + 0.12, zf + 0.08, zf + 1.04))
+                    p0, p1 = bcx - (bay_len - 0.48) * 0.5, bcx + (bay_len - 0.48) * 0.5
+                    for s0, s1 in cut_spans(p0, p1, cuts):
+                        cols.append((s0, s1, edge_y - 0.12, edge_y + 0.12, zf + 0.08, zf + 1.04))
+    # 和平樓西端（x=x0）2F–5F 南走廊盡頭安全護欄碰撞
+    if fl >= 1 and prefix == "Bldg_Heping":
+        cols.append((x0, x0 + 0.28, y0, core_y0, zf + 0.08, zf + 1.25))
 
     hollow_bays = [b for b in range(bays) if b not in ctx["solid_bays"] and not (fl == 0 and b in ctx["breezeways"])]
     if not hollow_bays:
@@ -309,37 +343,62 @@ def build_corridor_floor_interior_x(ctx: dict, fl: int, zf: float, fh: float) ->
 
         door_open = []
         door_us = []
+        north_pass_open = []
         for s in segs:
+            is_cq_stair6 = (
+                prefix == "Bldg_Chongqing"
+                and fl >= 1
+                and s["idx"] is None
+                and ctx.get("stair_mid_x") is not None
+                and s["a"] - 0.2 <= ctx["stair_mid_x"] <= s["b"] + 0.2
+            )
+            s["is_pass"] = is_cq_stair6
             s["door_x"] = pick_door_u(s["a"], s["b"], win_spans)
             door_us.append(s["door_x"])
-            door_open.append((s["door_x"] - 0.55, s["door_x"] + 0.55, z_lo - 0.2, zf + 2.25))
+            if is_cq_stair6:
+                # 重慶樓 2F–5F 6 梯段南北貫通開放通道（對接南雙圓洞連廊直通南走廊！）
+                px_c = max(s["a"] + 1.3, min(s["b"] - 1.3, -45.6))
+                s["door_x"] = px_c
+                door_open.append((px_c - 1.15, px_c + 1.15, z_lo - 0.2, zf + 2.55))
+                north_pass_open.append((px_c - 1.15, px_c + 1.15, z_lo - 0.2, zf + 2.55))
+            else:
+                door_open.append((s["door_x"] - 0.55, s["door_x"] + 0.55, z_lo - 0.2, zf + 2.25))
 
         # 走廊側（開門面）窗洞與鋁窗依所有門洞保護區精準裁切，100% 杜絕窗壓在門上！
         south_wins = clip_windows_by_doors(raw_south_wins, door_us)
+        if north_pass_open:
+            north_wins = clip_windows_by_doors(north_wins, [0.5 * (p[0] + p[1]) for p in north_pass_open], door_margin=1.45)
         if bm_glass is not None and bm_frame is not None and add_win_fn is not None:
             for wa, wb, wz0, wz1 in south_wins:
                 w_span = (wb - wa) + 0.10
                 w_cols = max(1, min(4, int(round(w_span / 1.45))))
                 add_win_fn(bm_glass, bm_frame, (0.5 * (wa + wb), core_y0 - 0.05, win_z), w_span, win_h, axis="X", cols=w_cols)
+            if prefix == "Bldg_Chongqing" and fl >= 1:
+                for wa, wb, wz0, wz1 in north_wins:
+                    w_span = (wb - wa) + 0.10
+                    w_cols = max(1, min(4, int(round(w_span / 1.45))))
+                    add_win_fn(bm_glass, bm_frame, (0.5 * (wa + wb), core_y1 + 0.05, win_z), w_span, win_h, axis="X", cols=w_cols)
         if fl == 1 and "corridor_windows_2f" in ctx:
             for wa, wb, wz0, wz1 in south_wins:
                 ctx["corridor_windows_2f"].append((wa - 0.10, wb + 0.10, win_z - win_h * 0.5 - 0.08, win_z + win_h * 0.5 + 0.08))
 
         for a, b, za, zb in wall_rects(xa, xb, south_wins + door_open, z_lo, z_hi):
             _add_wall_segment_x(bm_outer, bm_cream, a, b, za, zb, core_y0, +1.0, t_o, t_i, cols)
-        for a, b, za, zb in wall_rects(xa, xb, north_wins, z_lo, z_hi):
+        for a, b, za, zb in wall_rects(xa, xb, north_wins + north_pass_open, z_lo, z_hi):
             _add_wall_segment_x(bm_outer, bm_cream, a, b, za, zb, core_y1, -1.0, t_o, t_i, cols)
 
-        # 走廊側磁磚腰帶（門洞處斷開）與木門框
+        # 走廊側磁磚腰帶（門洞與貫通口處斷開）與木門框
         if "south" in corridor_sides:
             for a, b, za, zb in wall_rects(xa, xb, door_open, zf + 0.03, zf + 1.21):
                 gp.bm_box(bm_dado, (0.5 * (a + b), core_y0 - 0.03, 0.5 * (za + zb)), (b - a, 0.06, zb - za))
         if "north" in corridor_sides:
-            for a, b, za, zb in wall_rects(xa, xb, [], zf + 0.03, zf + 1.21):
+            for a, b, za, zb in wall_rects(xa, xb, north_pass_open, zf + 0.03, zf + 1.21):
                 gp.bm_box(bm_dado, (0.5 * (a + b), core_y1 + 0.03, 0.5 * (za + zb)), (b - a, 0.06, zb - za))
 
         wall_c = core_y0 + 0.5 * (t_o + t_i)
         for s in segs:
+            if s.get("is_pass"):
+                continue
             dx = s["door_x"]
             for jx in (dx - 0.58, dx + 0.58):
                 gp.bm_box(bm_door, (jx, wall_c, zf + 1.28), (0.06, t_o + t_i + 0.04, 2.16))
@@ -378,7 +437,9 @@ def build_corridor_floor_interior_x(ctx: dict, fl: int, zf: float, fh: float) ->
                     "z_floor": round(z_floor, 3),
                     "z_ceil": round(zf + fh + 0.01, 3),
                     "door_x": round(s["door_x"], 3),
-                    "door": {
+                    "door": None
+                    if s.get("is_pass")
+                    else {
                         "x": round(s["door_x"], 3),
                         "y": round(wall_c, 3),
                         "z": round(z_floor, 3),
@@ -415,7 +476,7 @@ def build_wuquan_floor_interior(ctx: dict, fl: int, zf: float, fh: float) -> Non
     z_corr = zf + (0.385 if fl == 0 else 0.315)
     ctx["floors"].append({"floor": fl + 1, "zf": round(zf, 3), "z_floor": round(z_floor, 3), "z_top": round(z_corr, 3), "fh": round(fh, 3)})
 
-    # 雙側走廊柱與女兒牆碰撞（西走廊 b=3 重慶轉角口與東走廊 2F b=6 司令台露台保持暢通）
+    # 雙側走廊柱與女兒牆碰撞（西走廊重慶南北口＋和平南口與東走廊 2F 司令台露台全部切開暢通！）
     for b in range(bays):
         by0 = y0 + b * bay_len
         bcy = by0 + 0.5 * bay_len
@@ -424,22 +485,31 @@ def build_wuquan_floor_interior(ctx: dict, fl: int, zf: float, fh: float) -> Non
             if side == "east" and is_south_solid:
                 continue
             edge_x = (x0 + 0.16) if side == "west" else (x1 - 0.16)
-            cols.append((edge_x - 0.26, edge_x + 0.26, by0 + 0.25 - 0.26, by0 + 0.25 + 0.26, zf, zf + fh))
-            if b == bays - 1:
-                cols.append((edge_x - 0.26, edge_x + 0.26, by0 + bay_len - 0.25 - 0.26, by0 + bay_len - 0.25 + 0.26, zf, zf + fh))
+            cuts = WUQUAN_WEST_CUTS if side == "west" else []
+            col_ys = [by0 + 0.25] + ([by0 + bay_len - 0.25] if b == bays - 1 else [])
+            for cy_p in col_ys:
+                if not any(c0 + 0.1 <= cy_p <= c1 - 0.1 for (c0, c1) in cuts):
+                    cols.append((edge_x - 0.26, edge_x + 0.26, cy_p - 0.26, cy_p + 0.26, zf, zf + fh))
             if fl >= 1:
                 is_stage_open = side == "east" and fl == 1 and b == 6
-                is_cq_open = side == "west" and b == 3
-                if not is_stage_open and not is_cq_open:
-                    cols.append((edge_x - 0.12, edge_x + 0.12, bcy - (bay_len - 0.48) * 0.5, bcy + (bay_len - 0.48) * 0.5, zf + 0.08, zf + 1.04))
+                if not is_stage_open:
+                    p0, p1 = bcy - (bay_len - 0.48) * 0.5, bcy + (bay_len - 0.48) * 0.5
+                    for s0, s1 in cut_spans(p0, p1, cuts):
+                        cols.append((edge_x - 0.12, edge_x + 0.12, s0, s1, zf + 0.08, zf + 1.04))
+    # 五權樓 2F–5F 南北端走廊盡頭安全護欄碰撞（避免走出建築端頭懸空跌落）
+    if fl >= 1:
+        y1_wq = y0 + bays * bay_len
+        cols.append((x0, core_x0, y0, y0 + 0.28, zf + 0.08, zf + 1.25))
+        cols.append((x0, core_x0, y1_wq - 0.28, y1_wq, zf + 0.08, zf + 1.25))
+        cols.append((core_x1, x1, y1_wq - 0.28, y1_wq, zf + 0.08, zf + 1.25))
 
     bm_salmon, bm_cream, bm_dado, bm_door, bm_light = ctx["bm_salmon"], ctx["bm_cream"], ctx["bm_dado"], ctx["bm_door"], ctx["bm_light"]
     bm_glass, bm_frame, add_win_fn = ctx.get("bm_glass"), ctx.get("bm_frame"), ctx.get("add_window_fn")
     cand_rooms = floor_rooms_along(cfg, fl, "Y")
 
-    # 區段分組：南翼 b=0..4 一段，中北翼 b=5..10（1F 扣掉穿堂 b=6, 8）分段
+    # 區段分組：南翼 b=0..4 一段，中北翼 b=5..11（含 b=11 徹底消除舊版實心假門塊；1F 扣掉穿堂 b=6, 8）
     south_bays = [b for b in range(0, 5) if not (fl == 0 and b in ctx["breezeways"])]
-    north_bays = [b for b in range(5, 11) if not (fl == 0 and b in ctx["breezeways"])]
+    north_bays = [b for b in range(5, 12) if not (fl == 0 and b in ctx["breezeways"])]
 
     def _build_wing_intervals(wing_bays: List[int], is_south: bool) -> None:
         if not wing_bays:
@@ -534,7 +604,7 @@ def build_wuquan_floor_interior(ctx: dict, fl: int, zf: float, fh: float) -> Non
             boundaries = [s["b"] for s in segs[:-1]]
             if ba == 0 or (ba - 1 in ctx["breezeways"] and fl == 0) or ba == 5:
                 boundaries.append(ya + 0.1)
-            if bb == 4 or bb == 10 or (bb + 1 in ctx["breezeways"] and fl == 0):
+            if bb == 4 or bb == 11 or (bb + 1 in ctx["breezeways"] and fl == 0):
                 boundaries.append(yb - 0.1)
             for py in boundaries:
                 gp.bm_box(bm_cream, (0.5 * (xa + xb), py, 0.5 * (z_lo + z_hi)), (xb - xa, 0.2, z_hi - z_lo))
@@ -576,6 +646,52 @@ def build_wuquan_floor_interior(ctx: dict, fl: int, zf: float, fh: float) -> Non
 
     _build_wing_intervals(south_bays, True)
     _build_wing_intervals(north_bays, False)
+
+    # 補齊 1F b=8 北角「118-1 播音室」（y=2.0..6.73，保留南半 y=-1.46..2.0 穿堂暢通，讓全校 124/124 實體室 100% 均有門！）
+    if fl == 0:
+        b8_rm = next((r for r in cand_rooms if "播音" in r.get("name", "")), None)
+        if b8_rm is not None:
+            pa, pb = 2.0, y0 + 9 * bay_len
+            cx0, cx1 = core_x0, core_x1
+            xa, xb = cx0 + t_o + t_i, cx1 - t_o - t_i
+            dy_p = 4.35
+            d_open = [(dy_p - 0.55, dy_p + 0.55, z_lo - 0.2, zf + 2.25)]
+            for a, b_u, za, zb in wall_rects(pa, pb, d_open, z_lo, z_hi):
+                _add_wall_segment_y(bm_salmon, bm_cream, a, b_u, za, zb, cx0, +1.0, t_o, t_i, cols)
+            for a, b_u, za, zb in wall_rects(pa, pb, [], z_lo, z_hi):
+                _add_wall_segment_y(bm_salmon, bm_cream, a, b_u, za, zb, cx1, -1.0, t_o, t_i, cols)
+            for a, b_u, za, zb in wall_rects(pa, pb, d_open, zf + 0.03, zf + 1.21):
+                gp.bm_box(bm_dado, (cx0 - 0.03, 0.5 * (a + b_u), 0.5 * (za + zb)), (0.06, b_u - a, zb - za))
+            wall_x = cx0 + 0.5 * (t_o + t_i)
+            for jy in (dy_p - 0.58, dy_p + 0.58):
+                gp.bm_box(bm_door, (wall_x, jy, zf + 1.28), (t_o + t_i + 0.04, 0.06, 2.16))
+            gp.bm_box(bm_door, (wall_x, dy_p, zf + 2.28), (t_o + t_i + 0.04, 1.18, 0.06))
+            gp.bm_box(bm_cream, (0.5 * (xa + xb), pa + 0.1, 0.5 * (z_lo + z_hi)), (xb - xa, 0.2, z_hi - z_lo))
+            cols.append((xa, xb, pa, pa + 0.2, z_lo, z_hi))
+            ctx["rooms"].append(
+                {
+                    "bldg": prefix,
+                    "key": f"{prefix}:{b8_rm['idx']}",
+                    "kind": "room",
+                    "floor": 1,
+                    "x0": round(xa, 3),
+                    "x1": round(xb, 3),
+                    "y0": round(pa + 0.2, 3),
+                    "y1": round(pb - 0.1, 3),
+                    "z_floor": round(z_floor, 3),
+                    "z_ceil": round(zf + fh + 0.01, 3),
+                    "door": {
+                        "x": round(wall_x, 3),
+                        "y": round(dy_p, 3),
+                        "z": round(z_floor, 3),
+                        "axis": "Y",
+                        "normal": [-1, 0],
+                        "width": 1.1,
+                        "height": 2.12,
+                        "slide": 1,
+                    },
+                }
+            )
 
 
 # =============================================================================
@@ -734,69 +850,110 @@ def build_guanghe_interiors(
     wing_s_y0, wing_s_y1 = y0, cy - breezeway_half
     n_cands = [r for r in cands_1f if r["cu"] > cy + 2.0]
     s_cands = [r for r in cands_1f if r["cu"] < cy - 2.0]
-    n_segs = plan_interval_rooms(wing_n_y0, wing_n_y1, n_cands)
-    s_segs = plan_interval_rooms(wing_s_y0, wing_s_y1, s_cands)
+    # 1F 南北兩翼各為單一大處室（北翼學務處、南翼健康中心），全翼貫通直開穿堂門，避免多切空白段導致門疊門或隔間牆擋門！
+    n_segs = [{"idx": n_cands[0]["idx"], "a": wing_n_y0, "b": wing_n_y1, "name": n_cands[0]["name"]}] if len(n_cands) == 1 else plan_interval_rooms(wing_n_y0, wing_n_y1, n_cands)
+    s_segs = [{"idx": s_cands[0]["idx"], "a": wing_s_y0, "b": wing_s_y1, "name": s_cands[0]["name"]}] if len(s_cands) == 1 else plan_interval_rooms(wing_s_y0, wing_s_y1, s_cands)
     w_n_win = [(0.5 * (wing_n_y0 + wing_n_y1) - (wing_n_y1 - wing_n_y0) * 0.33, 0.5 * (wing_n_y0 + wing_n_y1) + (wing_n_y1 - wing_n_y0) * 0.33, plinth_h + 0.92, plinth_h + 2.38)]
     w_s_win = [(0.5 * (wing_s_y0 + wing_s_y1) - (wing_s_y1 - wing_s_y0) * 0.33, 0.5 * (wing_s_y0 + wing_s_y1) + (wing_s_y1 - wing_s_y0) * 0.33, plinth_h + 0.92, plinth_h + 2.38)]
     # 1F 兩翼門開在 x = -36.8（避開穿堂榮譽牆 x=-49.0..-39.0 與東側列柱 x=-33.7）
     _add_gh_room_shell(0, plinth_h, h1 - plinth_h, plinth_h + 0.03, x0 + 0.2, core_x1, wing_n_y0, wing_n_y1, "S", -36.8, w_n_win, [], [], [], n_segs)
     _add_gh_room_shell(0, plinth_h, h1 - plinth_h, plinth_h + 0.03, x0 + 0.2, core_x1, wing_s_y0, wing_s_y1, "N", -36.8, w_s_win, [], [], [], s_segs)
 
-    # --- 2F (fl=1): 退縮挑空門廳 + 兩翼 + 東側開放走廊 ---
+    # --- 2F ~ 5F 南北雙端 2.0m 東西向貫通連廊（3梯／4梯梯廳）：直接接通南北雙圓洞連廊與廣和樓東側主走廊 ---
+    y_s_in = y0 + 2.0  # -8.5（南端連廊 y = -10.5..-8.5）
+    y_n_in = y1 - 2.0  # +9.5（北端連廊 y = +9.5..+11.5）
+
+    def _add_gh_end_connector_halls(zf_h: float, fh_h: float, add_flank_win: bool) -> None:
+        z_lo_h, z_hi_h = zf_h + 0.12, zf_h + fh_h + 0.04
+        portal_open = [(-48.6, -44.2, zf_h - 0.1, zf_h + 2.65)]
+        if add_flank_win:
+            win_z_h = zf_h + 2.02
+            win_h_h = 1.48
+            portal_open.append((x0 + 14.2 - 2.75, x0 + 14.2 + 2.75, win_z_h - win_h_h * 0.46, win_z_h + win_h_h * 0.46))
+        # 北端連廊（y = y_n_in .. y1）：北外牆挖雙圓洞連廊拱口、西端封牆、東端完全敞開接東走廊
+        for a, b, za, zb in wall_rects(x0 + t_tot, core_x1, portal_open, z_lo_h, z_hi_h):
+            _add_wall_segment_x(bm_wall, bm_wall, a, b, za, zb, y1, -1.0, t_o, t_i, cols)
+        _add_wall_segment_y(bm_wall, bm_wall, y_n_in, y1, z_lo_h, z_hi_h, x0, +1.0, t_o, t_i, cols)
+        # 南端連廊（y = y0 .. y_s_in）：南外牆挖雙圓洞連廊拱口、西端封牆、東端完全敞開接東走廊
+        for a, b, za, zb in wall_rects(x0 + t_tot, core_x1, portal_open, z_lo_h, z_hi_h):
+            _add_wall_segment_x(bm_wall, bm_wall, a, b, za, zb, y0, +1.0, t_o, t_i, cols)
+        _add_wall_segment_y(bm_wall, bm_wall, y0, y_s_in, z_lo_h, z_hi_h, x0, +1.0, t_o, t_i, cols)
+        # 南北轉折通廊磨石子地坪與天花日光燈
+        tz_z = zf_h + (0.31 if not add_flank_win else 0.295)
+        hall_x0, hall_x1 = x0 + t_tot + 0.05, core_x1 + 0.15
+        for hy0, hy1 in ((y0 + t_tot + 0.02, y_s_in - 0.02), (y_n_in + 0.02, y1 - t_tot - 0.02)):
+            gp.bm_box(bm_terrazzo, (0.5 * (hall_x0 + hall_x1), 0.5 * (hy0 + hy1), tz_z), (hall_x1 - hall_x0, hy1 - hy0, 0.03))
+            for lx_h in (-46.4, -40.5, -35.8):
+                gp.bm_box(bm_light, (lx_h, 0.5 * (hy0 + hy1), zf_h + fh_h - 0.04), (1.5, 0.22, 0.05))
+        # 東走廊南北外端（x = core_x1 .. x1）視覺低女兒牆＋安全欄杆與碰撞盒
+        for ey_e, sgn_e in ((y0 + 0.14, 1.0), (y1 - 0.14, -1.0)):
+            gp.bm_box(bm_brick, (corr_cx, ey_e, zf_h + 0.58), (corridor_w - 0.20, 0.24, 1.02))
+            gp.bm_box(bm_rail, (corr_cx, ey_e, zf_h + 1.22), (corridor_w - 0.20, 0.07, 0.07))
+            cols.append((core_x1, x1, ey_e - 0.15, ey_e + 0.15, zf_h, zf_h + 1.3))
+
+    # --- 2F (fl=1): 退縮挑空門廳 + 兩翼 + 東側開放走廊 + 南北端 2.0m 轉折連廊 ---
     z2 = h1
     floors_meta.append({"floor": 2, "zf": round(z2, 3), "z_floor": round(z2 + 0.30, 3), "z_top": round(z2 + 0.33, 3), "fh": round(hu, 3)})
     gp.bm_box(bm_terrazzo, (corr_cx, cy, z2 + 0.31), (corridor_w - 0.3, y1 - y0 - 0.2, 0.03))
     gp.bm_box(bm_brick, (x1 - 0.14, cy, z2 + 0.58), (0.24, y1 - y0, 1.02))
     gp.bm_box(bm_rail, (x1 - 0.14, cy, z2 + 1.22), (0.07, y1 - y0, 0.07))
     cols.append((x1 - 0.28, x1, y0, y1, z2, z2 + 1.3))
-    cols.append((core_x1, x1, y0 - 0.1, y0 + 0.25, z2, z2 + 1.3))
-    cols.append((core_x1, x1, y1 - 0.25, y1 + 0.1, z2, z2 + 1.3))
+    _add_gh_end_connector_halls(z2, hu, add_flank_win=False)
+
     cands_2f = floor_rooms_along(cfg, 1, "Y")
-    # 2F 分成北翼（人事/主計）、中段退縮（輔導室）、南翼（廁所）
-    for (wy0, wy1, rx0_w, w_wins) in [
-        (wing_n_y0, wing_n_y1, x0, [(y1 - 2.8 - 1.65, y1 - 2.8 + 1.65, z2 + 1.18, z2 + 2.62)]),
-        (wing_s_y1, wing_n_y0, x0 + 5.2, []),
-        (wing_s_y0, wing_s_y1, x0, []),
+    # 2F 兩翼配合南北 2.0m 轉折通廊內縮至 [-8.5, +9.5]，並完整保留人事室與主計室 2 間獨立門
+    n_cands_2f = sorted([r for r in cands_2f if r["cu"] >= 5.6], key=lambda r: r["cu"])
+    if len(n_cands_2f) == 2:
+        mid_n2 = 0.5 * (5.6 + y_n_in)
+        segs_n2 = [
+            {"idx": n_cands_2f[0]["idx"], "a": 5.6, "b": mid_n2, "name": n_cands_2f[0]["name"]},
+            {"idx": n_cands_2f[1]["idx"], "a": mid_n2, "b": y_n_in, "name": n_cands_2f[1]["name"]},
+        ]
+    else:
+        segs_n2 = plan_interval_rooms(5.6, y_n_in, n_cands_2f)
+    segs_m2 = plan_interval_rooms(wing_s_y1, 5.6, [r for r in cands_2f if wing_s_y1 - 0.8 <= r["cu"] < 5.6])
+    segs_s2 = plan_interval_rooms(y_s_in, wing_s_y1, [r for r in cands_2f if r["cu"] < wing_s_y1 + 0.8])
+
+    for (wy0, wy1, rx0_w, w_wins, segs) in [
+        (5.6, y_n_in, x0, [(y1 - 3.65 - 1.35, y1 - 3.65 + 1.35, z2 + 1.18, z2 + 2.62)], segs_n2),
+        (wing_s_y1, 5.6, x0 + 5.2, [], segs_m2),
+        (y_s_in, wing_s_y1, x0, [], segs_s2),
     ]:
-        sub_cands = [r for r in cands_2f if wy0 - 0.8 <= r["cu"] <= wy1 + 0.8]
-        segs = plan_interval_rooms(wy0, wy1, sub_cands)
         e_wins_2f = []
         for s in segs:
             s["door_u"] = pick_door_u(s["a"], s["b"], [])
-            if s["b"] - s["a"] > 3.5:
+            if s["b"] - s["a"] > 3.2:
                 wa, wb = (s["door_u"] + 0.86, s["b"] - 0.35) if (s["b"] - s["door_u"]) >= (s["door_u"] - s["a"]) else (s["a"] + 0.35, s["door_u"] - 0.86)
                 if wb - wa > 1.0:
                     e_wins_2f.append((wa, wb, z2 + 1.32, z2 + 2.68))
                     add_window_fn(bm_glass, bm_frame, (core_x1 + 0.04, 0.5 * (wa + wb), z2 + 2.0), wb - wa, 1.38, axis="Y", cols=max(1, int(round((wb - wa) / 1.35))))
         _add_gh_room_shell(1, z2, hu, z2 + 0.30, rx0_w, core_x1, wy0, wy1, "E", 0.0, w_wins, [], [], e_wins_2f, segs)
 
-    # --- 3F ~ 5F (fl=2, 3, 4): 全寬中空處室與教室 + 東走廊 ---
+    # --- 3F ~ 5F (fl=2, 3, 4): 全寬中空處室與教室（y=-8.5..+9.5）+ 東走廊 + 南北端 2.0m 雙圓洞連廊貫通梯廳 ---
     for fl in range(2, 5):
         zf = h1 + (fl - 1) * hu
         floors_meta.append({"floor": fl + 1, "zf": round(zf, 3), "z_floor": round(zf + 0.27, 3), "z_top": round(zf + 0.315, 3), "fh": round(hu, 3)})
         gp.bm_box(bm_terrazzo, (corr_cx, cy, zf + 0.295), (corridor_w - 0.3, y1 - y0 - 0.2, 0.03))
         cols.append((x1 - 0.28, x1, y0, y1, zf, zf + 1.3))
-        cols.append((core_x1, x1, y0 - 0.1, y0 + 0.25, zf, zf + 1.3))
-        cols.append((core_x1, x1, y1 - 0.25, y1 + 0.1, zf, zf + 1.3))
+        _add_gh_end_connector_halls(zf, hu, add_flank_win=True)
 
         win_z = zf + 2.02
         win_h = 1.48
         w_wins = [
-            (y0 + 2.65 - 1.60, y0 + 2.65 + 1.60, win_z - win_h * 0.46, win_z + win_h * 0.46),
-            (y1 - 2.65 - 1.60, y1 - 2.65 + 1.60, win_z - win_h * 0.46, win_z + win_h * 0.46),
+            (y0 + 3.55 - 1.35, y0 + 3.55 + 1.35, win_z - win_h * 0.46, win_z + win_h * 0.46),
+            (y1 - 3.55 - 1.35, y1 - 3.55 + 1.35, win_z - win_h * 0.46, win_z + win_h * 0.46),
         ]
         if fl < 4:
             w_wins.append((cy - 5.65, cy + 5.65, win_z - win_h * 0.46, win_z + win_h * 0.46))
-        flank_wins = [(x0 + 14.2 - 2.75, x0 + 14.2 + 2.75, win_z - win_h * 0.46, win_z + win_h * 0.46)]
 
         cands_f = floor_rooms_along(cfg, fl, "Y")
-        segs = plan_interval_rooms(y0, y1, cands_f)
+        segs = plan_interval_rooms(y_s_in, y_n_in, cands_f)
         east_wins = []
         for s in segs:
             s["door_u"] = pick_door_u(s["a"], s["b"], [])
             # 在每間處室東側留一段與門錯開 >=0.86m 之走廊窗洞＋實際鋁窗，杜絕門窗重疊
             room_len = s["b"] - s["a"]
-            if room_len > 3.4:
+            if room_len > 3.2:
                 if (s["b"] - s["door_u"]) >= (s["door_u"] - s["a"]):
                     wa, wb = s["door_u"] + 0.86, s["b"] - 0.35
                 else:
@@ -805,7 +962,17 @@ def build_guanghe_interiors(
                     east_wins.append((wa, wb, zf + 1.32, zf + 2.68))
                     add_window_fn(bm_glass, bm_frame, (core_x1 + 0.04, 0.5 * (wa + wb), zf + 2.0), wb - wa, 1.38, axis="Y", cols=max(1, int(round((wb - wa) / 1.35))))
 
-        _add_gh_room_shell(fl, zf, hu, zf + 0.27, x0, core_x1, y0, y1, "E", 0.0, w_wins, flank_wins, flank_wins, east_wins, segs)
+        _add_gh_room_shell(fl, zf, hu, zf + 0.27, x0, core_x1, y_s_in, y_n_in, "E", 0.0, w_wins, [], [], east_wins, segs)
+
+    # 南北雙圓洞連廊東西兩側安全護欄碰撞盒（2F–5F，避免人物走出空橋欄杆外）
+    for fl_b in range(1, 5):
+        zf_b = 3.6 + (fl_b - 1) * 3.4
+        # 北連廊 y=11.5..25.5, x=-49.2..-43.6
+        cols.append((-49.2, -48.75, 11.5, 25.5, zf_b, zf_b + 2.2))
+        cols.append((-44.05, -43.6, 11.5, 25.5, zf_b, zf_b + 2.2))
+        # 南連廊 y=-29.5..-10.5, x=-49.2..-43.6
+        cols.append((-49.2, -48.75, -29.5, -10.5, zf_b, zf_b + 2.2))
+        cols.append((-44.05, -43.6, -29.5, -10.5, zf_b, zf_b + 2.2))
 
     register_building_walk_data(
         prefix,

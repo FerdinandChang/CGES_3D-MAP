@@ -2863,6 +2863,12 @@ export function createWalkMode(opts) {
 
   function describeLocation() {
     const { x, y, z } = S.P;
+    // 優先辨識南北雙圓洞跨棟連廊（2F–5F）
+    if (x >= -49.6 && x <= -43.2 && z > 3.1) {
+      const flB = Math.max(2, Math.min(5, Math.round((z - 3.91) / 3.4) + 2));
+      if (y > 11.45 && y < 25.55) return `北側雙圓洞連廊 ${flB}F`;
+      if (y > -29.55 && y < -10.45) return `南側雙圓洞連廊 ${flB}F`;
+    }
     const curB = currentBuilding(x, y);
     if (!curB) return "校園戶外";
     const fl = floorForBuilding(curB.meta, z);
@@ -2876,7 +2882,7 @@ export function createWalkMode(opts) {
           const info = infoList.find((i) => i.specKey === r.key);
           if (info) return `${curB.meta.name} ${fl.floor}F・${info.short || info.name}`;
         }
-        if (r.kind === "stair") return `${curB.meta.name} ${fl.floor}F・梯間`;
+        if (r.kind === "stair") return `${curB.meta.name} ${fl.floor}F・梯間通道`;
         return `${curB.meta.name} ${fl.floor}F・室內空間`;
       }
     }

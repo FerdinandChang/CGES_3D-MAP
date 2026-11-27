@@ -266,12 +266,12 @@ def build_guanghe_building(cfg: dict, palette: Dict[str, bpy.types.Material]) ->
     # 3. 2F（中央門廳退縮雙層挑空 + 陽台女兒牆 + 中空兩翼與退縮中段）
     z2 = h1
     gp.bm_box(bm_floor, (cx + 1.8, cy, z2 + 0.15), (wx - 3.6, wy, 0.30))
-    for wy0, wy1 in (wing_y_n, wing_y_s):
+    for wy0, wy1 in ((wing_y_n[0] - 0.25, wing_y_n[1]), wing_y_s):
         gp.bm_box(bm_floor, (cx, (wy0 + wy1) * 0.5, z2 + 0.15), (wx - 0.16, wy1 - wy0, 0.30))
     gp.bm_box(bm_brick, (x0 + 2.4, cy, z2 + 0.55), (0.24, breezeway_half * 2.0, 1.0))
     gp.bm_box(bm_rail, (x0 + 2.4, cy, z2 + 1.15), (0.07, breezeway_half * 2.0, 0.07))
-    # 2F north wing detailed window
-    _add_detailed_window(bm_glass, bm_frame, (x0 - 0.04, y1 - 2.8, z2 + 1.9), 3.4, 1.48, axis="Y", cols=3)
+    # 2F north wing detailed window (clear of north connector hall partition at y=+9.5)
+    _add_detailed_window(bm_glass, bm_frame, (x0 - 0.04, y1 - 3.65, z2 + 1.9), 2.8, 1.48, axis="Y", cols=3)
 
     bm_salmon_gh = bmesh.new()
     bm_dark_gh = bmesh.new()
@@ -305,18 +305,19 @@ def build_guanghe_building(cfg: dict, palette: Dict[str, bpy.types.Material]) ->
                 gp.bm_box(bm_wall, (x0 - 0.30, rec_yc, z_roof + 1.90), (0.50, rec_w + 0.12, 0.12))
                 # Outer vertical white square-tile pilaster separating recessed bay from side wing
                 gp.bm_box(bm_wall, (x0 - 0.24, cy + sgn_y * 5.72, 0.5 * (zf + 1.28 + z_roof + 2.18)), (0.44, 0.58, (z_roof + 2.18) - (zf + 1.28)))
-        # Side wings: 2 crisp windows with projecting drip lintels
-        for wy_mid in (y0 + 2.65, y1 - 2.65):
-            _add_detailed_window(bm_glass, bm_frame, (x0 - 0.05, wy_mid, win_z), 3.3, win_h, axis="Y", cols=3)
-            gp.bm_box(bm_wall, (x0 - 0.22, wy_mid, win_z + win_h * 0.5 + 0.08), (0.36, 3.55, 0.14))
+        # Side wings: 2 crisp windows with projecting drip lintels (clear of y=-8.5/+9.5 connector halls)
+        for wy_mid in (y0 + 3.55, y1 - 3.55):
+            _add_detailed_window(bm_glass, bm_frame, (x0 - 0.05, wy_mid, win_z), 2.8, win_h, axis="Y", cols=3)
+            gp.bm_box(bm_wall, (x0 - 0.22, wy_mid, win_z + win_h * 0.5 + 0.08), (0.36, 3.05, 0.14))
         # North & south flank windows on east half (clear of x=-49.2..-43.6 North/South connector bridges!) + D-03 projecting sunshade!
         for side_y, sdir in ((y0 - 0.05, -1.0), (y1 + 0.05, 1.0)):
             _add_detailed_window(bm_glass, bm_frame, (x0 + 14.2, side_y, win_z), 5.6, win_h, axis="X", cols=4)
             gp.bm_box(bm_wall, (x0 + 14.2, side_y + sdir * 0.28, win_z + win_h * 0.5 + 0.09), (6.4, 0.56, 0.14))
-        # Brick-red horizontal accent bands (extruded cleanly outside wall perimeter, zero Cycles Z-fighting!)
+        # Brick-red horizontal accent bands (南北側避開雙圓洞連廊貫通拱口 x=-48.65..-44.15，避免橫擋地面門檻)
         gp.bm_box(bm_brick, (x0 - 0.06, cy, zf + 0.44), (0.12, wy + 0.24, 0.34))
-        gp.bm_box(bm_brick, ((x0 + core_x1) * 0.5, y0 - 0.06, zf + 0.44), (core_x1 - x0 + 0.20, 0.12, 0.34))
-        gp.bm_box(bm_brick, ((x0 + core_x1) * 0.5, y1 + 0.06, zf + 0.44), (core_x1 - x0 + 0.20, 0.12, 0.34))
+        for bx_a, bx_b in wi.cut_spans(x0 - 0.10, core_x1 + 0.10, [(-48.65, -44.15)]):
+            gp.bm_box(bm_brick, (0.5 * (bx_a + bx_b), y0 - 0.06, zf + 0.44), (bx_b - bx_a, 0.12, 0.34))
+            gp.bm_box(bm_brick, (0.5 * (bx_a + bx_b), y1 + 0.06, zf + 0.44), (bx_b - bx_a, 0.12, 0.34))
         # East corridor facing courtyard
         gp.bm_box(bm_brick, (x1 - 0.14, cy, zf + 0.58), (0.24, wy, 1.02))
         gp.bm_box(bm_rail, (x1 - 0.14, cy, zf + 1.22), (0.07, wy, 0.07))
@@ -504,7 +505,7 @@ def build_corridor_building(cfg: dict, palette: Dict[str, bpy.types.Material]) -
         solid_bays = {0}
     elif prefix == "Bldg_Wuquan":
         solid_stairs = set()
-        solid_bays = {11, 12}
+        solid_bays = {12}
     else:
         solid_stairs = stairs
         solid_bays = set(stairs)
@@ -575,7 +576,8 @@ def build_corridor_building(cfg: dict, palette: Dict[str, bpy.types.Material]) -
         fh = h1 if fl == 0 else hu
 
         if fl > 0:
-            gp.bm_box(bm_floor, (cx, cy, zf + 0.14), (wx - 0.16, wy - 0.16, 0.26))
+            # 沿接縫軸保持全寬確保和平／重慶東端與五權西走廊於 x=-7.0 零縫隙銜接
+            gp.bm_box(bm_floor, (cx, cy, zf + 0.14), (wx, wy - 0.16, 0.26))
 
         for b in range(bays):
             if along_x:
@@ -612,18 +614,17 @@ def build_corridor_building(cfg: dict, palette: Dict[str, bpy.types.Material]) -
                     win_h = 1.48 if (not is_stair or is_cq_east_end) else 2.25
                     win_z = zf + fh * 0.58
                     for side_y, face_dir in ((c_y0 - 0.05, "S"), (c_y1 + 0.05, "N")):
-                        # 中空教室之南側開門面鋁窗由 mod_walk_interior 依門洞裁切退縮統一建置，100% 避免門窗重疊
-                        if not (hollow_bay and face_dir == "S"):
+                        # 中空教室之南側開門面鋁窗、以及重慶樓 2F–5F 北側窗（含 6 梯貫通口避讓）由 mod_walk_interior 統一建置
+                        skip_walk_win = (hollow_bay and face_dir == "S") or (prefix == "Bldg_Chongqing" and hollow_bay and fl >= 1 and face_dir == "N")
+                        if not skip_walk_win:
                             _add_detailed_window(bm_glass, bm_frame, (box_cx, side_y, win_z), win_w * 0.78 if not is_stair else win_w, win_h, axis="X", cols=3 if (is_stair or is_cq_east_end) else 4)
-                        # D-02: Classroom corridor 1.2m lower light-gray tile dado + wooden sliding door (act_23.jpg!)
+                        # D-02: Classroom corridor 1.2m lower light-gray tile dado (solid stair bays 不再畫舊版實心假門塊!)
                         is_corr_face = (face_dir == "S" and "south" in corridor_sides) or (face_dir == "N" and "north" in corridor_sides)
                         sdir = -1.0 if face_dir == "S" else 1.0
                         if hollow_bay:
-                            pass  # 中空教室：腰帶與門洞改由 _cq_floor_interior 依門洞切分建置
+                            pass  # 中空教室：腰帶與門洞改由 mod_walk_interior 依門洞切分建置
                         elif is_corr_face and (not is_stair or is_cq_west_end or is_cq_east_end):
                             gp.bm_box(bm_dado, (box_cx, side_y + sdir * 0.03, zf + 0.62), (box_w - 0.16, 0.06, 1.18))
-                            if not is_cq_east_end:
-                                gp.bm_box(bm_door, (bx0 + 0.88, side_y + sdir * 0.05, zf + 1.15), (1.05, 0.08, 2.15))
                         elif not is_stair:
                             # D-03: Deep projecting 0.55m concrete sunshade canopy above exterior windows (act_12/22!)
                             gp.bm_box(bm_cream, (bcx, side_y + sdir * 0.28, win_z + win_h * 0.5 + 0.09), (bay_len - 0.32, 0.56, 0.14))
@@ -659,19 +660,32 @@ def build_corridor_building(cfg: dict, palette: Dict[str, bpy.types.Material]) -
                         gp.bm_box(bm_light, (bcx - 1.2, in_y, zf + fh - 0.18), (1.4, 0.14, 0.06))
                         continue
                     # v6 Street-View Exact Palette (27 廣和街): Salmon-pink outer structural columns & beams + Cream-white corridor parapet!
-                    gp.bm_box(bm_salmon, (bx0 + 0.25, edge_y, zf + fh * 0.5), (0.52, 0.52, fh))
-                    if b == bays - 1:
-                        gp.bm_box(bm_salmon, (bx1 - 0.25, edge_y, zf + fh * 0.5), (0.52, 0.52, fh))
+                    # 和平南走廊接北雙圓洞連廊、重慶北走廊接南雙圓洞連廊：依 wi.BRIDGE_X_CUTS 切開柱子、女兒牆、欄杆與花台
+                    has_bridge_cut = (prefix == "Bldg_Heping" and side == "south") or (prefix == "Bldg_Chongqing" and side == "north")
+                    cuts_x = wi.BRIDGE_X_CUTS if has_bridge_cut else []
+                    col_xs_b = [bx0 + 0.25] + ([bx1 - 0.25] if b == bays - 1 else [])
+                    for cx_p in col_xs_b:
+                        if not any(c0 + 0.1 <= cx_p <= c1 - 0.1 for (c0, c1) in cuts_x):
+                            gp.bm_box(bm_salmon, (cx_p, edge_y, zf + fh * 0.5), (0.52, 0.52, fh))
                     gp.bm_box(bm_light, (bcx, in_y, zf + fh - 0.18), (1.4, 0.14, 0.06))
                     if fl >= 1 and (not is_stair or is_cq_west_north or is_cq_east_north):
-                        gp.bm_box(bm_cream, (bcx, edge_y, zf + 0.56), (bay_len - 0.48, 0.24, 0.96))
-                        gp.bm_box(bm_rail, (bcx, edge_y, zf + 1.24), (bay_len - 0.48, 0.065, 0.065))
-                        gp.bm_box(bm_rail, (bcx, edge_y, zf + 1.08), (bay_len - 0.48, 0.045, 0.045))
+                        p0_x, p1_x = bcx - (bay_len - 0.48) * 0.5, bcx + (bay_len - 0.48) * 0.5
+                        for s0, s1 in wi.cut_spans(p0_x, p1_x, cuts_x):
+                            scx, slen = 0.5 * (s0 + s1), s1 - s0
+                            gp.bm_box(bm_cream, (scx, edge_y, zf + 0.56), (slen, 0.24, 0.96))
+                            gp.bm_box(bm_rail, (scx, edge_y, zf + 1.24), (slen, 0.065, 0.065))
+                            gp.bm_box(bm_rail, (scx, edge_y, zf + 1.08), (slen, 0.045, 0.045))
                         gp.bm_box(bm_salmon, (bcx, edge_y, zf + fh - 0.24), (bay_len, 0.42, 0.48))
-                        if (b + fl) % 2 == 0 and not is_cq_east_north:
+                        plant_blocked = any(not (bcx + 0.95 <= c0 or bcx - 0.95 >= c1) for (c0, c1) in cuts_x)
+                        if (b + fl) % 2 == 0 and not is_cq_east_north and not plant_blocked:
                             gp.bm_box(bm_plant, (bcx, edge_y + (0.18 if side == "north" else -0.18), zf + 1.08), (1.8, 0.32, 0.28))
                     elif fl == 0:
                         gp.bm_box(bm_salmon, (bcx, edge_y, zf + fh - 0.24), (bay_len, 0.42, 0.48))
+                    # 和平樓西端（b=0, x=x0）2F–5F 南走廊盡頭補上安全低女兒牆與欄杆
+                    if fl >= 1 and prefix == "Bldg_Heping" and b == 0 and side == "south":
+                        gp.bm_box(bm_cream, (x0 + 0.14, in_y, zf + 0.56), (0.24, corridor_w - 0.32, 0.96))
+                        gp.bm_box(bm_rail, (x0 + 0.14, in_y, zf + 1.24), (0.065, corridor_w - 0.32, 0.065))
+                        gp.bm_box(bm_rail, (x0 + 0.14, in_y, zf + 1.08), (0.045, corridor_w - 0.32, 0.045))
             else:
                 by0 = y0 + b * bay_len
                 by1 = by0 + bay_len
@@ -718,7 +732,6 @@ def build_corridor_building(cfg: dict, palette: Dict[str, bpy.types.Material]) -
                             pass  # 中空教室：腰帶與門洞改由 mod_walk_interior 依門洞切分建置
                         elif is_corr_face and not is_stair:
                             gp.bm_box(bm_dado, (side_x + sdir * 0.03, bcy, zf + 0.62), (0.06, bay_len - 0.16, 1.18))
-                            gp.bm_box(bm_door, (side_x + sdir * 0.05, by0 + 0.88, zf + 1.15), (0.08, 1.05, 2.15))
                         elif not is_stair:
                             gp.bm_box(bm_cream, (side_x + sdir * 0.28, bcy, win_z + win_h * 0.5 + 0.09), (0.56, bay_len - 0.32, 0.14))
                     for side in corridor_sides:
@@ -739,22 +752,24 @@ def build_corridor_building(cfg: dict, palette: Dict[str, bpy.types.Material]) -
                     edge_x = (x1 - 0.16) if side == "east" else (x0 + 0.16)
                     in_x = (x1 - corridor_w * 0.5) if side == "east" else (x0 + corridor_w * 0.5)
                     # Outer structural columns + mid-bay sub-column on Wuquan east face for exact 9/2 五權街 pillar rhythm!
+                    # 五權樓西走廊接重慶樓＆和平樓處依 wi.WUQUAN_WEST_CUTS 切開結構柱、女兒牆、欄杆與花台
+                    cuts_y = wi.WUQUAN_WEST_CUTS if (is_wq and side == "west") else []
                     col_bm_outer = bm_cream if (is_wq_south_solid and side == "east" and b <= 3) else bm_salmon
-                    gp.bm_box(col_bm_outer, (edge_x, by0 + 0.25, zf + fh * 0.5), (0.52, 0.52, fh))
+                    if not any(c0 + 0.1 <= (by0 + 0.25) <= c1 - 0.1 for (c0, c1) in cuts_y):
+                        gp.bm_box(col_bm_outer, (edge_x, by0 + 0.25, zf + fh * 0.5), (0.52, 0.52, fh))
                     if is_wq and side == "east":
                         if b <= 3:
                             gp.bm_box(bm_cream, (edge_x + 0.04, bcy, zf + fh * 0.5), (0.42, 0.42, fh))
                         elif b >= 5 and b != 6 and b != 8 and not (b == 12 and fl == 0):
                             gp.bm_box(bm_salmon, (edge_x, bcy, zf + fh * 0.5), (0.48, 0.48, fh))
                     if b == bays - 1:
-                        gp.bm_box(bm_salmon, (edge_x, by1 - 0.25, zf + fh * 0.5), (0.52, 0.52, fh))
+                        if not any(c0 + 0.1 <= (by1 - 0.25) <= c1 - 0.1 for (c0, c1) in cuts_y):
+                            gp.bm_box(bm_salmon, (edge_x, by1 - 0.25, zf + fh * 0.5), (0.52, 0.52, fh))
                     if not (is_wq_south_solid and side == "east"):
                         gp.bm_box(bm_light, (in_x, bcy, zf + fh - 0.18), (0.14, 1.4, 0.06))
                     if fl >= 1 and not is_stair:
                         # v11.8: Keep Wuquan Bldg 2F east corridor bay b=6 (y=-17.85..-9.65) OPEN into the attached assembly stage 2F terrace!
-                        # v12.3: Keep Wuquan Bldg west corridor bay b=3 (y=-42.42..-34.23) OPEN into Chongqing Bldg L-shaped corner junction!
                         is_stage_terrace_open = (is_wq and side == "east" and fl == 1 and b == 6)
-                        is_cq_junction_open = (is_wq and side == "west" and b == 3)
                         if is_wq_south_solid and side == "east":
                             # Flush classroom wall spandrel beam only (no open corridor parapet!)
                             gp.bm_box(bm_salmon, (edge_x, bcy, zf + fh - 0.22), (0.44, bay_len, 0.44))
@@ -776,13 +791,23 @@ def build_corridor_building(cfg: dict, palette: Dict[str, bpy.types.Material]) -
                                             gp.bm_box(bm_brick, (edge_x + 0.38, sub_yc, zf + 0.52), (0.08, 0.58, 0.50))
                             gp.bm_box(bm_salmon, (edge_x, bcy, zf + fh - 0.24), (0.44, bay_len, 0.48))
                         else:
-                            if not is_stage_terrace_open and not is_cq_junction_open:
-                                gp.bm_box(bm_cream, (edge_x, bcy, zf + 0.56), (0.24, bay_len - 0.48, 0.96))
-                                gp.bm_box(bm_rail, (edge_x, bcy, zf + 1.24), (0.065, bay_len - 0.48, 0.065))
-                                gp.bm_box(bm_rail, (edge_x, bcy, zf + 1.08), (0.045, bay_len - 0.48, 0.045))
-                                if (b + fl) % 2 == 0:
+                            if not is_stage_terrace_open:
+                                p0_y, p1_y = bcy - (bay_len - 0.48) * 0.5, bcy + (bay_len - 0.48) * 0.5
+                                for s0, s1 in wi.cut_spans(p0_y, p1_y, cuts_y):
+                                    scy, slen = 0.5 * (s0 + s1), s1 - s0
+                                    gp.bm_box(bm_cream, (edge_x, scy, zf + 0.56), (0.24, slen, 0.96))
+                                    gp.bm_box(bm_rail, (edge_x, scy, zf + 1.24), (0.065, slen, 0.065))
+                                    gp.bm_box(bm_rail, (edge_x, scy, zf + 1.08), (0.045, slen, 0.045))
+                                plant_blocked_y = any(not (bcy + 0.95 <= c0 or bcy - 0.95 >= c1) for (c0, c1) in cuts_y)
+                                if (b + fl) % 2 == 0 and not plant_blocked_y:
                                     gp.bm_box(bm_plant, (edge_x + (0.18 if side == "east" else -0.18), bcy, zf + 1.08), (0.32, 1.8, 0.28))
                             gp.bm_box(bm_salmon, (edge_x, bcy, zf + fh - 0.24), (0.42, bay_len, 0.48))
+                        # 五權樓 2F–5F 南端西走廊（b=0, y=y0）與北端西／東走廊（b=bays-1, y=y1）補上端頭安全女兒牆與欄杆
+                        if is_wq and ((b == 0 and side == "west") or b == bays - 1):
+                            end_y = (y0 + 0.14) if b == 0 else (y1 - 0.14)
+                            gp.bm_box(bm_cream, (in_x, end_y, zf + 0.56), (corridor_w - 0.30, 0.24, 0.96))
+                            gp.bm_box(bm_rail, (in_x, end_y, zf + 1.24), (corridor_w - 0.30, 0.065, 0.065))
+                            gp.bm_box(bm_rail, (in_x, end_y, zf + 1.08), (corridor_w - 0.30, 0.045, 0.045))
                     elif fl == 0:
                         gp.bm_box(bm_salmon, (edge_x, bcy, zf + fh - 0.24), (0.42, bay_len, 0.48))
 
@@ -853,9 +878,15 @@ def build_corridor_building(cfg: dict, palette: Dict[str, bpy.types.Material]) -
         zf2 = h1
         mural_openings = list(walk_ctx["corridor_windows_2f"]) if walk_ctx else []
         for rm_m in walk_ctx["rooms"]:
-            if rm_m.get("floor") == 2 and rm_m.get("door"):
+            if rm_m.get("floor") != 2:
+                continue
+            if rm_m.get("door"):
                 dx_m = rm_m["door"]["x"]
                 mural_openings.append((dx_m - 0.62, dx_m + 0.62, zf2, zf2 + 2.34))
+            elif rm_m.get("kind") == "stair" and rm_m.get("door_x") is not None:
+                # 6 梯南北貫通口（寬 2.3m）同步挖空彩繪火車壁畫，避免火車牆板遮住通道左半邊
+                dx_m = rm_m["door_x"]
+                mural_openings.append((dx_m - 1.20, dx_m + 1.20, zf2, zf2 + 2.60))
         objs.extend(_build_chongqing_west_gable(prefix, x0, y0, y1, core_y0, core_y1, floors, h1, hu, z_roof, palette, col, mural_openings))
 
     if prefix == "Bldg_Wuquan":
@@ -1481,9 +1512,14 @@ def build_guanghe_connector_bridges(spec: dict, palette: Dict[str, bpy.types.Mat
     # 2F - 5F North Connector Floors
     for fl in range(1, 5):
         zf = h1 + (fl - 1) * hu
-        # Floor structural slab + walkable terrazzo deck + ceiling linear LED lights
+        # Floor structural slab + walkable terrazzo deck + 接廣和樓北端 3 階平滑過渡踏階（抹平 0.58m 樓板高差！）
         gp.bm_box(bm_n_floor, (xc, nyc, zf + 0.14), (bw - 0.12, nlen, 0.28))
         gp.bm_box(bm_n_terrazzo, (xc, nyc, zf + 0.295), (bw - 0.50, nlen - 0.1, 0.03))
+        for si in range(3):
+            sh = (si + 1) * 0.16
+            sy_c = 13.12 - (si + 0.5) * 0.54  # 往南進入廣和樓（y=13.12 -> 11.50）逐階抬升
+            gp.bm_box(bm_n_floor, (xc, sy_c, zf + 0.30 + sh * 0.5), (4.42, 0.56, sh))
+            gp.bm_box(bm_n_terrazzo, (xc, sy_c, zf + 0.30 + sh + 0.015), (4.38, 0.52, 0.03))
         for ly_l in (13.8, 18.5, 23.2):
             gp.bm_box(bm_n_light, (xc, ly_l, zf + hu - 0.16), (0.18, 1.8, 0.06))
 
@@ -1667,6 +1703,12 @@ def build_guanghe_connector_bridges(spec: dict, palette: Dict[str, bpy.types.Mat
         zf = h1 + (fl - 1) * hu
         gp.bm_box(bm_s_floor, (xc, syc, zf + 0.14), (bw - 0.12, slen_tot, 0.28))
         gp.bm_box(bm_s_terrazzo, (xc, syc, zf + 0.295), (bw - 0.50, slen_tot - 0.1, 0.03))
+        # 接廣和樓南端 3 階平滑過渡踏階（往北進入廣和樓 y=-12.12 -> -10.50，抹平 0.58m 樓板高差！）
+        for si in range(3):
+            sh = (si + 1) * 0.16
+            sy_c = -12.12 + (si + 0.5) * 0.54
+            gp.bm_box(bm_s_floor, (xc, sy_c, zf + 0.30 + sh * 0.5), (4.42, 0.56, sh))
+            gp.bm_box(bm_s_terrazzo, (xc, sy_c, zf + 0.30 + sh + 0.015), (4.38, 0.52, 0.03))
         for ly_l in (-26.5, -19.8, -13.0):
             gp.bm_box(bm_s_light, (xc, ly_l, zf + hu - 0.16), (0.18, 2.0, 0.06))
 
