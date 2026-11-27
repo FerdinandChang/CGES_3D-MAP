@@ -775,6 +775,12 @@ export function createWalkMode(opts) {
       const n = m.name || "";
       if (GROUND_RE.test(n) && !GROUND_EXCLUDE_RE.test(n)) out.push(m);
     }
+    // 納入室內可踩踏階梯／舞台地板（如 505 視聽中心階梯紅地毯與雙階實木舞台）
+    if (S.interior) {
+      S.interior.traverse((o) => {
+        if (o.isMesh && o.userData?.walkableGround) out.push(o);
+      });
+    }
     S.groundMeshes = out;
   }
 
@@ -1180,6 +1186,7 @@ export function createWalkMode(opts) {
     const group = new THREE.Group();
     group.name = "WalkInterior";
     const libRooms = [];
+    const audRooms = [];
 
     for (const rm of S.data.rooms || []) {
       if (rm.kind !== "room") continue;
@@ -1205,20 +1212,9 @@ export function createWalkMode(opts) {
       if (layout === "empty") continue;
 
       if (layout === "auditorium") {
-        // 505 視聽中心：西牆大銀幕＋多排紅色階梯式劇院座椅
-        white.add(rm.x0 + 0.18, cy, zf + 1.85, 0.05, Math.min(5.2, wy * 0.68), 2.1);
-        wood.add(rm.x0 + 1.1, cy, zf + 0.14, 1.8, wy - 0.8, 0.28);
-        const rows = Math.max(2, Math.min(6, Math.floor((wx - 3.6) / 1.35)));
-        const cols = Math.max(3, Math.min(8, Math.floor((wy - 1.6) / 0.8)));
-        for (let r = 0; r < rows; r++) {
-          const sx = rm.x0 + 3.1 + r * 1.35;
-          for (let c = 0; c < cols; c++) {
-            const sy = rm.y0 + 0.9 + (c * (wy - 1.8)) / Math.max(1, cols - 1);
-            seatRed.add(sx, sy, zf + 0.44, 0.46, 0.5, 0.1);
-            seatRed.add(sx + 0.2, sy, zf + 0.72, 0.1, 0.5, 0.52);
-          }
-        }
-        lamp.add(cx, cy, zc - 0.05, Math.min(1.5, wx * 0.25), 0.28, 0.04);
+        // 交由 505 視聽中心專屬實景劇院模組精細建置（雙階實木舞台、酒紅絨布幕、8 排階梯排椅、斜降木吸音牆與音控室）
+        audRooms.push(rm);
+        continue;
       } else if (layout === "library") {
         // 交由專屬實景圖書館模組精細建置（音符矮書架、粉彩矮桌圓凳、悅讀重慶火車牆、雙白拱門與好書區）
         libRooms.push(rm);
@@ -1464,9 +1460,501 @@ export function createWalkMode(opts) {
     for (const rm of libRooms) {
       buildLibraryInterior(rm, group);
     }
+    for (const rm of audRooms) {
+      buildAuditoriumInterior(rm, group);
+    }
     group.visible = false;
     scene.add(group);
     S.interior = group;
+  }
+
+  // ---------- 廣和樓 5F「505 視聽中心」實景專屬渲染（依《二年級神奇的魔術》相簿 1:1 還原）----------
+  function buildAuditoriumInterior(rm, parentGroup) {
+    const aud = new THREE.Group();
+    aud.name = "WalkAuditorium505";
+    const { x0, x1, y0, y1, z_floor: zf, z_ceil: zc } = rm;
+    const wx = x1 - x0; // 18.90m（西舞台 x0 -> 東後門 x1）
+    const wy = y1 - y0; // 7.80m（南側左牆 y0 -> 北側右牆 y1）
+    const cx = 0.5 * (x0 + x1);
+    const cy = 0.5 * (y0 + y1);
+    const h = zc - zf;
+
+    const M = (color, opts = {}) =>
+      new THREE.MeshStandardMaterial({
+        color,
+        roughness: opts.roughness ?? 0.72,
+        metalness: opts.metalness ?? 0.0,
+        emissive: opts.emissive ? new THREE.Color(opts.emissive) : new THREE.Color(0x000000),
+        emissiveIntensity: opts.emissiveIntensity ?? 0,
+        side: opts.side ?? THREE.FrontSide,
+      });
+
+    const creamFloorMat = M(0xe6d6b0, { roughness: 0.26, metalness: 0.04 }); // 台前淺米黃奶油亮面地板
+    const carpetRedMat = M(0x6e1826, { roughness: 0.92 }); // 觀眾席深酒紅地毯
+    const burgundyWallMat = M(0x661a26, { roughness: 0.78 }); // 台口酒紅側牆／壁柱
+    const curtainRedMat = M(0x6f1422, { roughness: 0.85, side: THREE.DoubleSide });
+    const stageWoodMat = (() => {
+      const c = document.createElement("canvas");
+      c.width = 512;
+      c.height = 256;
+      const ctx = c.getContext("2d");
+      ctx.fillStyle = "#dcb268";
+      ctx.fillRect(0, 0, 512, 256);
+      for (let y = 0; y < 256; y += 16) {
+        const shade = ((y * 13) % 24) - 12;
+        ctx.fillStyle = shade > 0 ? `rgba(255,244,210,${shade * 0.015})` : `rgba(130,82,28,${-shade * 0.016})`;
+        ctx.fillRect(0, y, 512, 15);
+        ctx.fillStyle = "rgba(120,76,26,0.28)";
+        ctx.fillRect(0, y + 15, 512, 1);
+      }
+      const t = makeCanvasTex(c);
+      t.wrapS = t.wrapT = THREE.RepeatWrapping;
+      t.repeat.set(3, 4);
+      return new THREE.MeshStandardMaterial({ map: t, roughness: 0.24, metalness: 0.06 });
+    })();
+    const walnutMat = M(0x4a2c1a, { roughness: 0.52 }); // 深胡桃木隔音門與扶手
+    const choirGrayMat = M(0x9ca3af, { roughness: 0.72 });
+    const blackMat = M(0x14171d, { roughness: 0.28, metalness: 0.3 });
+    const silverMat = M(0xcfd6de, { roughness: 0.35, metalness: 0.6 });
+    const whiteMat = M(0xf3f1ec, { roughness: 0.72 });
+    const khakiTrimMat = M(0xcbbca6, { roughness: 0.75 });
+    const exitGreenMat = M(0x16a34a, { emissive: 0x22c55e, emissiveIntensity: 1.25, roughness: 0.3 });
+    const lampWarmMat = M(0xfffbeb, { emissive: 0xfff5d6, emissiveIntensity: 1.15, roughness: 0.28 });
+
+    const addBox = (mat, bx, by, bz, sx, sy, sz, walkable = false) => {
+      const m = new THREE.Mesh(new THREE.BoxGeometry(sx, sz, sy), mat);
+      m.position.copy(b2t(bx, by, bz));
+      if (walkable) m.userData.walkableGround = true;
+      aud.add(m);
+      return m;
+    };
+
+    const addCyl = (mat, bx, by, bz, rt, rb, ch, seg = 16) => {
+      const m = new THREE.Mesh(new THREE.CylinderGeometry(rt, rb, ch, seg), mat);
+      m.position.copy(b2t(bx, by, bz));
+      aud.add(m);
+      return m;
+    };
+
+    // 1. 地板分區：台前淺米黃奶油色平滑活動平地＋東入口純平玄關（留足 1.68m 避免內推門碰台階）
+    const stageEdgeX = x0 + 3.85; // 舞台前緣 x ≈ -49.35
+    const frontFlatEnd = stageEdgeX + 2.55; // 台前平地 x ≈ -46.80
+    const flatMesh = new THREE.Mesh(new THREE.PlaneGeometry(wx - 0.04, wy - 0.04), creamFloorMat);
+    flatMesh.rotation.x = -Math.PI / 2;
+    flatMesh.position.copy(b2t(cx, cy, zf + 0.01));
+    aud.add(flatMesh);
+
+    // 2. 西側舞台區：全寬雙階亮面淺金黃實木舞台（可真實走上舞台！）＋深酒紅重磅褶皺大幕、側翼幕、上簷幕
+    // 第 1 踏階（高 0.18m）與第 2 階主舞台面（高 0.36m）
+    addBox(stageWoodMat, stageEdgeX + 0.24, cy, zf + 0.09, 0.52, wy - 0.08, 0.18, true);
+    addBox(walnutMat, stageEdgeX + 0.5, cy, zf + 0.175, 0.04, wy - 0.08, 0.03);
+    addBox(stageWoodMat, 0.5 * (x0 + stageEdgeX), cy, zf + 0.18, stageEdgeX - x0, wy - 0.08, 0.36, true);
+    addBox(walnutMat, stageEdgeX + 0.01, cy, zf + 0.355, 0.04, wy - 0.08, 0.03);
+
+    // 深酒紅重磅垂直褶皺絨布大幕貼圖
+    const velvetTex = (() => {
+      const c = document.createElement("canvas");
+      c.width = 512;
+      c.height = 512;
+      const ctx = c.getContext("2d");
+      const folds = 18;
+      const fw = 512 / folds;
+      for (let i = 0; i < folds; i++) {
+        const fx = i * fw;
+        const g = ctx.createLinearGradient(fx, 0, fx + fw, 0);
+        g.addColorStop(0.0, "#3d0912");
+        g.addColorStop(0.28, "#7b1627");
+        g.addColorStop(0.55, "#941d31");
+        g.addColorStop(0.85, "#5c0f1c");
+        g.addColorStop(1.0, "#36070f");
+        ctx.fillStyle = g;
+        ctx.fillRect(fx, 0, fw + 1, 512);
+      }
+      // 頂部收皺微暗陰影
+      const topG = ctx.createLinearGradient(0, 0, 0, 90);
+      topG.addColorStop(0, "rgba(25,4,8,0.45)");
+      topG.addColorStop(1, "rgba(25,4,8,0)");
+      ctx.fillStyle = topG;
+      ctx.fillRect(0, 0, 512, 90);
+      return makeCanvasTex(c);
+    })();
+    const velvetMat = new THREE.MeshStandardMaterial({ map: velvetTex, roughness: 0.86, side: THREE.DoubleSide });
+
+    // 西側全寬酒紅絨布背景大幕
+    const backCurtain = new THREE.Mesh(new THREE.PlaneGeometry(wy - 0.16, h - 0.42), velvetMat);
+    backCurtain.rotation.y = Math.PI / 2;
+    backCurtain.position.copy(b2t(x0 + 0.16, cy, zf + 0.36 + (h - 0.42) * 0.5));
+    aud.add(backCurtain);
+    // 兩側各 2 道酒紅垂直側翼幕＋舞台上方 2 道橫向酒紅上簷幕（幔帳）
+    for (const wxPos of [x0 + 1.5, x0 + 3.05]) {
+      for (const sideY of [y0 + 0.58, y1 - 0.58]) {
+        addBox(velvetMat, wxPos, sideY, zf + 0.36 + (h - 0.44) * 0.5, 0.08, 1.05, h - 0.44);
+      }
+    }
+    for (const vxPos of [stageEdgeX - 0.15, stageEdgeX + 1.8]) {
+      addBox(velvetMat, vxPos, cy, zc - 0.24, 0.09, wy - 0.12, 0.42);
+    }
+
+    // 舞台上設備：3 組 3 層灰色合唱團台階、黑色平台鋼琴＋琴凳、台下前側銀灰移動式講桌＋左右 PA 大音響
+    for (let lv = 0; lv < 3; lv++) {
+      addBox(choirGrayMat, x0 + 0.72 + lv * 0.36, cy + 0.85, zf + 0.36 + (3 - lv) * 0.11, 0.36, 3.6, (3 - lv) * 0.22);
+    }
+    // 黑色平台鋼琴（舞台西南角）＋黑色琴凳
+    const pX = x0 + 2.05;
+    const pY = y0 + 1.55;
+    addBox(blackMat, pX, pY, zf + 1.06, 1.45, 1.25, 0.24);
+    addBox(blackMat, pX + 0.68, pY, zf + 1.01, 0.28, 1.18, 0.14);
+    addBox(whiteMat, pX + 0.79, pY, zf + 1.07, 0.09, 1.06, 0.03); // 琴鍵
+    for (const [lx, ly] of [
+      [-0.58, -0.5],
+      [0.58, -0.5],
+      [0.58, 0.5],
+      [-0.58, 0.5],
+    ]) {
+      addBox(blackMat, pX + lx, pY + ly, zf + 0.66, 0.08, 0.08, 0.6);
+    }
+    addBox(blackMat, pX + 1.08, pY, zf + 0.82, 0.34, 0.66, 0.07);
+    addBox(blackMat, pX + 1.08, pY - 0.26, zf + 0.58, 0.05, 0.05, 0.44);
+    addBox(blackMat, pX + 1.08, pY + 0.26, zf + 0.58, 0.05, 0.05, 0.44);
+
+    // 台下左側銀灰色移動式小型講桌＋大型壁掛黑色 PA 主音響喇叭（南北兩側台口高處）
+    addBox(silverMat, stageEdgeX + 0.95, y0 + 0.95, zf + 0.56, 0.42, 0.56, 1.08);
+    addBox(silverMat, stageEdgeX + 0.95, y0 + 0.95, zf + 1.12, 0.52, 0.64, 0.04);
+    for (const spY of [y0 + 0.35, y1 - 0.35]) {
+      addBox(blackMat, stageEdgeX + 0.65, spY, zf + 2.28, 0.44, 0.36, 0.74);
+    }
+
+    // 3. 階梯式深酒紅地毯觀眾席（8 排遞升，每排 +0.11m，含東入口 3 階平緩紅地毯進場台階，全區可步行！）
+    const nRows = 8;
+    const rowDepth = 1.12;
+    const rowRise = 0.11;
+    const row1X0 = frontFlatEnd; // 第 1 排前緣 x ≈ -46.30
+    const seatRed = new InstBox(0xa61c32, { roughness: 0.76 }); // 飽和酒紅布面靠背與上折坐墊
+    const seatWalnut = new InstBox(0x4a2c1a, { roughness: 0.54 }); // 深胡桃實木扶手與排端側板
+    const seatShell = new InstBox(0x1f242d, { roughness: 0.62, metalness: 0.15 }); // 黑色壓模坐墊護殼與金屬支腳
+    const seatTag = new InstBox(0xf8fafc, { roughness: 0.5 }); // 白底座號牌
+
+    // 左、中、右三區座位 Y 座標（留下兩條寬 0.80m 縱向紅地毯階梯走道）
+    const seatYs = [
+      y0 + 0.45,
+      y0 + 0.95,
+      y0 + 1.45,
+      y0 + 1.95,
+      // 走道 y0 + 2.25 .. y0 + 3.05
+      cy - 0.5,
+      cy,
+      cy + 0.5,
+      // 走道 y1 - 3.05 .. y1 - 2.25
+      y1 - 1.95,
+      y1 - 1.45,
+      y1 - 0.95,
+      y1 - 0.45,
+    ];
+    const aisleBreakIdx = new Set([3, 6]); // 左／中／右三區塊端點（加胡桃木排端側飾板）
+
+    for (let r = 0; r < nRows; r++) {
+      const rx0 = row1X0 + r * rowDepth;
+      const rxC = rx0 + rowDepth * 0.5;
+      const stepH = 0.08 + r * rowRise; // 0.08m .. 0.85m
+      // 每一排全寬深酒紅地毯階梯踏台（標記 walkableGround=true 讓人物順暢上下階梯！）
+      addBox(carpetRedMat, rxC, cy, zf + stepH * 0.5, rowDepth + 0.01, wy - 0.08, stepH, true);
+
+      const sz = zf + stepH;
+      const seatX = rxC + 0.14;
+      for (let s = 0; s < seatYs.length; s++) {
+        const sy = seatYs[s];
+        // 高靠背（飽和酒紅色織布，略微後傾感）
+        seatRed.add(seatX + 0.16, sy, sz + 0.56, 0.11, 0.45, 0.6);
+        // 坐墊（呈現半折／坐面酒紅布＋底面黑色波浪壓模護殼）
+        seatRed.add(seatX - 0.06, sy, sz + 0.36, 0.38, 0.44, 0.09);
+        seatShell.add(seatX - 0.06, sy, sz + 0.305, 0.39, 0.44, 0.035);
+        // 坐墊前緣白底座號牌
+        seatTag.add(seatX - 0.255, sy, sz + 0.35, 0.01, 0.09, 0.038);
+        // 黑色金屬中支柱支腳
+        seatShell.add(seatX + 0.02, sy, sz + 0.15, 0.08, 0.08, 0.3);
+        // 深胡桃實木扶手（兩側與排端側飾板）
+        if (s === 0 || aisleBreakIdx.has(s - 1)) {
+          seatWalnut.add(seatX + 0.02, sy - 0.245, sz + 0.44, 0.34, 0.045, 0.34);
+        }
+        seatWalnut.add(seatX + 0.02, sy + 0.245, sz + 0.54, 0.34, 0.045, 0.05);
+        if (s === seatYs.length - 1 || aisleBreakIdx.has(s)) {
+          seatWalnut.add(seatX + 0.02, sy + 0.245, sz + 0.44, 0.34, 0.045, 0.34);
+        }
+      }
+    }
+
+    // 東側後方過道與門內 3 階平緩紅地毯踏階（從門檻 zf 順滑登上第 8 排制高點，門前留足 1.68m 平地不撞門）
+    const topDeckX0 = row1X0 + nRows * rowDepth; // ≈ -37.84
+    const topH = 0.08 + (nRows - 1) * rowRise; // 0.85m
+    addBox(carpetRedMat, topDeckX0 + 0.39, cy, zf + topH * 0.5, 0.78, wy - 0.08, topH, true);
+    for (let st = 0; st < 3; st++) {
+      const sh = topH * (1 - (st + 1) / 4);
+      const sx = topDeckX0 + 0.78 + st * 0.36 + 0.18;
+      addBox(carpetRedMat, sx, cy, zf + sh * 0.5, 0.37, wy - 0.08, sh, true);
+    }
+
+    for (const b of [seatRed, seatWalnut, seatShell, seatTag]) {
+      const m = b.build();
+      if (m) aud.add(m);
+    }
+
+    // 4. 左右兩側牆面：標誌性「隨階梯斜降之垂直暖棕木質吸音格柵」＋上半米白吸音板＋酒紅壁柱＋海報＋深酒紅後窗簾
+    const makeSideWallTex = (isSouth) => {
+      const c = document.createElement("canvas");
+      c.width = 1024;
+      c.height = 256;
+      const ctx = c.getContext("2d");
+      // 上半段淺米白分段吸音牆板
+      ctx.fillStyle = "#ebe8e1";
+      ctx.fillRect(0, 0, 1024, 256);
+      ctx.strokeStyle = "#d5cfc4";
+      ctx.lineWidth = 2;
+      for (let i = 1; i < 10; i++) {
+        ctx.beginPath();
+        ctx.moveTo(i * 102.4, 0);
+        ctx.lineTo(i * 102.4, 256);
+        ctx.stroke();
+      }
+      // 定義：isSouth=true (rotation.y=PI) 時，Canvas 左端(0)=東側後排高處、右端(1024)=西側舞台低處
+      // isSouth=false (rotation.y=0) 時，Canvas 左端(0)=西側舞台低處、右端(1024)=東側後排高處
+      const xStage = isSouth ? 810 : 214;
+      const xBack = isSouth ? 65 : 959;
+      const drawSlatZone = () => {
+        ctx.save();
+        ctx.beginPath();
+        if (isSouth) {
+          ctx.moveTo(0, 56);
+          ctx.lineTo(130, 56);
+          ctx.lineTo(790, 156);
+          ctx.lineTo(1024, 156);
+          ctx.lineTo(1024, 256);
+          ctx.lineTo(0, 256);
+        } else {
+          ctx.moveTo(0, 156);
+          ctx.lineTo(234, 156);
+          ctx.lineTo(894, 56);
+          ctx.lineTo(1024, 56);
+          ctx.lineTo(1024, 256);
+          ctx.lineTo(0, 256);
+        }
+        ctx.closePath();
+        ctx.clip();
+        // 暖棕實木垂直細吸音格柵條＋深色背襯縫隙
+        ctx.fillStyle = "#3a2214";
+        ctx.fillRect(0, 40, 1024, 216);
+        for (let sx = 0; sx < 1024; sx += 7) {
+          ctx.fillStyle = sx % 14 === 0 ? "#8a5634" : "#9c643e";
+          ctx.fillRect(sx, 40, 4.5, 216);
+        }
+        ctx.restore();
+        // 斜坡頂緣深胡桃收邊線條
+        ctx.strokeStyle = "#52321e";
+        ctx.lineWidth = 4;
+        ctx.beginPath();
+        if (isSouth) {
+          ctx.moveTo(0, 56);
+          ctx.lineTo(130, 56);
+          ctx.lineTo(790, 156);
+          ctx.lineTo(1024, 156);
+        } else {
+          ctx.moveTo(0, 156);
+          ctx.lineTo(234, 156);
+          ctx.lineTo(894, 56);
+          ctx.lineTo(1024, 56);
+        }
+        ctx.stroke();
+      };
+      drawSlatZone();
+
+      // 舞台最前段下半牆轉為深酒紅色台口牆板
+      ctx.fillStyle = "#661a26";
+      if (isSouth) ctx.fillRect(790, 148, 234, 108);
+      else ctx.fillRect(0, 148, 234, 108);
+
+      // 左側牆中段酒紅垂直壁柱
+      if (isSouth) {
+        ctx.fillStyle = "#661a26";
+        ctx.fillRect(468, 0, 32, 256);
+      }
+
+      // 木格柵上懸掛大型彩色矩形活動海報（左側 1 幅、右側 3 幅）
+      const posters = isSouth ? [260] : [350, 535, 720];
+      for (const px of posters) {
+        ctx.fillStyle = "#ffffff";
+        ctx.fillRect(px, 146, 66, 48);
+        ctx.fillStyle = "#38bdf8";
+        ctx.fillRect(px + 4, 150, 58, 22);
+        ctx.fillStyle = "#f97316";
+        ctx.fillRect(px + 4, 174, 26, 16);
+        ctx.fillStyle = "#22c55e";
+        ctx.fillRect(px + 34, 174, 28, 16);
+      }
+
+      // 最靠後方角落細長高窗配深酒紅厚重遮光布簾
+      const winX = isSouth ? 32 : 950;
+      ctx.fillStyle = "#5c111e";
+      ctx.fillRect(winX, 12, 42, 128);
+      ctx.fillStyle = "#8a1c2e";
+      for (let fx = 0; fx < 42; fx += 9) ctx.fillRect(winX + fx, 12, 4, 128);
+
+      // 前後兩處深胡桃木隔音側門＋上方綠色 EXIT 標誌
+      const doorsX = isSouth ? [104, 710] : [264, 882];
+      for (const dx of doorsX) {
+        ctx.fillStyle = "#4d2c19";
+        ctx.fillRect(dx, 92, 54, 164);
+        ctx.strokeStyle = "#331b0e";
+        ctx.lineWidth = 3;
+        ctx.strokeRect(dx, 92, 54, 164);
+        ctx.fillStyle = "#16a34a";
+        ctx.fillRect(dx + 14, 68, 26, 14);
+        ctx.fillStyle = "#ffffff";
+        ctx.font = "bold 9px sans-serif";
+        ctx.fillText("EXIT", dx + 17, 78);
+      }
+
+      // 後排參考點避免未使用警告
+      void xStage;
+      void xBack;
+      return makeCanvasTex(c);
+    };
+
+    const southWall = new THREE.Mesh(
+      new THREE.PlaneGeometry(wx - 0.08, h - 0.06),
+      new THREE.MeshStandardMaterial({ map: makeSideWallTex(true), roughness: 0.78 })
+    );
+    southWall.rotation.y = Math.PI;
+    southWall.position.copy(b2t(cx, y0 + 0.04, zf + h * 0.5));
+    aud.add(southWall);
+
+    const northWall = new THREE.Mesh(
+      new THREE.PlaneGeometry(wx - 0.08, h - 0.06),
+      new THREE.MeshStandardMaterial({ map: makeSideWallTex(false), roughness: 0.78 })
+    );
+    northWall.position.copy(b2t(cx, y1 - 0.04, zf + h * 0.5));
+    aud.add(northWall);
+
+    // 兩側白牆等距安裝之「白色半圓筒形上照壁燈」（每側 4 盞）
+    for (const sideY of [y0 + 0.11, y1 - 0.11]) {
+      for (let i = 0; i < 4; i++) {
+        const lx = stageEdgeX + 2.2 + i * 3.1;
+        addCyl(whiteMat, lx, sideY, zf + 2.34, 0.12, 0.12, 0.24, 12);
+        addCyl(lampWarmMat, lx, sideY, zf + 2.47, 0.1, 0.1, 0.02, 12);
+      }
+    }
+
+    // 5. 後牆（東牆，避開中央門洞）：橫向木質吸音格柵＋三格銀框透明玻璃音控室視窗＋圓形掛鐘＋雙側壁掛扇＋發光 EXIT 燈箱
+    const backSlatTex = (() => {
+      const c = document.createElement("canvas");
+      c.width = 256;
+      c.height = 256;
+      const ctx = c.getContext("2d");
+      ctx.fillStyle = "#3a2214";
+      ctx.fillRect(0, 0, 256, 256);
+      for (let y = 0; y < 256; y += 8) {
+        ctx.fillStyle = y % 16 === 0 ? "#8a5634" : "#9c643e";
+        ctx.fillRect(0, y, 256, 5);
+      }
+      return makeCanvasTex(c);
+    })();
+    const backSlatMat = new THREE.MeshStandardMaterial({ map: backSlatTex, roughness: 0.76 });
+    const drY = rm.door?.y ?? cy;
+    // 門洞兩側下半段橫向木吸音條＋上半段米白牆
+    for (const [ya, yb] of [
+      [y0 + 0.05, drY - 0.64],
+      [drY + 0.64, y1 - 0.05],
+    ]) {
+      const sw = yb - ya;
+      const sc = 0.5 * (ya + yb);
+      addBox(backSlatMat, x1 - 0.04, sc, zf + 1.15, 0.04, sw, 2.28);
+      addBox(whiteMat, x1 - 0.04, sc, zf + 2.7, 0.04, sw, 0.86);
+    }
+    // 後牆上方正中央：三格銀灰鋁框透明玻璃音控室視窗（窗內可見酒紅窗簾）＋圓形掛鐘＋門頂綠色發光 EXIT 燈箱
+    addBox(silverMat, x1 - 0.05, cy, zc - 0.44, 0.06, 3.1, 0.62);
+    addBox(M(0x4d121d, { roughness: 0.4 }), x1 - 0.065, cy, zc - 0.44, 0.04, 2.94, 0.5);
+    for (const barY of [cy - 0.96, cy + 0.96]) {
+      addBox(silverMat, x1 - 0.08, barY, zc - 0.44, 0.03, 0.05, 0.54);
+    }
+    // 圓形掛鐘（面朝室內 -X）＋雙側米白色壁掛式電風扇＋入口門上方發光綠色 EXIT 燈箱
+    const wallClock = addCyl(whiteMat, x1 - 0.09, cy, zc - 0.11, 0.13, 0.13, 0.04, 16);
+    wallClock.rotation.z = Math.PI / 2;
+    for (const fanY of [y0 + 1.15, y1 - 1.15]) {
+      const wallFan = addCyl(whiteMat, x1 - 0.16, fanY, zc - 0.48, 0.22, 0.22, 0.06, 16);
+      wallFan.rotation.z = Math.PI / 2;
+    }
+    addBox(exitGreenMat, x1 - 0.08, drY, zf + 2.18, 0.06, 0.44, 0.16);
+
+    // 6. 分段階梯折板米白輕鋼架聲學天花板＋嵌入式格柵平板燈＋圓形吸頂廣播喇叭＋中央白色吊掛投影機
+    const ceilGridTex = (() => {
+      const c = document.createElement("canvas");
+      c.width = 512;
+      c.height = 512;
+      const ctx = c.getContext("2d");
+      ctx.fillStyle = "#ece9e2";
+      ctx.fillRect(0, 0, 512, 512);
+      ctx.strokeStyle = "#cfc9be";
+      ctx.lineWidth = 3;
+      for (let i = 0; i <= 6; i++) {
+        const p = (i * 512) / 6;
+        ctx.beginPath();
+        ctx.moveTo(p, 0);
+        ctx.lineTo(p, 512);
+        ctx.moveTo(0, p);
+        ctx.lineTo(512, p);
+        ctx.stroke();
+      }
+      const t = makeCanvasTex(c);
+      t.wrapS = t.wrapT = THREE.RepeatWrapping;
+      t.repeat.set(5, 2);
+      return t;
+    })();
+    const ceilPanelMat = new THREE.MeshStandardMaterial({ map: ceilGridTex, roughness: 0.85 });
+    // 三段折板高低落差聲學天花板＋卡其分隔飾條
+    const ceilSegs = [
+      [x0 + 0.04, stageEdgeX + 2.0, zc - 0.04],
+      [stageEdgeX + 2.0, stageEdgeX + 7.6, zc - 0.11],
+      [stageEdgeX + 7.6, x1 - 0.04, zc - 0.05],
+    ];
+    for (const [xa, xb, cz] of ceilSegs) {
+      const sw = xb - xa;
+      const sc = 0.5 * (xa + xb);
+      const pm = new THREE.Mesh(new THREE.PlaneGeometry(sw, wy - 0.06), ceilPanelMat);
+      pm.rotation.x = Math.PI / 2;
+      pm.position.copy(b2t(sc, cy, cz));
+      aud.add(pm);
+      addBox(khakiTrimMat, xb, cy, cz + 0.01, 0.22, wy - 0.08, 0.08);
+    }
+    // 嵌入式發光長方形格柵平板燈（6 排 × 3 列）＋圓形吸頂廣播喇叭／空調出風口
+    for (let ix = 0; ix < 6; ix++) {
+      const lx = x0 + 1.8 + ix * ((wx - 3.4) / 5);
+      for (const ly of [cy - 2.35, cy, cy + 2.35]) {
+        addBox(lampWarmMat, lx, ly, zc - 0.125, 0.95, 0.45, 0.02);
+      }
+      if (ix % 2 === 1) {
+        addCyl(whiteMat, lx, cy - 1.15, zc - 0.13, 0.18, 0.18, 0.03, 14);
+        addCyl(whiteMat, lx, cy + 1.15, zc - 0.13, 0.18, 0.18, 0.03, 14);
+      }
+    }
+    // 天花板中央懸吊白色投影機（靠舞台前方朝西投射）
+    const projX = stageEdgeX + 2.35;
+    addCyl(silverMat, projX, cy, zc - 0.16, 0.025, 0.025, 0.24, 10);
+    addBox(whiteMat, projX, cy, zc - 0.31, 0.42, 0.36, 0.14);
+    addBox(blackMat, projX - 0.22, cy, zc - 0.31, 0.04, 0.1, 0.08);
+
+    // 柔和雙暖白劇院主光（舞台暖亮＋觀眾席柔和明亮）
+    const stageLight = new THREE.PointLight(0xfff5e0, 8.5, 16, 1.3);
+    stageLight.position.copy(b2t(stageEdgeX - 0.6, cy, zc - 0.5));
+    aud.add(stageLight);
+    const hallLight = new THREE.PointLight(0xfff8ee, 7.5, 16, 1.35);
+    hallLight.position.copy(b2t(cx + 3.2, cy, zc - 0.5));
+    aud.add(hallLight);
+
+    aud.traverse((o) => {
+      if (o.isMesh) {
+        o.castShadow = false;
+        o.receiveShadow = false;
+      }
+    });
+    parentGroup.add(aud);
   }
 
   // ---------- 重慶國小圖書館實景專屬渲染（依《用愛陪讀》相簿 1:1 還原）----------
