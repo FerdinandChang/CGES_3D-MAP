@@ -83,6 +83,73 @@ class InstBox {
   }
 }
 
+const OUTFITS = [
+  { key: "pe", btn: "👕 運動服" },
+  { key: "boy", btn: "👔 男生制服" },
+  { key: "girl", btn: "👗 女生制服" },
+];
+const OUTFIT_STORAGE_KEY = "cges_walk_outfit_v1";
+
+function drawCgesCrest(ctx, x, y, scale = 1) {
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.scale(scale, scale);
+  ctx.beginPath();
+  ctx.moveTo(-42, -44);
+  ctx.lineTo(42, -44);
+  ctx.lineTo(42, 4);
+  ctx.quadraticCurveTo(42, 44, 0, 50);
+  ctx.quadraticCurveTo(-42, 44, -42, 4);
+  ctx.closePath();
+  ctx.fillStyle = "#ffffff";
+  ctx.fill();
+  ctx.lineWidth = 6.5;
+  ctx.strokeStyle = "#00693c";
+  ctx.stroke();
+
+  ctx.lineCap = "round";
+  ctx.lineJoin = "round";
+  const leftStripes = [
+    { col: "#044d2d", dx: -4, w: 7.5 },
+    { col: "#0e8f56", dx: 2, w: 6.5 },
+    { col: "#044d2d", dx: 8, w: 5.5 },
+  ];
+  for (const s of leftStripes) {
+    ctx.strokeStyle = s.col;
+    ctx.lineWidth = s.w;
+    ctx.beginPath();
+    ctx.moveTo(-4 + s.dx * 0.45, 14);
+    ctx.quadraticCurveTo(-4 + s.dx * 0.45, -14, -22 + s.dx * 0.85, -24 + s.dx * 0.4);
+    ctx.stroke();
+  }
+  const rightStripes = [
+    { col: "#044d2d", dy: -6, w: 7 },
+    { col: "#0e8f56", dy: 1, w: 6.5 },
+    { col: "#044d2d", dy: 8, w: 5.8 },
+  ];
+  for (const s of rightStripes) {
+    ctx.strokeStyle = s.col;
+    ctx.lineWidth = s.w;
+    ctx.beginPath();
+    ctx.moveTo(4, 14 + s.dy * 0.35);
+    ctx.quadraticCurveTo(8, -8 + s.dy * 0.6, 26, -15 + s.dy * 0.85);
+    ctx.stroke();
+  }
+  ctx.fillStyle = "#044d2d";
+  ctx.font = "900 24px 'Microsoft JhengHei', 'Noto Sans TC', sans-serif";
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.fillText("重慶", 0, 32);
+  ctx.restore();
+}
+
+function makeCanvasTex(canvas) {
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.anisotropy = 4;
+  return tex;
+}
+
 function makeShirtTexture(side) {
   const c = document.createElement("canvas");
   c.width = 512;
@@ -109,7 +176,6 @@ function makeShirtTexture(side) {
   ctx.stroke();
 
   if (side === "front") {
-    // 領口：貼齊頂緣之翠綠羅紋圓領滾邊＋內側膚色鎖骨區
     ctx.save();
     ctx.beginPath();
     ctx.ellipse(256, -4, 118, 84, 0, 0, Math.PI);
@@ -120,66 +186,8 @@ function makeShirtTexture(side) {
     ctx.fillStyle = "#e8bc97";
     ctx.fill();
     ctx.restore();
-
-    // 左胸重慶國小盾牌校徽（正面看位於畫面右側 x≈358，對應人物左胸 -Z 側）
-    ctx.save();
-    ctx.translate(358, 194);
-    ctx.scale(1.24, 1.24);
-    // 盾牌輪廓（上平下圓弧）
-    const drawShield = (r) => {
-      ctx.beginPath();
-      ctx.moveTo(-42 * r, -44 * r);
-      ctx.lineTo(42 * r, -44 * r);
-      ctx.lineTo(42 * r, 4 * r);
-      ctx.quadraticCurveTo(42 * r, 44 * r, 0, 50 * r);
-      ctx.quadraticCurveTo(-42 * r, 44 * r, -42 * r, 4 * r);
-      ctx.closePath();
-    };
-    drawShield(1);
-    ctx.fillStyle = "#ffffff";
-    ctx.fill();
-    ctx.lineWidth = 6.5;
-    ctx.strokeStyle = "#00693c";
-    ctx.stroke();
-
-    // 校徽中央：深綠＋翠綠分岔飛揚葉羽圖騰
-    ctx.lineCap = "round";
-    ctx.lineJoin = "round";
-    const leftStripes = [
-      { col: "#044d2d", dx: -4, w: 7.5 },
-      { col: "#0e8f56", dx: 2, w: 6.5 },
-      { col: "#044d2d", dx: 8, w: 5.5 },
-    ];
-    for (const s of leftStripes) {
-      ctx.strokeStyle = s.col;
-      ctx.lineWidth = s.w;
-      ctx.beginPath();
-      ctx.moveTo(-4 + s.dx * 0.45, 14);
-      ctx.quadraticCurveTo(-4 + s.dx * 0.45, -14, -22 + s.dx * 0.85, -24 + s.dx * 0.4);
-      ctx.stroke();
-    }
-    const rightStripes = [
-      { col: "#044d2d", dy: -6, w: 7 },
-      { col: "#0e8f56", dy: 1, w: 6.5 },
-      { col: "#044d2d", dy: 8, w: 5.8 },
-    ];
-    for (const s of rightStripes) {
-      ctx.strokeStyle = s.col;
-      ctx.lineWidth = s.w;
-      ctx.beginPath();
-      ctx.moveTo(4, 14 + s.dy * 0.35);
-      ctx.quadraticCurveTo(8, -8 + s.dy * 0.6, 26, -15 + s.dy * 0.85);
-      ctx.stroke();
-    }
-    // 校徽下方「重慶」字樣
-    ctx.fillStyle = "#044d2d";
-    ctx.font = "900 24px 'Microsoft JhengHei', 'Noto Sans TC', sans-serif";
-    ctx.textAlign = "center";
-    ctx.textBaseline = "middle";
-    ctx.fillText("重慶", 0, 32);
-    ctx.restore();
+    drawCgesCrest(ctx, 358, 194, 1.24);
   } else if (side === "back") {
-    // 背後淺圓領翠綠滾邊
     ctx.beginPath();
     ctx.ellipse(256, -4, 114, 38, 0, 0, Math.PI);
     ctx.fillStyle = "#007443";
@@ -189,11 +197,247 @@ function makeShirtTexture(side) {
     ctx.fillStyle = "#e8bc97";
     ctx.fill();
   }
+  return makeCanvasTex(c);
+}
 
-  const tex = new THREE.CanvasTexture(c);
-  tex.colorSpace = THREE.SRGBColorSpace;
-  tex.anisotropy = 4;
-  return tex;
+function fillGingham(ctx, x, y, w, h) {
+  ctx.save();
+  ctx.fillStyle = "#f4f8ff";
+  ctx.fillRect(x, y, w, h);
+  const step = 12;
+  ctx.fillStyle = "rgba(44, 92, 160, 0.36)";
+  for (let gx = x; gx < x + w; gx += step * 2) ctx.fillRect(gx, y, step, h);
+  for (let gy = y; gy < y + h; gy += step * 2) ctx.fillRect(x, gy, w, step);
+  ctx.fillStyle = "rgba(28, 63, 122, 0.48)";
+  for (let gx = x; gx < x + w; gx += step * 2) {
+    for (let gy = y; gy < y + h; gy += step * 2) ctx.fillRect(gx, gy, step, step);
+  }
+  ctx.restore();
+}
+
+function makeBoyUniformShirtTexture(side) {
+  const c = document.createElement("canvas");
+  c.width = 512;
+  c.height = 512;
+  const ctx = c.getContext("2d");
+
+  // 純白短袖襯衫底色
+  ctx.fillStyle = "#f7f8fa";
+  ctx.fillRect(0, 0, 512, 512);
+  const g = ctx.createLinearGradient(0, 0, 0, 512);
+  g.addColorStop(0, "rgba(255,255,255,0.2)");
+  g.addColorStop(1, "rgba(180,195,215,0.16)");
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, 512, 512);
+
+  if (side === "front") {
+    // 門襟與 4 顆鈕扣
+    ctx.fillStyle = "rgba(220,228,238,0.55)";
+    ctx.fillRect(241, 126, 30, 386);
+    ctx.strokeStyle = "rgba(148,163,184,0.6)";
+    ctx.lineWidth = 2.5;
+    ctx.beginPath();
+    ctx.moveTo(241, 126);
+    ctx.lineTo(241, 512);
+    ctx.moveTo(271, 126);
+    ctx.lineTo(271, 512);
+    ctx.stroke();
+    for (let i = 0; i < 4; i++) {
+      const by = 188 + i * 86;
+      ctx.beginPath();
+      ctx.arc(256, by, 7.5, 0, Math.PI * 2);
+      ctx.fillStyle = "#ffffff";
+      ctx.fill();
+      ctx.lineWidth = 2;
+      ctx.strokeStyle = "#94a3b8";
+      ctx.stroke();
+    }
+
+    // 領口 V 字膚色開襟
+    ctx.beginPath();
+    ctx.moveTo(192, 0);
+    ctx.lineTo(320, 0);
+    ctx.lineTo(256, 132);
+    ctx.closePath();
+    ctx.fillStyle = "#e8bc97";
+    ctx.fill();
+
+    // 左右藍白細格紋開領翻領（重慶國小男生夏季制服標誌特色）
+    const drawLapel = (pts) => {
+      ctx.save();
+      ctx.beginPath();
+      pts.forEach(([px, py], idx) => (idx === 0 ? ctx.moveTo(px, py) : ctx.lineTo(px, py)));
+      ctx.closePath();
+      ctx.clip();
+      fillGingham(ctx, 90, 0, 340, 175);
+      ctx.restore();
+      ctx.beginPath();
+      pts.forEach(([px, py], idx) => (idx === 0 ? ctx.moveTo(px, py) : ctx.lineTo(px, py)));
+      ctx.closePath();
+      ctx.strokeStyle = "#2b4d82";
+      ctx.lineWidth = 3.5;
+      ctx.stroke();
+    };
+    drawLapel([
+      [192, 0],
+      [118, 12],
+      [148, 134],
+      [252, 132],
+    ]);
+    drawLapel([
+      [320, 0],
+      [394, 12],
+      [364, 134],
+      [260, 132],
+    ]);
+
+    // 左胸白襯衫口袋＋上方重慶盾牌校徽
+    ctx.strokeStyle = "rgba(148,163,184,0.75)";
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.moveTo(316, 206);
+    ctx.lineTo(426, 206);
+    ctx.lineTo(426, 304);
+    ctx.quadraticCurveTo(371, 326, 316, 304);
+    ctx.closePath();
+    ctx.fillStyle = "rgba(255,255,255,0.75)";
+    ctx.fill();
+    ctx.stroke();
+    drawCgesCrest(ctx, 371, 250, 0.82);
+  } else if (side === "back") {
+    // 背後藍白細格紋翻領
+    ctx.save();
+    ctx.beginPath();
+    ctx.moveTo(116, 0);
+    ctx.lineTo(396, 0);
+    ctx.lineTo(382, 74);
+    ctx.quadraticCurveTo(256, 94, 130, 74);
+    ctx.closePath();
+    ctx.clip();
+    fillGingham(ctx, 100, 0, 320, 100);
+    ctx.restore();
+    ctx.beginPath();
+    ctx.moveTo(116, 0);
+    ctx.lineTo(396, 0);
+    ctx.lineTo(382, 74);
+    ctx.quadraticCurveTo(256, 94, 130, 74);
+    ctx.closePath();
+    ctx.strokeStyle = "#2b4d82";
+    ctx.lineWidth = 3.5;
+    ctx.stroke();
+  }
+  return makeCanvasTex(c);
+}
+
+function makeGirlUniformTopTexture(side) {
+  const c = document.createElement("canvas");
+  c.width = 512;
+  c.height = 512;
+  const ctx = c.getContext("2d");
+
+  // 深丈青連身吊帶背心裙上半身底色
+  ctx.fillStyle = "#182644";
+  ctx.fillRect(0, 0, 512, 512);
+  // 細微立體修身剪裁線
+  ctx.strokeStyle = "rgba(255,255,255,0.08)";
+  ctx.lineWidth = 3;
+  ctx.beginPath();
+  ctx.moveTo(120, 160);
+  ctx.lineTo(132, 512);
+  ctx.moveTo(392, 160);
+  ctx.lineTo(380, 512);
+  ctx.stroke();
+
+  // 腰部拼接線
+  ctx.fillStyle = "rgba(8,14,28,0.45)";
+  ctx.fillRect(0, 468, 512, 14);
+
+  if (side === "front") {
+    // 背心 U 領內的白色襯衫區塊
+    ctx.beginPath();
+    ctx.ellipse(256, 12, 128, 124, 0, 0, Math.PI);
+    ctx.fillStyle = "#f7f8fa";
+    ctx.fill();
+
+    // 頸口露出一點膚色
+    ctx.beginPath();
+    ctx.ellipse(256, -4, 72, 46, 0, 0, Math.PI);
+    ctx.fillStyle = "#e8bc97";
+    ctx.fill();
+
+    // 經典圓弧白色娃娃領（Peter Pan Collar，左右兩瓣翻在深丈青背心上）
+    const drawPeterPan = (sign) => {
+      ctx.beginPath();
+      ctx.moveTo(256, 48);
+      ctx.quadraticCurveTo(256 + sign * 42, 144, 256 + sign * 144, 118);
+      ctx.quadraticCurveTo(256 + sign * 194, 96, 256 + sign * 176, 8);
+      ctx.lineTo(256 + sign * 70, 0);
+      ctx.quadraticCurveTo(256 + sign * 56, 44, 256, 48);
+      ctx.closePath();
+      ctx.fillStyle = "#ffffff";
+      ctx.fill();
+      ctx.strokeStyle = "#cbd5e1";
+      ctx.lineWidth = 3.5;
+      ctx.stroke();
+    };
+    drawPeterPan(-1);
+    drawPeterPan(1);
+
+    // 左胸精緻小名牌條＋校徽
+    ctx.fillStyle = "#f8fafc";
+    ctx.fillRect(322, 178, 86, 28);
+    ctx.strokeStyle = "#94a3b8";
+    ctx.lineWidth = 2;
+    ctx.strokeRect(322, 178, 86, 28);
+    ctx.fillStyle = "#0b5c38";
+    ctx.fillRect(330, 185, 16, 14);
+    ctx.fillStyle = "#334155";
+    ctx.fillRect(354, 189, 44, 6);
+  } else if (side === "back") {
+    // 背後圓弧純白後娃娃領
+    ctx.beginPath();
+    ctx.moveTo(96, 0);
+    ctx.lineTo(416, 0);
+    ctx.quadraticCurveTo(426, 88, 336, 94);
+    ctx.quadraticCurveTo(278, 96, 256, 62);
+    ctx.quadraticCurveTo(234, 96, 176, 94);
+    ctx.quadraticCurveTo(86, 88, 96, 0);
+    ctx.closePath();
+    ctx.fillStyle = "#ffffff";
+    ctx.fill();
+    ctx.strokeStyle = "#cbd5e1";
+    ctx.lineWidth = 3.5;
+    ctx.stroke();
+  }
+  return makeCanvasTex(c);
+}
+
+function makePleatedSkirtTexture() {
+  const c = document.createElement("canvas");
+  c.width = 512;
+  c.height = 256;
+  const ctx = c.getContext("2d");
+
+  // 16 道深丈青立體百褶陰影
+  const pleats = 16;
+  const pw = 512 / pleats;
+  for (let i = 0; i < pleats; i++) {
+    const x0 = i * pw;
+    const g = ctx.createLinearGradient(x0, 0, x0 + pw, 0);
+    g.addColorStop(0.0, "#0e172a");
+    g.addColorStop(0.22, "#1c2d50");
+    g.addColorStop(0.68, "#253963");
+    g.addColorStop(0.92, "#15223d");
+    g.addColorStop(1.0, "#0c1424");
+    ctx.fillStyle = g;
+    ctx.fillRect(x0, 0, pw + 1, 256);
+  }
+
+  // 裙襬底端雙條淺色細飾線（還原照片女生制服裙底細節）
+  ctx.fillStyle = "rgba(226, 232, 240, 0.52)";
+  ctx.fillRect(0, 224, 512, 4);
+  ctx.fillRect(0, 236, 512, 4);
+  return makeCanvasTex(c);
 }
 
 function makeShortsLegTexture(isOuterSide) {
@@ -206,7 +450,6 @@ function makeShortsLegTexture(isOuterSide) {
   ctx.fillStyle = "#00854e";
   ctx.fillRect(0, 0, 256, 256);
 
-  // 細微褲管布褶層次
   const g = ctx.createLinearGradient(0, 0, 256, 0);
   g.addColorStop(0, "rgba(0,0,0,0.08)");
   g.addColorStop(0.5, "rgba(255,255,255,0.06)");
@@ -214,20 +457,17 @@ function makeShortsLegTexture(isOuterSide) {
   ctx.fillStyle = g;
   ctx.fillRect(0, 0, 256, 256);
 
-  // 褲腳底緣：白色細滾線＋深丈青黑寬邊
   ctx.fillStyle = "#ffffff";
   ctx.fillRect(0, 226, 256, 7);
   ctx.fillStyle = "#0f172a";
   ctx.fillRect(0, 233, 256, 23);
 
   if (isOuterSide) {
-    // 外側經典垂直深丈青條＋左右白細邊，底部呈弧形開衩接往褲腳黑邊
     ctx.fillStyle = "#ffffff";
     ctx.fillRect(108, 0, 40, 233);
     ctx.fillStyle = "#0f172a";
     ctx.fillRect(114, 0, 28, 256);
 
-    // 側邊弧形開衩滾邊過渡（還原圖一短褲下襬圓弧白黑包邊）
     ctx.strokeStyle = "#ffffff";
     ctx.lineWidth = 7;
     ctx.beginPath();
@@ -245,19 +485,16 @@ function makeShortsLegTexture(isOuterSide) {
     ctx.quadraticCurveTo(140, 240, 256, 244);
     ctx.stroke();
   }
-
-  const tex = new THREE.CanvasTexture(c);
-  tex.colorSpace = THREE.SRGBColorSpace;
-  tex.anisotropy = 4;
-  return tex;
+  return makeCanvasTex(c);
 }
 
-function buildAvatar() {
+function buildAvatar(initialOutfit = "pe") {
   const g = new THREE.Group();
   const M = (c, r = 0.78) => new THREE.MeshStandardMaterial({ color: c, roughness: r });
   const shirtWhite = M(0xf4f5f2, 0.84);
   const collarGreen = M(0x007443, 0.76);
   const shortsGreen = M(0x00854e, 0.74);
+  const uniformNavy = M(0x182644, 0.76);
   const trimNavy = M(0x0f172a, 0.7);
   const trimWhite = M(0xffffff, 0.82);
   const skin = M(0xf2c7a3, 0.56);
@@ -273,16 +510,37 @@ function buildAvatar() {
     return m;
   };
 
-  // 上衣軀幹（正背面使用高解析 CanvasTexture：翠綠圓領＋左胸重慶盾牌校徽）
-  const shirtFrontMat = new THREE.MeshStandardMaterial({ map: makeShirtTexture("front"), roughness: 0.84 });
-  const shirtBackMat = new THREE.MeshStandardMaterial({ map: makeShirtTexture("back"), roughness: 0.84 });
-  // BoxGeometry 6 面順序：[+X 正面, -X 背面, +Y 頂, -Y 底, +Z 右側, -Z 左側]
-  const torsoMats = [shirtFrontMat, shirtBackMat, shirtWhite, shirtWhite, shirtWhite, shirtWhite];
-  const torso = new THREE.Mesh(new THREE.BoxGeometry(0.24, 0.45, 0.38), torsoMats);
+  // 三套上衣材質快取（BoxGeometry 6 面：[+X 正, -X 背, +Y 頂, -Y 底, +Z 右, -Z 左]）
+  const peTorsoMats = [
+    new THREE.MeshStandardMaterial({ map: makeShirtTexture("front"), roughness: 0.84 }),
+    new THREE.MeshStandardMaterial({ map: makeShirtTexture("back"), roughness: 0.84 }),
+    shirtWhite,
+    shirtWhite,
+    shirtWhite,
+    shirtWhite,
+  ];
+  const boyTorsoMats = [
+    new THREE.MeshStandardMaterial({ map: makeBoyUniformShirtTexture("front"), roughness: 0.82 }),
+    new THREE.MeshStandardMaterial({ map: makeBoyUniformShirtTexture("back"), roughness: 0.82 }),
+    shirtWhite,
+    shirtWhite,
+    shirtWhite,
+    shirtWhite,
+  ];
+  const girlTorsoMats = [
+    new THREE.MeshStandardMaterial({ map: makeGirlUniformTopTexture("front"), roughness: 0.8 }),
+    new THREE.MeshStandardMaterial({ map: makeGirlUniformTopTexture("back"), roughness: 0.8 }),
+    shirtWhite,
+    uniformNavy,
+    uniformNavy,
+    uniformNavy,
+  ];
+
+  const torso = new THREE.Mesh(new THREE.BoxGeometry(0.24, 0.45, 0.38), peTorsoMats);
   torso.position.set(0, 1.0, 0);
   g.add(torso);
 
-  // 膚色脖子＋肩領頂緣翠綠滾邊（貼齊衣領不與正面 U 領重疊成雙環）
+  // 膚色脖子＋運動服專屬翠綠圓領環
   const neck = new THREE.Mesh(new THREE.CylinderGeometry(0.068, 0.074, 0.09, 16), skin);
   neck.position.set(0, 1.25, 0);
   g.add(neck);
@@ -291,14 +549,28 @@ function buildAvatar() {
   collarRing.position.set(-0.015, 1.224, 0);
   g.add(collarRing);
 
-  // 運動短褲鬆緊腰頭＋骨盆段（兩側帶深丈青滾白邊直條）
-  g.add(box(shortsGreen, 0.235, 0.14, 0.365, 0, 0.72, 0));
+  // 骨盆／褲頭段＋運動服專屬側邊滾條
+  const pelvis = box(shortsGreen, 0.235, 0.14, 0.365, 0, 0.72, 0);
+  g.add(pelvis);
+  const peHipTrims = new THREE.Group();
   for (const sz of [0.184, -0.184]) {
-    g.add(box(trimWhite, 0.056, 0.14, 0.006, 0, 0.72, sz));
-    g.add(box(trimNavy, 0.036, 0.14, 0.01, 0, 0.72, sz));
+    peHipTrims.add(box(trimWhite, 0.056, 0.14, 0.006, 0, 0.72, sz));
+    peHipTrims.add(box(trimNavy, 0.036, 0.14, 0.01, 0, 0.72, sz));
   }
+  g.add(peHipTrims);
 
-  // 頭部、頭髮與五官（劉海微抬避免遮蓋雙眼）
+  // 女生制服專屬：立體 A 字深丈青百褶裙擺（橢圓截面自然貼合腰臀、底部露出膚色小腿）
+  const skirtMat = new THREE.MeshStandardMaterial({
+    map: makePleatedSkirtTexture(),
+    roughness: 0.76,
+    side: THREE.DoubleSide,
+  });
+  const skirt = new THREE.Mesh(new THREE.CylinderGeometry(0.19, 0.285, 0.38, 28, 1, true), skirtMat);
+  skirt.scale.set(0.84, 1, 1.1);
+  skirt.position.set(0, 0.59, 0);
+  g.add(skirt);
+
+  // 頭部、短髮與五官
   const head = new THREE.Mesh(new THREE.SphereGeometry(0.195, 18, 14), skin);
   head.position.set(0, 1.435, 0);
   g.add(head);
@@ -309,14 +581,24 @@ function buildAvatar() {
   g.add(box(dark, 0.02, 0.038, 0.036, 0.19, 1.405, -0.068));
   g.add(box(M(0xd97766, 0.6), 0.015, 0.014, 0.046, 0.188, 1.335, 0));
 
-  // 雙腿：翠綠寬短褲管（外側丈青白滾邊＋弧形褲腳）→ 膚色小腿 → 白襪 → 運動鞋
+  // 女生制服專屬：自然披肩長髮＋頭頂深藍蝴蝶結髮飾
+  const girlHair = new THREE.Group();
+  girlHair.add(box(hair, 0.11, 0.36, 0.35, -0.155, 1.33, 0));
+  girlHair.add(box(hair, 0.11, 0.25, 0.065, -0.04, 1.36, 0.185));
+  girlHair.add(box(hair, 0.11, 0.25, 0.065, -0.04, 1.36, -0.185));
+  const bowMat = M(0x1e3a5f, 0.65);
+  girlHair.add(box(bowMat, 0.04, 0.055, 0.15, -0.02, 1.66, 0));
+  girlHair.add(box(trimWhite, 0.046, 0.035, 0.036, -0.02, 1.66, 0));
+  g.add(girlHair);
+
+  // 雙腿（短褲管材質支援一鍵切換：運動服翠綠滾邊／制服深丈青）
   const shortsOuterMat = new THREE.MeshStandardMaterial({ map: makeShortsLegTexture(true), roughness: 0.74 });
   const shortsPlainMat = new THREE.MeshStandardMaterial({ map: makeShortsLegTexture(false), roughness: 0.74 });
+  const shortLegMeshes = [];
   const mkLeg = (pz) => {
     const pivot = new THREE.Group();
     pivot.position.set(0, 0.68, pz);
-    // pz > 0 為右腿（外側在 +Z 面 index 4）；pz < 0 為左腿（外側在 -Z 面 index 5）
-    const legMats = [
+    const peLegMats = [
       shortsPlainMat,
       shortsPlainMat,
       shortsGreen,
@@ -324,15 +606,14 @@ function buildAvatar() {
       pz > 0 ? shortsOuterMat : shortsPlainMat,
       pz < 0 ? shortsOuterMat : shortsPlainMat,
     ];
-    const shortLeg = new THREE.Mesh(new THREE.BoxGeometry(0.185, 0.25, 0.178), legMats);
+    const shortLeg = new THREE.Mesh(new THREE.BoxGeometry(0.185, 0.25, 0.178), peLegMats);
     shortLeg.position.set(0, -0.115, 0);
+    shortLeg.userData.peLegMats = peLegMats;
+    shortLegMeshes.push(shortLeg);
     pivot.add(shortLeg);
 
-    // 露出之膚色小腿
     pivot.add(box(skin, 0.11, 0.24, 0.11, 0, -0.35, 0));
-    // 白色運動短襪
     pivot.add(box(sockWhite, 0.118, 0.11, 0.118, 0, -0.525, 0));
-    // 黑白國小運動鞋（白色鞋底＋深灰鞋面）
     pivot.add(box(shoeUpper, 0.19, 0.068, 0.132, 0.035, -0.612, 0));
     pivot.add(box(shoeSole, 0.205, 0.028, 0.14, 0.038, -0.66, 0));
     g.add(pivot);
@@ -341,21 +622,40 @@ function buildAvatar() {
   const legL = mkLeg(0.098);
   const legR = mkLeg(-0.098);
 
-  // 雙臂：白色短袖 → 翠綠袖口滾邊 → 膚色前臂與小手
+  // 雙臂：白色短袖 → 袖口滾邊（運動服為翠綠、制服為白襯衫袖口）→ 膚色前臂
+  const cuffMeshes = [];
   const mkArm = (pz) => {
     const pivot = new THREE.Group();
     pivot.position.set(0, 1.19, pz);
-    // 白色短袖
     pivot.add(box(shirtWhite, 0.14, 0.165, 0.135, 0, -0.075, 0));
-    // 翠綠袖口羅紋滾邊
-    pivot.add(box(collarGreen, 0.146, 0.03, 0.141, 0, -0.168, 0));
-    // 膚色手臂與手掌
+    const cuff = box(collarGreen, 0.146, 0.03, 0.141, 0, -0.168, 0);
+    cuffMeshes.push(cuff);
+    pivot.add(cuff);
     pivot.add(box(skin, 0.092, 0.24, 0.092, 0, -0.30, 0));
     g.add(pivot);
     return pivot;
   };
   const armL = mkArm(0.255);
   const armR = mkArm(-0.255);
+
+  const applyOutfit = (key) => {
+    const k = OUTFITS.some((o) => o.key === key) ? key : "pe";
+    torso.material = k === "pe" ? peTorsoMats : k === "boy" ? boyTorsoMats : girlTorsoMats;
+    collarRing.visible = k === "pe";
+    pelvis.material = k === "pe" ? shortsGreen : uniformNavy;
+    peHipTrims.visible = k === "pe";
+    skirt.visible = k === "girl";
+    girlHair.visible = k === "girl";
+    for (const m of shortLegMeshes) {
+      m.material = k === "pe" ? m.userData.peLegMats : uniformNavy;
+      // 男生制服短褲略長直筒；女生藏於百褶裙內稍窄避免擺腿穿裙
+      m.scale.set(k === "girl" ? 0.88 : 1, k === "boy" ? 1.12 : 1, k === "girl" ? 0.88 : 1);
+    }
+    for (const c of cuffMeshes) {
+      c.material = k === "pe" ? collarGreen : shirtWhite;
+    }
+  };
+  applyOutfit(initialOutfit);
 
   g.traverse((o) => {
     if (o.isMesh) {
@@ -374,7 +674,7 @@ function buildAvatar() {
   const root = new THREE.Group();
   root.add(g);
   root.add(blob);
-  root.userData = { body: g, legL, legR, armL, armR, blob };
+  root.userData = { body: g, legL, legR, armL, armR, blob, applyOutfit };
   return root;
 }
 
@@ -396,6 +696,14 @@ export function createWalkMode(opts) {
     doorPickMeshes: [],
     avatar: null,
     light: null,
+    outfit: (() => {
+      try {
+        const saved = localStorage.getItem(OUTFIT_STORAGE_KEY);
+        return OUTFITS.some((o) => o.key === saved) ? saved : "pe";
+      } catch (_) {
+        return "pe";
+      }
+    })(),
     view: "third",
     camDist: 4.2,
     yaw: Math.PI / 2,
@@ -425,6 +733,7 @@ export function createWalkMode(opts) {
     prompt: () => document.getElementById("walkPrompt"),
     fade: () => document.getElementById("walkFade"),
     crosshair: () => document.getElementById("walkCrosshair"),
+    outfitBtn: () => document.getElementById("btnWalkOutfit"),
     viewBtn: () => document.getElementById("btnWalkView"),
     spawn: () => document.getElementById("walkSpawnSelect"),
     exit: () => document.getElementById("btnWalkExit"),
@@ -1011,6 +1320,8 @@ export function createWalkMode(opts) {
       e.preventDefault();
     } else if (code === "KeyV") {
       toggleView();
+    } else if (code === "KeyC") {
+      cycleOutfit();
     } else if (code === "KeyF") {
       const dr = raycastDoor() || nearestDoor(2.7);
       if (dr) toggleDoor(dr);
@@ -1169,6 +1480,31 @@ export function createWalkMode(opts) {
     el.toolBtn()?.classList.toggle("active", on);
   }
 
+  function refreshOutfitBtn() {
+    const b = el.outfitBtn();
+    const cur = OUTFITS.find((o) => o.key === S.outfit) || OUTFITS[0];
+    if (b) b.textContent = cur.btn;
+  }
+
+  function setOutfit(key) {
+    const found = OUTFITS.find((o) => o.key === key) || OUTFITS[0];
+    S.outfit = found.key;
+    try {
+      localStorage.setItem(OUTFIT_STORAGE_KEY, S.outfit);
+    } catch (_) {
+      // ignore storage errors
+    }
+    S.avatar?.userData?.applyOutfit?.(S.outfit);
+    refreshOutfitBtn();
+    requestRender(4);
+  }
+
+  function cycleOutfit() {
+    const idx = OUTFITS.findIndex((o) => o.key === S.outfit);
+    const next = OUTFITS[(idx + 1) % OUTFITS.length];
+    setOutfit(next.key);
+  }
+
   function refreshViewBtn() {
     const b = el.viewBtn();
     if (b) b.textContent = S.view === "third" ? "👤 第三人稱" : "👁 第一人稱";
@@ -1184,7 +1520,7 @@ export function createWalkMode(opts) {
     const ok = await ensureLoaded();
     if (!ok) return false;
     if (!S.avatar) {
-      S.avatar = buildAvatar();
+      S.avatar = buildAvatar(S.outfit);
       S.avatar.visible = false;
       scene.add(S.avatar);
       S.light = new THREE.PointLight(0xfff1d6, 7, 9, 1.6);
@@ -1214,6 +1550,7 @@ export function createWalkMode(opts) {
     if (S.light) S.light.visible = true;
     S.avatar.visible = S.view === "third";
     showHud(true);
+    refreshOutfitBtn();
     refreshViewBtn();
     const sel = el.spawn();
     if (sel && spec2?.key && SPAWNS[spec2.key]) sel.value = spec2.key;
@@ -1435,8 +1772,10 @@ export function createWalkMode(opts) {
         }
       });
     }
+    el.outfitBtn()?.addEventListener("click", () => cycleOutfit());
     el.viewBtn()?.addEventListener("click", () => toggleView());
     el.exit()?.addEventListener("click", () => exit());
+    refreshOutfitBtn();
   }
   bindHud();
 
@@ -1451,6 +1790,8 @@ export function createWalkMode(opts) {
     exit,
     update,
     toggleView,
+    cycleOutfit,
+    setOutfit,
     ensureLoaded,
     roomEntry,
     spawns: SPAWNS,

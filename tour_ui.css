@@ -1646,8 +1646,20 @@ body {
 }
 
 .walk-spawn-select {
-  width: 210px;
+  width: 192px;
   flex: 0 0 auto;
+}
+
+.walk-outfit-btn {
+  white-space: nowrap;
+  border-color: rgba(16, 185, 129, 0.48);
+  background: rgba(16, 185, 129, 0.16);
+  color: #ecfdf5;
+}
+
+.walk-outfit-btn:hover {
+  background: rgba(16, 185, 129, 0.28);
+  border-color: rgba(52, 211, 153, 0.8);
 }
 
 .walk-exit-btn {
