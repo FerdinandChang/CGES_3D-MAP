@@ -2,7 +2,7 @@
  * 重慶國小 3D 校園「全校四棟自由步行」模式（桌機）
  * - 涵蓋廣和樓、和平樓、五權樓、重慶樓全部中空教室（1F–5F）與戶外操場／球場／中庭
  * - 第一人稱／第三人稱紅書包小人切換（V）、WASD／方向鍵移動、Shift 跑步、滑鼠拖曳／PointerLock 轉向
- * - 互動橫拉教室木門：點擊門板或走近按 F 鍵觸發平滑滑動開關動畫＋動態門板碰撞
+ * - 互動對內開啟木門：點擊門板或走近按 F 鍵觸發合頁向室內旋轉 95° 開關動畫＋動態門板碰撞
  * - 全校 1 梯～9 梯與廣和樓無障礙電梯：走近梯口按 E 上樓／Q 下樓自動爬升轉場
  * - 室內家具：依 campus_cges.json 以 InstancedMesh 動態鋪設黑板、講桌、課桌椅、書架、辦公桌與視聽中心座位
  */
@@ -469,12 +469,11 @@ export function createWalkMode(opts) {
     S.groundMeshes = out;
   }
 
-  // ---------- 動態互動木拉門（可點擊／按 F 鍵滑動開關＋門板碰撞）----------
+  // ---------- 動態互動內推木門（嵌於門框內，點擊／按 F 鍵向室內旋轉 95° 開關＋動態碰撞）----------
   function buildDoors() {
     const grp = new THREE.Group();
     grp.name = "WalkInteractiveDoors";
     const woodMat = new THREE.MeshStandardMaterial({ color: 0xb07d4f, roughness: 0.62, metalness: 0.05 });
-    const trimMat = new THREE.MeshStandardMaterial({ color: 0x7a502d, roughness: 0.72 });
     const glassMat = new THREE.MeshStandardMaterial({
       color: 0xbfe2ff,
       roughness: 0.15,
@@ -483,15 +482,17 @@ export function createWalkMode(opts) {
       opacity: 0.42,
     });
     const handleMat = new THREE.MeshStandardMaterial({ color: 0xd1d5db, roughness: 0.25, metalness: 0.85 });
+    const hingeMat = new THREE.MeshStandardMaterial({ color: 0x4b5563, roughness: 0.4, metalness: 0.75 });
 
-    // 共用幾何（標準門寬沿 X、厚度沿 Z、高度沿 Y；若門沿 Blender Y 軸則將群組旋轉 90°）
-    // 採台灣小學外掛吊軌拉門：門寬 1.18m 完整覆蓋 1.10m 門洞，沿走廊外牆平滑橫移 1.08m 不插牆
-    const topBarGeo = new THREE.BoxGeometry(1.18, 0.22, 0.055);
-    const botPanelGeo = new THREE.BoxGeometry(1.18, 1.04, 0.055);
-    const stileGeo = new THREE.BoxGeometry(0.24, 0.86, 0.055);
-    const glassGeo = new THREE.BoxGeometry(0.7, 0.86, 0.022);
-    const handleGeo = new THREE.BoxGeometry(0.035, 0.34, 0.11);
-    const railGeo = new THREE.BoxGeometry(2.3, 0.07, 0.08);
+    // 共用幾何（門寬 1.08m 嚴密嵌入 1.10m 門洞內，絕不外凸重疊相鄰窗戶；厚度 0.05m）
+    const doorW = 1.08;
+    const topBarGeo = new THREE.BoxGeometry(doorW, 0.22, 0.05);
+    const botPanelGeo = new THREE.BoxGeometry(doorW, 1.04, 0.05);
+    const stileGeo = new THREE.BoxGeometry(0.21, 0.86, 0.05);
+    const glassGeo = new THREE.BoxGeometry(doorW - 0.42, 0.86, 0.02);
+    const latchBaseGeo = new THREE.BoxGeometry(0.055, 0.12, 0.075);
+    const leverGeo = new THREE.BoxGeometry(0.11, 0.024, 0.13);
+    const hingeGeo = new THREE.BoxGeometry(0.028, 0.13, 0.068);
 
     const roomsInfo = getRooms ? getRooms() : [];
     const bySpecKey = new Map();
@@ -513,8 +514,24 @@ export function createWalkMode(opts) {
       const flMeta = bMeta?.floors?.find((f) => f.floor === rm.floor);
       const openH = flMeta ? Math.max(1.86, Math.min(2.14, flMeta.zf + 2.25 - dr.z)) : 2.0;
 
+      // 統一局部座標：rotation.y = atan2(nx, -ny) 使 local +Z 永遠指向門外走廊、local -Z 永遠指向教室內部
+      const theta = Math.atan2(nx, -ny);
+      const slide = dr.slide || 1;
+      // 合頁放在靠隔間牆側（遠離房間中心），門往室內打開 95° 時自然貼牆不擋路
+      const wallSideDot = dr.axis === "X" ? -slide * Math.cos(theta) : -slide * Math.sin(theta);
+      const hingeSide = wallSideDot >= 0 ? 1 : -1;
+      // local X 上合頁位於 hingeSide * (doorW / 2)，門片中心偏離合頁 -hingeSide * (doorW / 2)
+      const leafOffsetX = -hingeSide * (doorW * 0.5);
+      // 繞 Y 旋轉 -hingeSide * 95°：無論合頁在左或右，遠端門緣一律轉向 local -Z（教室內部）
+      const openAngle = -hingeSide * (Math.PI * 0.53);
+
       const pivot = new THREE.Group();
+      const hinge = new THREE.Group();
+      // 合頁軸置於門洞靠室內側門框內緣（local Z = -0.09），關門時門板收於牆體門洞內、開門往室內旋轉不擦牆
+      hinge.position.set(hingeSide * (doorW * 0.5), 0, -0.09);
+
       const leaf = new THREE.Group();
+      leaf.position.set(leafOffsetX, 0, 0);
 
       // 門板構成（標準高度 0 .. 2.12m，再依 openH 精準縮放）
       const bot = new THREE.Mesh(botPanelGeo, woodMat);
@@ -522,33 +539,36 @@ export function createWalkMode(opts) {
       const top = new THREE.Mesh(topBarGeo, woodMat);
       top.position.set(0, 2.01, 0);
       const stL = new THREE.Mesh(stileGeo, woodMat);
-      stL.position.set(-0.47, 1.47, 0);
+      stL.position.set(-(doorW * 0.5 - 0.105), 1.47, 0);
       const stR = new THREE.Mesh(stileGeo, woodMat);
-      stR.position.set(0.47, 1.47, 0);
+      stR.position.set(doorW * 0.5 - 0.105, 1.47, 0);
       const gl = new THREE.Mesh(glassGeo, glassMat);
       gl.position.set(0, 1.47, 0);
-      const hd = new THREE.Mesh(handleGeo, handleMat);
-      hd.position.set(dr.slide > 0 ? -0.46 : 0.46, 1.02, 0);
 
-      for (const m of [bot, top, stL, stR, gl, hd]) {
+      // 門把置於遠離合頁的門緣（正反兩面皆可見）
+      const handleX = -hingeSide * (doorW * 0.5 - 0.095);
+      const latch = new THREE.Mesh(latchBaseGeo, handleMat);
+      latch.position.set(handleX, 1.0, 0);
+      const lever = new THREE.Mesh(leverGeo, handleMat);
+      lever.position.set(handleX + hingeSide * 0.035, 1.0, 0);
+
+      // 合頁鉸鏈（上下兩顆）
+      const h1 = new THREE.Mesh(hingeGeo, hingeMat);
+      h1.position.set(hingeSide * (doorW * 0.5 - 0.01), 0.38, -0.01);
+      const h2 = new THREE.Mesh(hingeGeo, hingeMat);
+      h2.position.set(hingeSide * (doorW * 0.5 - 0.01), 1.72, -0.01);
+
+      for (const m of [bot, top, stL, stR, gl, latch, lever, h1, h2]) {
         m.userData.doorIdx = idx;
         S.doorPickMeshes.push(m);
         leaf.add(m);
       }
 
-      // 固定吊軌（外掛於門框走廊側上方，不隨門板移動）
-      const rail = new THREE.Mesh(railGeo, trimMat);
-      rail.position.set(dr.slide * 0.52, 2.13, 0);
-      pivot.add(rail);
-      pivot.add(leaf);
+      hinge.add(leaf);
+      pivot.add(hinge);
       pivot.scale.y = openH / 2.12;
-
-      // 外推 0.19m 貼齊走廊牆面（避免門板開門滑動時插進旁邊實心牆體）
-      pivot.position.copy(b2t(dr.x + nx * 0.19, dr.y + ny * 0.19, dr.z));
-      // axis === "X"：門寬沿 Three.js +X；axis === "Y"：門寬沿 Three.js -Z（對應 Blender +Y，旋轉 +PI/2）
-      if (dr.axis === "Y") {
-        pivot.rotation.y = Math.PI / 2;
-      }
+      pivot.position.copy(b2t(dr.x, dr.y, dr.z));
+      pivot.rotation.y = theta;
 
       grp.add(pivot);
       S.doors.push({
@@ -561,10 +581,10 @@ export function createWalkMode(opts) {
         y: dr.y,
         z: dr.z,
         axis: dr.axis,
-        normal: dr.normal || [0, -1],
+        normal: [nx, ny],
         width: dr.width || 1.1,
-        slide: dr.slide || 1,
-        leaf,
+        hinge,
+        openAngle,
         open: false,
         anim: 0,
       });
@@ -580,7 +600,7 @@ export function createWalkMode(opts) {
     door.open = Boolean(isOpen);
     if (instant) {
       door.anim = door.open ? 1 : 0;
-      door.leaf.position.x = door.slide * 1.08 * door.anim;
+      door.hinge.rotation.y = door.openAngle * door.anim;
     }
     requestRender(8);
   }
@@ -595,10 +615,10 @@ export function createWalkMode(opts) {
     for (const d of S.doors) {
       const tgt = d.open ? 1 : 0;
       if (Math.abs(d.anim - tgt) > 0.002) {
-        const step = dt * 4.6;
+        const step = dt * 4.2;
         d.anim = d.anim < tgt ? Math.min(tgt, d.anim + step) : Math.max(tgt, d.anim - step);
         const eased = d.anim * d.anim * (3 - 2 * d.anim);
-        d.leaf.position.x = d.slide * 1.08 * eased;
+        d.hinge.rotation.y = d.openAngle * eased;
         anyMoving = true;
       }
     }
