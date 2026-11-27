@@ -839,7 +839,21 @@ def build_corridor_building(cfg: dict, palette: Dict[str, bpy.types.Material]) -
     objs.append(su.create_mesh_object(f"{prefix}_CorridorTerrazzo", bm_terrazzo, palette["terrazzo_corridor"], col, uv_scale=0.45))
 
     if prefix == "Bldg_Chongqing":
-        objs.extend(_build_chongqing_west_gable(prefix, x0, y0, y1, core_y0, core_y1, floors, h1, hu, z_roof, palette, col))
+        # 收集 2F (fl=1) 門洞與窗洞，讓 2F 彩繪火車壁畫精準挖空門框與鋁窗，絕不封死門洞或與窗框穿模
+        zf2 = h1
+        fh2 = hu
+        win_w2 = bay_len * 0.76 * 0.78
+        win_h2 = 1.48
+        win_z2 = zf2 + fh2 * 0.58
+        mural_openings = []
+        for b_m in range(bays):
+            bcx_m = x0 + (b_m + 0.5) * bay_len
+            mural_openings.append((bcx_m - win_w2 * 0.5 - 0.08, bcx_m + win_w2 * 0.5 + 0.08, win_z2 - win_h2 * 0.5 - 0.08, win_z2 + win_h2 * 0.5 + 0.08))
+        for rm_m in walk_ctx["rooms"]:
+            if rm_m.get("floor") == 2 and rm_m.get("door"):
+                dx_m = rm_m["door"]["x"]
+                mural_openings.append((dx_m - 0.62, dx_m + 0.62, zf2, zf2 + 2.34))
+        objs.extend(_build_chongqing_west_gable(prefix, x0, y0, y1, core_y0, core_y1, floors, h1, hu, z_roof, palette, col, mural_openings))
 
     if prefix == "Bldg_Wuquan":
         objs.extend(_build_wuquan_end_gables(prefix, y0, y1, core_x0, core_x1, floors, h1, hu, z_roof, parapet, palette, col))
@@ -931,12 +945,28 @@ def _build_chongqing_west_gable(
     z_roof: float,
     palette: Dict[str, bpy.types.Material],
     col: str,
+    mural_openings: List[Tuple[float, float, float, float]] = None,
 ) -> List[bpy.types.Object]:
-    """建置重慶樓 2F 彩繪火車壁畫與 56 廣和街西山牆（雙開間米白方磚嵌板＋紅磚結構框＋2-4F 方窗＋開放北走廊＋綠鐵皮斜頂棚）。"""
+    """建置重慶樓 2F 彩繪火車壁畫（依門洞與窗洞自動挖空並保留連續 UV）與 56 廣和街西山牆。"""
     objs: List[bpy.types.Object] = []
     bm_train = bmesh.new()
-    ty_m = core_y0 - 0.10
-    _add_plane_uv(bm_train, (-62.0, ty_m, 3.85), (-46.0, ty_m, 3.85), (-46.0, ty_m, 6.45), (-62.0, ty_m, 6.45))
+    uv_layer = bm_train.loops.layers.uv.verify()
+    ty_m = core_y0 - 0.068
+    mx0, mx1 = -62.0, -46.0
+    mz0, mz1 = 3.85, 6.45
+    rects = wi.wall_rects(mx0, mx1, mural_openings or [], mz0, mz1)
+    for a, b, za, zb in rects:
+        u0, u1 = (a - mx0) / (mx1 - mx0), (b - mx0) / (mx1 - mx0)
+        v0, v1 = (za - mz0) / (mz1 - mz0), (zb - mz0) / (mz1 - mz0)
+        v_list = [
+            bm_train.verts.new((a, ty_m, za)),
+            bm_train.verts.new((b, ty_m, za)),
+            bm_train.verts.new((b, ty_m, zb)),
+            bm_train.verts.new((a, ty_m, zb)),
+        ]
+        f = bm_train.faces.new(v_list)
+        for loop, uv in zip(f.loops, ((u0, v0), (u1, v0), (u1, v1), (u0, v1))):
+            loop[uv_layer].uv = uv
     objs.append(su.create_mesh_object(f"{prefix}_LibraryTrainMural", bm_train, palette["train_mural"], col, auto_uv=False))
 
     bm_wg_frame = bmesh.new()

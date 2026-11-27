@@ -30,7 +30,7 @@ const SPAWNS = {
   wq1: { label: "🏫 五權樓 1F 西側中庭走廊", x: -5.8, y: -22.0, bldg: "Bldg_Wuquan", floor: 1, yaw: 0 },
   wq3: { label: "🏫 五權樓 3F 東側操場走廊", x: 5.3, y: -12.0, bldg: "Bldg_Wuquan", floor: 3, yaw: Math.PI },
   wq5: { label: "🏫 五權樓 5F 六年級走廊", x: 5.3, y: -20.5, bldg: "Bldg_Wuquan", floor: 5, yaw: Math.PI },
-  cq2: { label: "📚 重慶樓 2F 圖書室走廊", x: -55.0, y: -41.8, bldg: "Bldg_Chongqing", floor: 2, yaw: Math.PI / 2 },
+  cq2: { label: "📚 重慶樓 2F 圖書室走廊", x: -58.288, y: -41.7, bldg: "Bldg_Chongqing", floor: 2, yaw: Math.PI / 2 },
   cq3: { label: "🏫 重慶樓 3F 南側走廊", x: -27.8, y: -41.8, bldg: "Bldg_Chongqing", floor: 3, yaw: Math.PI / 2 },
   court: { label: "🏀 重慶樓南側雙籃球場", x: -38.0, y: -47.0, yaw: Math.PI / 2 },
   track: { label: "🏃 操場與升旗司令台大道", x: 16.0, y: -13.8, yaw: Math.PI },
@@ -1019,6 +1019,10 @@ export function createWalkMode(opts) {
       }
     };
 
+    const group = new THREE.Group();
+    group.name = "WalkInterior";
+    const libRooms = [];
+
     for (const rm of S.data.rooms || []) {
       if (rm.kind !== "room") continue;
       const info = rm.key ? bySpecKey.get(rm.key) : null;
@@ -1037,7 +1041,7 @@ export function createWalkMode(opts) {
       if (name.includes("廁") || name.includes("廚房")) layout = "empty";
       else if (name.includes("圖書")) layout = "library";
       else if (name.includes("視聽")) layout = "auditorium";
-      else if (cat === "admin" || /辦公室|資料室|諮商|處|室/.test(name) && !/教室|唱遊/.test(name)) layout = "office";
+      else if (cat === "admin" || (/辦公室|資料室|諮商|處|室/.test(name) && !/教室|唱遊/.test(name))) layout = "office";
       else if (name.includes("唱遊") || cat === "kinder") layout = "hall";
       if (layout === "empty") continue;
 
@@ -1056,22 +1060,9 @@ export function createWalkMode(opts) {
           }
         }
       } else if (layout === "library") {
-        const nShelf = Math.max(2, Math.floor((wx - 0.8) / 1.15));
-        for (let i = 0; i < nShelf; i++) {
-          const x = rm.x0 + 0.7 + i * ((wx - 1.4) / Math.max(1, nShelf - 1));
-          const y = rm.y1 - 0.45;
-          shelf.add(x, y, zf + 0.95, 0.9, 0.34, 1.9);
-          for (let k = 0; k < 4; k++) {
-            books.add(x, y - 0.18, zf + 0.35 + k * 0.45, 0.82, 0.03, 0.34, 0, palette[pi++ % palette.length]);
-          }
-        }
-        for (let t = 0; t < 2; t++) {
-          const x = rm.x0 + wx * (0.3 + 0.4 * t);
-          wood.add(x, cy - 0.6, zf + 0.74, 2.2, 1.0, 0.05);
-          metal.add(x, cy - 0.6, zf + 0.37, 2.0, 0.8, 0.7);
-          chair.add(x - 0.6, cy - 1.35, zf + 0.44, 0.4, 0.4, 0.04);
-          chair.add(x + 0.6, cy - 1.35, zf + 0.44, 0.4, 0.4, 0.04);
-        }
+        // 交由專屬實景圖書館模組精細建置（音符矮書架、粉彩矮桌圓凳、悅讀重慶火車牆、雙白拱門與好書區）
+        libRooms.push(rm);
+        continue;
       } else if (layout === "office") {
         // 行政處室／辦公室：依房間長寬自動排辦公桌＋螢幕＋檔案櫃
         const nX = Math.max(1, Math.min(3, Math.floor((wx - 1.4) / 2.6)));
@@ -1139,15 +1130,711 @@ export function createWalkMode(opts) {
       lamp.add(cx, cy, rm.z_ceil - 0.05, Math.min(1.5, wx * 0.25), 0.28, 0.04);
     }
 
-    const group = new THREE.Group();
-    group.name = "WalkInterior";
     for (const b of [wood, metal, chair, seatRed, board, white, books, lamp, shelf]) {
       const m = b.build();
       if (m) group.add(m);
     }
+    for (const rm of libRooms) {
+      buildLibraryInterior(rm, group);
+    }
     group.visible = false;
     scene.add(group);
     S.interior = group;
+  }
+
+  // ---------- 重慶國小圖書館實景專屬渲染（依《用愛陪讀》相簿 1:1 還原）----------
+  function buildLibraryInterior(rm, parentGroup) {
+    const lib = new THREE.Group();
+    lib.name = "WalkLibraryDetail";
+    const { x0, x1, y0, y1, z_floor: zf, z_ceil: zc } = rm;
+    const wx = x1 - x0;
+    const wy = y1 - y0;
+    const cx = 0.5 * (x0 + x1);
+    const cy = 0.5 * (y0 + y1);
+    const h = zc - zf;
+
+    const M = (color, opts = {}) =>
+      new THREE.MeshStandardMaterial({
+        color,
+        roughness: opts.roughness ?? 0.75,
+        metalness: opts.metalness ?? 0.0,
+        emissive: opts.emissive ? new THREE.Color(opts.emissive) : new THREE.Color(0x000000),
+        emissiveIntensity: opts.emissiveIntensity ?? 0,
+        side: opts.side ?? THREE.FrontSide,
+      });
+
+    const oakMat = M(0xd8ba8c, { roughness: 0.68 });
+    const oakDarkMat = M(0xb89462, { roughness: 0.74 });
+    const skyWallMat = M(0x95c8e3, { roughness: 0.85 });
+    const whiteMat = M(0xf8fafc, { roughness: 0.65 });
+    const mintPadMat = M(0x52c7b1, { roughness: 0.58 });
+    const curtainMat = M(0xeae6dc, { roughness: 0.9 });
+    const tealDeskMat = M(0x1b6e78, { roughness: 0.6 });
+    const darkMat = M(0x1f2937, { roughness: 0.55, metalness: 0.25 });
+    const purpleMat = M(0x7c4da8, { roughness: 0.62 });
+    const yellowMat = M(0xfacc15, { roughness: 0.62 });
+    const limeMat = M(0x84cc16, { roughness: 0.55 });
+    const cartBlueMat = M(0x2563eb, { roughness: 0.45, metalness: 0.35 });
+    const chromeMat = M(0xd1d5db, { roughness: 0.3, metalness: 0.75 });
+
+    const addBox = (mat, bx, by, bz, sx, sy, sz, rotY = 0) => {
+      const m = new THREE.Mesh(new THREE.BoxGeometry(sx, sz, sy), mat);
+      m.position.copy(b2t(bx, by, bz));
+      if (rotY) m.rotation.y = rotY;
+      lib.add(m);
+      return m;
+    };
+
+    const addCyl = (mat, bx, by, bz, rt, rb, ch, seg = 20) => {
+      const m = new THREE.Mesh(new THREE.CylinderGeometry(rt, rb, ch, seg), mat);
+      m.position.copy(b2t(bx, by, bz));
+      lib.add(m);
+      return m;
+    };
+
+    // 1. 淺灰白霧面無縫 PVC 地板（微帶柔和窗光反射）
+    const floorTex = (() => {
+      const c = document.createElement("canvas");
+      c.width = 256;
+      c.height = 256;
+      const ctx = c.getContext("2d");
+      ctx.fillStyle = "#eceff1";
+      ctx.fillRect(0, 0, 256, 256);
+      for (let i = 0; i < 420; i++) {
+        ctx.fillStyle = i % 2 ? "rgba(255,255,255,0.22)" : "rgba(180,192,202,0.12)";
+        ctx.fillRect((i * 53) % 256, (i * 97) % 256, 18, 6);
+      }
+      const t = makeCanvasTex(c);
+      t.wrapS = t.wrapT = THREE.RepeatWrapping;
+      t.repeat.set(4, 3);
+      return t;
+    })();
+    const floorMesh = new THREE.Mesh(
+      new THREE.PlaneGeometry(wx - 0.04, wy - 0.04),
+      new THREE.MeshStandardMaterial({ map: floorTex, roughness: 0.34, metalness: 0.04 })
+    );
+    floorMesh.rotation.x = -Math.PI / 2;
+    floorMesh.position.copy(b2t(cx, cy, zf + 0.012));
+    lib.add(floorMesh);
+
+    // 2. 白色輕鋼架天花板（T-Bar 格線）＋嵌入式 LED 格柵燈＋四向白色吸頂循環扇
+    const ceilTex = (() => {
+      const c = document.createElement("canvas");
+      c.width = 512;
+      c.height = 512;
+      const ctx = c.getContext("2d");
+      ctx.fillStyle = "#f4f6f8";
+      ctx.fillRect(0, 0, 512, 512);
+      ctx.strokeStyle = "#cfd8e3";
+      ctx.lineWidth = 4;
+      for (let i = 0; i <= 4; i++) {
+        const p = i * 128;
+        ctx.beginPath();
+        ctx.moveTo(p, 0);
+        ctx.lineTo(p, 512);
+        ctx.moveTo(0, p);
+        ctx.lineTo(512, p);
+        ctx.stroke();
+      }
+      const t = makeCanvasTex(c);
+      t.wrapS = t.wrapT = THREE.RepeatWrapping;
+      t.repeat.set(5, 4);
+      return t;
+    })();
+    const ceilMesh = new THREE.Mesh(
+      new THREE.PlaneGeometry(wx - 0.04, wy - 0.04),
+      new THREE.MeshStandardMaterial({ map: ceilTex, roughness: 0.85 })
+    );
+    ceilMesh.rotation.x = Math.PI / 2;
+    ceilMesh.position.copy(b2t(cx, cy, zc - 0.03));
+    lib.add(ceilMesh);
+
+    const ledMat = M(0xffffff, { emissive: 0xf8fbff, emissiveIntensity: 1.15, roughness: 0.25 });
+    for (let ix = 0; ix < 4; ix++) {
+      const lx = x0 + 1.6 + ix * ((wx - 3.2) / 3);
+      for (let iy = 0; iy < 3; iy++) {
+        const ly = y0 + 1.45 + iy * ((wy - 2.9) / 2);
+        addBox(ledMat, lx, ly, zc - 0.045, 0.95, 0.48, 0.025);
+      }
+    }
+    // 吸頂節能循環扇（3 台）
+    for (let ix = 0; ix < 3; ix++) {
+      const fx = x0 + 2.8 + ix * ((wx - 5.6) / 2);
+      addBox(whiteMat, fx, cy, zc - 0.06, 0.62, 0.62, 0.05);
+      addCyl(M(0xe2e8f0, { roughness: 0.5 }), fx, cy, zc - 0.095, 0.24, 0.24, 0.02, 18);
+    }
+
+    // 3. 柔和淺天藍牆面（避開東側 0.1m 隔間牆厚）、北側窗間天藍結構柱、沙漏形綁帶落地窗簾、靠窗薄荷綠矮櫃與冷氣
+    addBox(skyWallMat, x0 + 0.03, cy, zf + h * 0.5, 0.05, wy - 0.08, h - 0.06);
+    // 東牆隔間內表面在 x1 - 0.10，將天藍飾牆內移至 x1 - 0.125 避免被隔間牆遮蔽
+    addBox(skyWallMat, x1 - 0.125, cy, zf + h * 0.5, 0.04, wy - 0.08, h - 0.06);
+    // 北牆下緣窗台與頂部樑刷天藍（避開 -63.45..-57.13 採光大窗玻璃）
+    addBox(skyWallMat, cx, y1 - 0.03, zf + 0.62, wx - 0.24, 0.05, 1.24);
+    addBox(skyWallMat, cx, y1 - 0.03, zc - 0.24, wx - 0.24, 0.05, 0.44);
+    // 北側實牆窗間結構柱（精準避開窗洞）與沙漏形束帶米白落地窗簾（底部收於坐墊上方不穿模）
+    for (const px of [x0 + 0.35, x0 + 1.55, x1 - 1.85, x1 - 0.35]) {
+      addBox(skyWallMat, px, y1 - 0.14, zf + h * 0.5, 0.46, 0.24, h - 0.06);
+    }
+    for (const curX of [x0 + 1.98, x1 - 2.3]) {
+      // 上半垂褶（上寬下收束）＋綁帶環＋下半垂褶（上束下展，底緣止於 zf + 0.51 不穿入坐墊）
+      addCyl(curtainMat, curX, y1 - 0.15, zf + 2.02, 0.16, 0.075, 1.32, 14);
+      addCyl(M(0xcbd5e1), curX, y1 - 0.15, zf + 1.34, 0.084, 0.084, 0.065, 14);
+      addCyl(curtainMat, curX, y1 - 0.15, zf + 0.91, 0.075, 0.155, 0.8, 14);
+    }
+    // 靠北窗長條原木矮櫃＋薄荷綠皮質軟墊（Window Bench，完整貼齊北牆不被柱或窗簾穿過）
+    for (const [bx0, bx1] of [
+      [x0 + 1.85, x1 - 2.15],
+      [x1 - 1.55, x1 - 0.6],
+    ]) {
+      const bw = bx1 - bx0;
+      const bc = 0.5 * (bx0 + bx1);
+      addBox(oakMat, bc, y1 - 0.27, zf + 0.22, bw, 0.48, 0.42);
+      addBox(mintPadMat, bc, y1 - 0.27, zf + 0.46, bw - 0.04, 0.44, 0.07);
+    }
+    // 壁掛式白色分離式冷氣室內機（2 台）
+    for (const ax of [cx - 2.3, cx + 1.6]) {
+      addBox(whiteMat, ax, y1 - 0.14, zf + 2.66, 1.05, 0.24, 0.28);
+      addBox(M(0xdbeafe), ax, y1 - 0.265, zf + 2.6, 0.92, 0.02, 0.05);
+    }
+
+    // 4. 西牆：「悅讀重慶」繪本小火車彩繪主題牆 ＋ 亮黃／橘／紅跳色 5 層靠牆高書架
+    const muralTex = (() => {
+      const c = document.createElement("canvas");
+      c.width = 1024;
+      c.height = 320;
+      const ctx = c.getContext("2d");
+      // 藍天白雲綠草地背景
+      const sky = ctx.createLinearGradient(0, 0, 0, 260);
+      sky.addColorStop(0, "#7ec4ea");
+      sky.addColorStop(1, "#bae4f8");
+      ctx.fillStyle = sky;
+      ctx.fillRect(0, 0, 1024, 320);
+      // 白雲
+      ctx.fillStyle = "rgba(255,255,255,0.92)";
+      for (const [ux, uy, r] of [
+        [290, 68, 28],
+        [322, 62, 34],
+        [356, 72, 24],
+        [680, 58, 30],
+        [716, 54, 36],
+        [752, 66, 26],
+        [910, 82, 26],
+      ]) {
+        ctx.beginPath();
+        ctx.arc(ux, uy, r, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      // 翠綠波浪山丘草地
+      ctx.fillStyle = "#65c466";
+      ctx.beginPath();
+      ctx.moveTo(0, 320);
+      ctx.lineTo(0, 248);
+      ctx.quadraticCurveTo(240, 210, 512, 246);
+      ctx.quadraticCurveTo(780, 282, 1024, 232);
+      ctx.lineTo(1024, 320);
+      ctx.closePath();
+      ctx.fill();
+
+      // 彩色立體大字「悅讀重慶」（錯落活潑排布）
+      const titleChars = [
+        { ch: "悅", x: 112, y: 122, bg: "#ef4444" },
+        { ch: "讀", x: 186, y: 146, bg: "#f59e0b" },
+        { ch: "重", x: 260, y: 118, bg: "#10b981" },
+        { ch: "慶", x: 334, y: 142, bg: "#3b82f6" },
+      ];
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.font = "900 46px 'Microsoft JhengHei', 'Noto Sans TC', sans-serif";
+      for (const it of titleChars) {
+        ctx.beginPath();
+        ctx.arc(it.x, it.y, 35, 0, Math.PI * 2);
+        ctx.fillStyle = it.bg;
+        ctx.fill();
+        ctx.lineWidth = 4;
+        ctx.strokeStyle = "#ffffff";
+        ctx.stroke();
+        ctx.fillStyle = "#ffffff";
+        ctx.fillText(it.ch, it.x, it.y + 3);
+      }
+
+      // 紅橘色系繪本小火車（車頭＋兩節載滿繪本與小動物的車廂）
+      const drawWheel = (wx0, wy0) => {
+        ctx.beginPath();
+        ctx.arc(wx0, wy0, 22, 0, Math.PI * 2);
+        ctx.fillStyle = "#334155";
+        ctx.fill();
+        ctx.beginPath();
+        ctx.arc(wx0, wy0, 10, 0, Math.PI * 2);
+        ctx.fillStyle = "#facc15";
+        ctx.fill();
+      };
+      // 車頭（紅橘色）
+      ctx.fillStyle = "#ea580c";
+      ctx.fillRect(420, 152, 130, 92);
+      ctx.fillStyle = "#dc2626";
+      ctx.fillRect(496, 106, 62, 138);
+      ctx.fillStyle = "#fde047";
+      ctx.fillRect(438, 114, 24, 42);
+      ctx.fillStyle = "#e0f2fe";
+      ctx.fillRect(508, 124, 38, 42);
+      // 煙霧愛心/白雲
+      ctx.fillStyle = "rgba(255,255,255,0.88)";
+      for (const [sx, sy, sr] of [
+        [446, 94, 14],
+        [466, 72, 18],
+        [496, 56, 20],
+      ]) {
+        ctx.beginPath();
+        ctx.arc(sx, sy, sr, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      drawWheel(450, 248);
+      drawWheel(528, 248);
+
+      // 第一節橘黃車廂
+      ctx.fillStyle = "#f97316";
+      ctx.fillRect(584, 156, 160, 88);
+      ctx.fillStyle = "#fef08a";
+      ctx.fillRect(600, 172, 128, 46);
+      // 車窗小熊剪影＋彩書
+      ctx.fillStyle = "#92400e";
+      ctx.beginPath();
+      ctx.arc(642, 198, 17, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = "#22c55e";
+      ctx.fillRect(680, 182, 34, 32);
+      drawWheel(620, 248);
+      drawWheel(708, 248);
+
+      // 第二節粉紅／天空藍繪本車廂
+      ctx.fillStyle = "#ef4444";
+      ctx.fillRect(772, 156, 174, 88);
+      ctx.fillStyle = "#ffffff";
+      ctx.fillRect(788, 172, 142, 46);
+      ctx.fillStyle = "#3b82f6";
+      ctx.fillRect(804, 180, 32, 34);
+      ctx.fillStyle = "#facc15";
+      ctx.fillRect(844, 182, 32, 32);
+      ctx.fillStyle = "#ec4899";
+      ctx.fillRect(884, 180, 32, 34);
+      drawWheel(812, 248);
+      drawWheel(908, 248);
+      return makeCanvasTex(c);
+    })();
+    const muralPlane = new THREE.Mesh(
+      new THREE.PlaneGeometry(wy - 0.9, 1.28),
+      new THREE.MeshStandardMaterial({ map: muralTex, roughness: 0.78 })
+    );
+    muralPlane.rotation.y = Math.PI / 2;
+    muralPlane.position.copy(b2t(x0 + 0.065, cy, zf + 2.34));
+    lib.add(muralPlane);
+
+    // 彩色書脊共用 InstBox（讓全圖書館書架塞滿高矮錯落的五彩繪本！）
+    const libBooks = new InstBox(0xffffff, { perInstance: true, roughness: 0.78 });
+    const bookColors = [
+      "#ef4444",
+      "#f97316",
+      "#facc15",
+      "#22c55e",
+      "#14b8a6",
+      "#3b82f6",
+      "#8b5cf6",
+      "#ec4899",
+      "#f43f5e",
+      "#06b6d4",
+      "#84cc16",
+      "#f59e0b",
+    ];
+    let bIdx = 0;
+    const fillBookRowX = (xa, xb, y, zBase, depth = 0.2, hMin = 0.19, hMax = 0.28) => {
+      for (let x = xa + 0.06; x < xb - 0.06; x += 0.055) {
+        const bh = hMin + ((bIdx * 37) % 100) / 100 * (hMax - hMin);
+        const bw = 0.036 + ((bIdx * 19) % 10) * 0.0014;
+        libBooks.add(x, y, zBase + bh * 0.5, bw, depth, bh, 0, bookColors[bIdx++ % bookColors.length]);
+      }
+    };
+    const fillBookRowY = (x, ya, yb, zBase, depth = 0.2, hMin = 0.19, hMax = 0.28) => {
+      for (let y = ya + 0.06; y < yb - 0.06; y += 0.055) {
+        const bh = hMin + ((bIdx * 41) % 100) / 100 * (hMax - hMin);
+        const bw = 0.036 + ((bIdx * 23) % 10) * 0.0014;
+        libBooks.add(x, y, zBase + bh * 0.5, depth, bw, bh, 0, bookColors[bIdx++ % bookColors.length]);
+      }
+    };
+
+    // 西牆下方：5 層跳色靠牆高書架（亮黃／橘／紅跳色立板）
+    const accentMats = [M(0xfacc15), M(0xfb923c), M(0xef4444), M(0xfacc15), M(0xfb923c), M(0xef4444)];
+    const wShelfY0 = y0 + 0.6;
+    const wShelfY1 = y1 - 0.7;
+    const wShelfN = 5;
+    const wBay = (wShelfY1 - wShelfY0) / wShelfN;
+    addBox(oakMat, x0 + 0.09, 0.5 * (wShelfY0 + wShelfY1), zf + 0.84, 0.04, wShelfY1 - wShelfY0, 1.66);
+    for (let k = 0; k <= 4; k++) {
+      addBox(oakMat, x0 + 0.25, 0.5 * (wShelfY0 + wShelfY1), zf + 0.08 + k * 0.39, 0.34, wShelfY1 - wShelfY0, 0.035);
+    }
+    for (let i = 0; i <= wShelfN; i++) {
+      const py = wShelfY0 + i * wBay;
+      addBox(accentMats[i % accentMats.length], x0 + 0.26, py, zf + 0.84, 0.36, 0.045, 1.68);
+      if (i < wShelfN) {
+        for (let lv = 0; lv < 4; lv++) {
+          fillBookRowY(x0 + 0.29, py + 0.05, py + wBay - 0.05, zf + 0.1 + lv * 0.39, 0.22);
+        }
+      }
+    }
+
+    // 5. 全場視覺核心：中央「音符鏤空欄板」淺原木雙面島型矮書架
+    const islX0 = x0 + 1.85;
+    const islX1 = x1 - 2.35;
+    const islLen = islX1 - islX0;
+    const islCx = 0.5 * (islX0 + islX1);
+    const islY = cy + 0.05;
+    // 矮書架本體（高 0.76m，雙面 2 層滿載繪本）
+    addBox(oakMat, islCx, islY, zf + 0.05, islLen, 0.62, 0.06);
+    addBox(oakMat, islCx, islY, zf + 0.4, islLen, 0.6, 0.035);
+    addBox(oakMat, islCx, islY, zf + 0.76, islLen + 0.04, 0.66, 0.04);
+    addBox(oakDarkMat, islCx, islY, zf + 0.4, islLen - 0.04, 0.04, 0.7);
+    const islBays = 6;
+    const islBayW = islLen / islBays;
+    for (let i = 0; i <= islBays; i++) {
+      const px = islX0 + i * islBayW;
+      addBox(oakMat, px, islY, zf + 0.4, 0.04, 0.62, 0.74);
+      if (i < islBays) {
+        for (const sideY of [islY - 0.18, islY + 0.18]) {
+          fillBookRowX(px + 0.04, px + islBayW - 0.04, sideY, zf + 0.08, 0.22, 0.2, 0.28);
+          fillBookRowX(px + 0.04, px + islBayW - 0.04, sideY, zf + 0.42, 0.22, 0.2, 0.28);
+        }
+      }
+    }
+    // 頂部經典「圓角矩形鏤空音符欄板」（淺原木框＋半透明壓克力＋彩色立體音符與高音譜記號）
+    const noteTex = (() => {
+      const c = document.createElement("canvas");
+      c.width = 1024;
+      c.height = 160;
+      const ctx = c.getContext("2d");
+      // 淺原木外框面板
+      ctx.fillStyle = "#d9bc8e";
+      ctx.fillRect(0, 0, 1024, 160);
+      const panels = 6;
+      const pw = 1024 / panels;
+      const noteCols = ["#dc2626", "#f59e0b", "#1e293b", "#2563eb", "#16a34a", "#ea580c", "#7c3aed"];
+      const drawNote = (nx, ny, col, kind) => {
+        ctx.save();
+        ctx.fillStyle = col;
+        ctx.strokeStyle = col;
+        ctx.lineWidth = 6;
+        ctx.lineCap = "round";
+        if (kind === 0) {
+          // 單八分音符
+          ctx.beginPath();
+          ctx.ellipse(nx, ny + 26, 12, 9, -0.35, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.beginPath();
+          ctx.moveTo(nx + 9, ny + 24);
+          ctx.lineTo(nx + 9, ny - 24);
+          ctx.quadraticCurveTo(nx + 28, ny - 12, nx + 22, ny + 4);
+          ctx.stroke();
+        } else if (kind === 1) {
+          // 雙八分連音符
+          for (const ox of [-14, 14]) {
+            ctx.beginPath();
+            ctx.ellipse(nx + ox, ny + 26, 10, 8, -0.35, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.beginPath();
+            ctx.moveTo(nx + ox + 8, ny + 24);
+            ctx.lineTo(nx + ox + 8, ny - 18);
+            ctx.stroke();
+          }
+          ctx.lineWidth = 8;
+          ctx.beginPath();
+          ctx.moveTo(nx - 6, ny - 18);
+          ctx.lineTo(nx + 22, ny - 25);
+          ctx.stroke();
+        } else {
+          // 高音譜記號風格符號
+          ctx.font = "900 72px Georgia, serif";
+          ctx.textAlign = "center";
+          ctx.textBaseline = "middle";
+          ctx.fillText("𝄞", nx, ny + 4);
+        }
+        ctx.restore();
+      };
+      for (let i = 0; i < panels; i++) {
+        const rx = i * pw + 14;
+        const rw = pw - 28;
+        // 圓角矩形視窗（半透明霧白壓克力質感）
+        ctx.save();
+        ctx.beginPath();
+        ctx.roundRect(rx, 20, rw, 120, 22);
+        ctx.fillStyle = "rgba(248, 250, 252, 0.72)";
+        ctx.fill();
+        ctx.lineWidth = 5;
+        ctx.strokeStyle = "#b89462";
+        ctx.stroke();
+        ctx.clip();
+        // 淡綠葉片裝飾
+        ctx.fillStyle = "rgba(74, 222, 128, 0.35)";
+        ctx.beginPath();
+        ctx.ellipse(rx + rw * 0.25, 134, 28, 16, -0.3, 0, Math.PI * 2);
+        ctx.ellipse(rx + rw * 0.78, 136, 26, 14, 0.25, 0, Math.PI * 2);
+        ctx.fill();
+        // 每格 3 個彩色音符
+        drawNote(rx + rw * 0.22, 82, noteCols[(i * 3) % noteCols.length], i % 3);
+        drawNote(rx + rw * 0.52, 78, noteCols[(i * 3 + 1) % noteCols.length], (i + 1) % 3);
+        drawNote(rx + rw * 0.82, 82, noteCols[(i * 3 + 2) % noteCols.length], (i + 2) % 3);
+        ctx.restore();
+      }
+      return makeCanvasTex(c);
+    })();
+    const notePanel = new THREE.Mesh(
+      new THREE.PlaneGeometry(islLen, 0.42),
+      new THREE.MeshStandardMaterial({ map: noteTex, transparent: true, roughness: 0.48, side: THREE.DoubleSide })
+    );
+    notePanel.position.copy(b2t(islCx, islY, zf + 0.99));
+    lib.add(notePanel);
+    addBox(oakDarkMat, islCx, islY, zf + 1.21, islLen + 0.04, 0.06, 0.035);
+
+    // 6. 前景主閱覽區（南側門內左方）：2x3 粉彩拼色模組矮閱讀桌＋攤開繪本＋彩色圓柱形軟墊矮凳
+    const tblX = x0 + 4.05;
+    const tblY = y0 + 1.95;
+    const pastelHex = [0x8ad2f2, 0xf7e57b, 0xa8e6b4, 0xf7ece6, 0xfbd3dc, 0x8ad2f2];
+    const modW = 0.84;
+    const modD = 0.74;
+    for (let r = 0; r < 2; r++) {
+      for (let c = 0; c < 3; c++) {
+        const mx = tblX + (c - 1) * (modW + 0.015);
+        const my = tblY + (r - 0.5) * (modD + 0.015);
+        addBox(M(pastelHex[r * 3 + c], { roughness: 0.52 }), mx, my, zf + 0.44, modW, modD, 0.036);
+        addBox(oakMat, mx - modW * 0.44, my, zf + 0.21, 0.04, modD - 0.08, 0.42);
+        addBox(oakMat, mx + modW * 0.44, my, zf + 0.21, 0.04, modD - 0.08, 0.42);
+      }
+    }
+    // 桌面上擺放數本攤開的彩色繪本
+    for (const [bx, by, col, yaw] of [
+      [tblX - 0.7, tblY - 0.25, 0xef4444, 0.15],
+      [tblX + 0.1, tblY + 0.28, 0x3b82f6, -0.22],
+      [tblX + 0.75, tblY - 0.18, 0x22c55e, 0.08],
+      [tblX - 0.2, tblY - 0.34, 0xf59e0b, -0.12],
+    ]) {
+      addBox(M(col, { roughness: 0.6 }), bx, by, zf + 0.466, 0.36, 0.24, 0.014, yaw);
+      addBox(whiteMat, bx, by, zf + 0.476, 0.33, 0.21, 0.008, yaw);
+    }
+    // 圓柱形軟墊矮凳（湖水綠為主＋亮黃、天藍、淺粉，含頂緣滾邊）
+    const addDrumStool = (sx, sy, hex) => {
+      addCyl(M(hex, { roughness: 0.45 }), sx, sy, zf + 0.17, 0.21, 0.21, 0.34, 22);
+      addCyl(M(0xf8fafc, { roughness: 0.6 }), sx, sy, zf + 0.335, 0.214, 0.214, 0.014, 22);
+    };
+    const drumPositions = [
+      [tblX - 1.55, tblY - 0.35, 0x4dc5b0],
+      [tblX - 1.55, tblY + 0.35, 0x4dc5b0],
+      [tblX - 0.75, tblY - 1.05, 0x4dc5b0],
+      [tblX + 0.1, tblY - 1.05, 0xf5d04c],
+      [tblX + 0.9, tblY - 1.05, 0x6ec4ea],
+      [tblX - 0.65, tblY + 1.05, 0xf4a7b9],
+      [tblX + 0.55, tblY + 1.05, 0x4dc5b0],
+    ];
+    for (const [sx, sy, hex] of drumPositions) addDrumStool(sx, sy, hex);
+
+    // 7. 東南閱讀角（進門右手邊）：米白色圓形矮閱讀桌＋軟墊圓凳＋藍色雙層鐵製書車（書車 1）
+    const rtX = x1 - 1.95;
+    const rtY = y0 + 1.95;
+    addCyl(M(0xf5f4ef, { roughness: 0.55 }), rtX, rtY, zf + 0.42, 0.58, 0.58, 0.036, 28);
+    for (const [ox, oy] of [
+      [-0.3, -0.3],
+      [0.3, -0.3],
+      [-0.3, 0.3],
+      [0.3, 0.3],
+    ]) {
+      addCyl(oakMat, rtX + ox, rtY + oy, zf + 0.2, 0.028, 0.028, 0.4, 10);
+    }
+    addDrumStool(rtX + 0.85, rtY - 0.2, 0x4dc5b0);
+    addDrumStool(rtX + 0.15, rtY - 0.88, 0xf5d04c);
+    addDrumStool(rtX + 0.78, rtY + 0.62, 0x6ec4ea);
+
+    // 藍色雙層書車（通道旁）
+    const ctX = x1 - 1.15;
+    const ctY = cy - 0.05;
+    addBox(cartBlueMat, ctX, ctY, zf + 0.16, 0.82, 0.42, 0.04);
+    addBox(cartBlueMat, ctX, ctY, zf + 0.56, 0.82, 0.42, 0.04);
+    addBox(cartBlueMat, ctX - 0.4, ctY, zf + 0.5, 0.035, 0.42, 0.74);
+    addBox(cartBlueMat, ctX + 0.4, ctY, zf + 0.5, 0.035, 0.42, 0.74);
+    fillBookRowX(ctX - 0.35, ctX + 0.35, ctY, zf + 0.58, 0.24, 0.18, 0.25);
+
+    // 8. 東牆背景：雙白色古典圓拱門框＋溝槽立柱＋紅黃藍綠彩色慶典小旗（Bunting）
+    const archTex = (() => {
+      const c = document.createElement("canvas");
+      c.width = 1024;
+      c.height = 512;
+      const ctx = c.getContext("2d");
+      ctx.fillStyle = "#8dc5e2";
+      ctx.fillRect(0, 0, 1024, 512);
+      // 拱門內深一階天空藍與遠景書架意象
+      for (const acx of [280, 744]) {
+        ctx.fillStyle = "#5b9dc4";
+        ctx.beginPath();
+        ctx.arc(acx, 220, 188, Math.PI, 0);
+        ctx.lineTo(acx + 188, 512);
+        ctx.lineTo(acx - 188, 512);
+        ctx.closePath();
+        ctx.fill();
+        // 拱內淡色遠景書牆
+        ctx.fillStyle = "#d9c29c";
+        ctx.fillRect(acx - 150, 260, 300, 252);
+        for (let r = 0; r < 4; r++) {
+          ctx.fillStyle = "#b89462";
+          ctx.fillRect(acx - 150, 290 + r * 56, 300, 8);
+          for (let b = 0; b < 18; b++) {
+            ctx.fillStyle = bookColors[(b + r * 5) % bookColors.length];
+            ctx.fillRect(acx - 142 + b * 16, 266 + r * 56, 11, 24);
+          }
+        }
+      }
+      // 白色古典圓拱頂與門框（遮罩拱上方）
+      ctx.fillStyle = "#f8fafc";
+      ctx.beginPath();
+      ctx.rect(0, 0, 1024, 512);
+      for (const acx of [280, 744]) {
+        ctx.moveTo(acx - 182, 512);
+        ctx.lineTo(acx - 182, 220);
+        ctx.arc(acx, 220, 182, Math.PI, 0, false);
+        ctx.lineTo(acx + 182, 512);
+        ctx.closePath();
+      }
+      ctx.fill("evenodd");
+      // 古典羅馬溝槽柱線條
+      for (const px of [48, 496, 944]) {
+        ctx.fillStyle = "#e2e8f0";
+        ctx.fillRect(px, 190, 32, 322);
+        ctx.fillStyle = "#ffffff";
+        ctx.fillRect(px - 10, 174, 52, 24);
+      }
+      // 右座圓拱懸掛彩色三角慶典小旗（Bunting）
+      const flagCols = ["#ef4444", "#facc15", "#3b82f6", "#22c55e", "#f97316", "#ec4899"];
+      ctx.strokeStyle = "#475569";
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.moveTo(564, 154);
+      ctx.quadraticCurveTo(744, 232, 924, 154);
+      ctx.stroke();
+      for (let i = 0; i < 11; i++) {
+        const t = (i + 0.5) / 11;
+        const fx = 564 + t * 360;
+        const fy = 154 + Math.sin(t * Math.PI) * 39;
+        ctx.fillStyle = flagCols[i % flagCols.length];
+        ctx.beginPath();
+        ctx.moveTo(fx - 13, fy);
+        ctx.lineTo(fx + 13, fy);
+        ctx.lineTo(fx, fy + 28);
+        ctx.closePath();
+        ctx.fill();
+      }
+      return makeCanvasTex(c);
+    })();
+    const archPlane = new THREE.Mesh(
+      new THREE.PlaneGeometry(wy - 0.4, h - 0.14),
+      new THREE.MeshStandardMaterial({ map: archTex, roughness: 0.72 })
+    );
+    archPlane.rotation.y = -Math.PI / 2;
+    // 東牆隔間內表面在 x1 - 0.10，置於 x1 - 0.155 清晰呈現雙白色古典圓拱門與彩色三角小旗
+    archPlane.position.copy(b2t(x1 - 0.155, cy, zf + (h - 0.14) * 0.5));
+    lib.add(archPlane);
+
+    // 9. 北側後方服務區：藍綠色借還書櫃檯（含 2 台電腦螢幕）＋「好書區」紫色拱頂展示書架＋螢光草綠兒童椅
+    const deskX = x1 - 2.3;
+    const deskY = y1 - 1.55;
+    addBox(tealDeskMat, deskX, deskY, zf + 0.44, 2.2, 0.72, 0.86);
+    addBox(oakMat, deskX, deskY, zf + 0.89, 2.28, 0.78, 0.04);
+    for (const mx of [deskX - 0.52, deskX + 0.48]) {
+      addBox(darkMat, mx, deskY + 0.05, zf + 1.13, 0.48, 0.04, 0.32);
+      addBox(chromeMat, mx, deskY + 0.06, zf + 0.94, 0.06, 0.06, 0.12);
+      addBox(darkMat, mx, deskY - 0.16, zf + 0.92, 0.36, 0.14, 0.02);
+    }
+
+    // 「好書區」紫色弧形拱頂展示書架（西北後區）
+    const gbX = x0 + 3.1;
+    const gbY = y1 - 1.45;
+    addBox(oakMat, gbX, gbY, zf + 0.72, 2.1, 0.48, 1.42);
+    addBox(limeMat, gbX + 1.12, gbY, zf + 0.55, 0.14, 0.44, 1.06);
+    // 紫色半圓弧頂蓋（軸沿 Z 深 0.52m、寬沿 X 2.12m、向上拱起高 0.38m）
+    const purpleArch = new THREE.Mesh(
+      new THREE.CylinderGeometry(1.06, 1.06, 0.52, 24, 1, false, -Math.PI / 2, Math.PI),
+      purpleMat
+    );
+    purpleArch.scale.set(1, 1, 0.36);
+    purpleArch.rotation.x = -Math.PI / 2;
+    purpleArch.position.copy(b2t(gbX, gbY, zf + 1.43));
+    lib.add(purpleArch);
+    // 鮮黃色「好書區」招牌橫樑
+    const goodBookTex = (() => {
+      const c = document.createElement("canvas");
+      c.width = 512;
+      c.height = 96;
+      const ctx = c.getContext("2d");
+      ctx.fillStyle = "#facc15";
+      ctx.fillRect(0, 0, 512, 96);
+      // 白底紅框「好書區」字牌＋兩側小紅花
+      ctx.fillStyle = "#ffffff";
+      ctx.fillRect(140, 14, 232, 68);
+      ctx.strokeStyle = "#dc2626";
+      ctx.lineWidth = 5;
+      ctx.strokeRect(140, 14, 232, 68);
+      ctx.fillStyle = "#dc2626";
+      ctx.font = "900 44px 'Microsoft JhengHei', 'Noto Sans TC', sans-serif";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText("好書區", 256, 50);
+      for (const fx of [72, 440]) {
+        ctx.beginPath();
+        ctx.arc(fx, 48, 22, 0, Math.PI * 2);
+        ctx.fillStyle = "#ef4444";
+        ctx.fill();
+        ctx.beginPath();
+        ctx.arc(fx, 48, 8, 0, Math.PI * 2);
+        ctx.fillStyle = "#fde047";
+        ctx.fill();
+      }
+      return makeCanvasTex(c);
+    })();
+    const gbBanner = new THREE.Mesh(
+      new THREE.PlaneGeometry(2.1, 0.34),
+      new THREE.MeshStandardMaterial({ map: goodBookTex, roughness: 0.55 })
+    );
+    gbBanner.position.copy(b2t(gbX, gbY - 0.25, zf + 1.38));
+    lib.add(gbBanner);
+    // 斜插繪本封面展示
+    for (let lv = 0; lv < 3; lv++) {
+      fillBookRowX(gbX - 0.96, gbX + 0.96, gbY - 0.22, zf + 0.16 + lv * 0.34, 0.12, 0.22, 0.26);
+    }
+    // 2 張螢光草綠兒童靠背塑膠椅
+    for (const [cx0, cy0] of [
+      [gbX - 0.45, gbY - 0.9],
+      [gbX + 0.55, gbY - 0.9],
+    ]) {
+      addBox(limeMat, cx0, cy0, zf + 0.32, 0.34, 0.34, 0.04);
+      addBox(limeMat, cx0, cy0 - 0.15, zf + 0.52, 0.34, 0.04, 0.36);
+      for (const [lx, ly] of [
+        [-0.14, -0.14],
+        [0.14, -0.14],
+        [-0.14, 0.14],
+        [0.14, 0.14],
+      ]) {
+        addBox(limeMat, cx0 + lx, cy0 + ly, zf + 0.16, 0.035, 0.035, 0.32);
+      }
+    }
+
+    const builtBooks = libBooks.build();
+    if (builtBooks) lib.add(builtBooks);
+
+    // 柔和室內補光（還原圖書館明亮清透氛圍）
+    const libLight = new THREE.PointLight(0xf6fbff, 6.5, 14, 1.35);
+    libLight.position.copy(b2t(cx, cy, zc - 0.35));
+    lib.add(libLight);
+
+    lib.traverse((o) => {
+      if (o.isMesh) {
+        o.castShadow = false;
+        o.receiveShadow = false;
+      }
+    });
+    parentGroup.add(lib);
   }
 
   // ---------- 碰撞（靜態牆＋關閉中之動態門板）與地面 ----------

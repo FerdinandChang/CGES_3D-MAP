@@ -1193,7 +1193,9 @@ function findRoomBySlug(query) {
   return (
     state.allRooms.find(
       (r) => (r.code && r.code.toLowerCase() === q) || r.short.toLowerCase() === q || r.name.toLowerCase() === q
-    ) || state.allRooms.find((r) => r.haystack.includes(q))
+    ) ||
+    state.allRooms.find((r) => r.short.toLowerCase().includes(q) || r.name.toLowerCase().includes(q)) ||
+    state.allRooms.find((r) => r.haystack.includes(q))
   );
 }
 
