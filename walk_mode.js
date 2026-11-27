@@ -778,30 +778,56 @@ export function createWalkMode(opts) {
     S.groundMeshes = out;
   }
 
-  // ---------- 動態互動內推木門（嵌於門框內，點擊／按 F 鍵向室內旋轉 95° 開關＋動態碰撞）----------
+  // ---------- 動態互動教室門（依 607 班實景：淺原木實心平面門＋銀色水平壓把＋深灰金屬門框＋門頂鋁框氣窗）----------
   function buildDoors() {
     const grp = new THREE.Group();
     grp.name = "WalkInteractiveDoors";
-    const woodMat = new THREE.MeshStandardMaterial({ color: 0xb07d4f, roughness: 0.62, metalness: 0.05 });
-    const glassMat = new THREE.MeshStandardMaterial({
-      color: 0xbfe2ff,
-      roughness: 0.15,
-      metalness: 0.1,
+
+    // 淺原木直紋平面實心木門貼圖（無門扇玻璃，還原重慶國小真實教室門）
+    const woodDoorTex = (() => {
+      const c = document.createElement("canvas");
+      c.width = 256;
+      c.height = 512;
+      const ctx = c.getContext("2d");
+      ctx.fillStyle = "#d9bc8e";
+      ctx.fillRect(0, 0, 256, 512);
+      for (let x = 0; x < 256; x += 4) {
+        const tone = ((x * 29) % 19) - 9;
+        ctx.fillStyle = tone > 0 ? `rgba(255,248,232,${tone * 0.015})` : `rgba(145,105,58,${-tone * 0.018})`;
+        ctx.fillRect(x, 0, 4, 512);
+      }
+      ctx.strokeStyle = "rgba(130,96,54,0.22)";
+      ctx.lineWidth = 4;
+      ctx.strokeRect(4, 4, 248, 504);
+      return makeCanvasTex(c);
+    })();
+
+    const woodMat = new THREE.MeshStandardMaterial({ map: woodDoorTex, roughness: 0.62, metalness: 0.04 });
+    const metalFrameMat = new THREE.MeshStandardMaterial({ color: 0x6b7280, roughness: 0.48, metalness: 0.55 });
+    const alumMat = new THREE.MeshStandardMaterial({ color: 0xcbd5e1, roughness: 0.35, metalness: 0.65 });
+    const transomGlassMat = new THREE.MeshStandardMaterial({
+      color: 0x94c5df,
+      roughness: 0.16,
+      metalness: 0.15,
       transparent: true,
-      opacity: 0.42,
+      opacity: 0.55,
     });
-    const handleMat = new THREE.MeshStandardMaterial({ color: 0xd1d5db, roughness: 0.25, metalness: 0.85 });
+    const handleMat = new THREE.MeshStandardMaterial({ color: 0xe2e8f0, roughness: 0.22, metalness: 0.88 });
     const hingeMat = new THREE.MeshStandardMaterial({ color: 0x4b5563, roughness: 0.4, metalness: 0.75 });
 
-    // 共用幾何（門寬 1.08m 嚴密嵌入 1.10m 門洞內，絕不外凸重疊相鄰窗戶；厚度 0.05m）
-    const doorW = 1.08;
-    const topBarGeo = new THREE.BoxGeometry(doorW, 0.22, 0.05);
-    const botPanelGeo = new THREE.BoxGeometry(doorW, 1.04, 0.05);
-    const stileGeo = new THREE.BoxGeometry(0.21, 0.86, 0.05);
-    const glassGeo = new THREE.BoxGeometry(doorW - 0.42, 0.86, 0.02);
-    const latchBaseGeo = new THREE.BoxGeometry(0.055, 0.12, 0.075);
-    const leverGeo = new THREE.BoxGeometry(0.11, 0.024, 0.13);
-    const hingeGeo = new THREE.BoxGeometry(0.028, 0.13, 0.068);
+    // 共用幾何（門寬 1.06m 嚴密嵌入深灰金屬門框內，絕不外凸重疊相鄰窗戶）
+    const doorW = 1.06;
+    const panelGeo = new THREE.BoxGeometry(doorW, 2.1, 0.05);
+    const latchPlateGeo = new THREE.BoxGeometry(0.048, 0.15, 0.072);
+    const leverGeo = new THREE.BoxGeometry(0.135, 0.022, 0.14);
+    const hingeGeo = new THREE.BoxGeometry(0.026, 0.13, 0.068);
+    // 深灰金屬門框包邊（固定於 pivot 不隨門旋轉）
+    const jambGeo = new THREE.BoxGeometry(0.04, 2.14, 0.31);
+    const headerGeo = new THREE.BoxGeometry(1.16, 0.05, 0.31);
+    // 門頂獨立銀鋁框透明氣窗（貼附門洞上方內外兩側，呈現教室門頂透光氣窗特徵）
+    const transomFrameGeo = new THREE.BoxGeometry(1.14, 0.34, 0.34);
+    const transomGlassGeo = new THREE.BoxGeometry(1.04, 0.25, 0.355);
+    const transomBarGeo = new THREE.BoxGeometry(0.032, 0.26, 0.365);
 
     const roomsInfo = getRooms ? getRooms() : [];
     const bySpecKey = new Map();
@@ -818,56 +844,62 @@ export function createWalkMode(opts) {
       const label = info ? info.short || info.name : rm.kind === "stair" ? "梯間" : "教室";
       const [nx, ny] = dr.normal || [0, -1];
 
-      // 依樓層門洞實際淨空縮放門高，貼齊門框頂樑不穿模
       const bMeta = S.buildings[rm.bldg];
       const flMeta = bMeta?.floors?.find((f) => f.floor === rm.floor);
       const openH = flMeta ? Math.max(1.86, Math.min(2.14, flMeta.zf + 2.25 - dr.z)) : 2.0;
 
-      // 統一局部座標：rotation.y = atan2(nx, -ny) 使 local +Z 永遠指向門外走廊、local -Z 永遠指向教室內部
+      // 統一局部座標：local +Z 永遠指向走廊、local -Z 永遠指向教室內部
       const theta = Math.atan2(nx, -ny);
       const slide = dr.slide || 1;
-      // 合頁放在靠隔間牆側（遠離房間中心），門往室內打開 95° 時自然貼牆不擋路
       const wallSideDot = dr.axis === "X" ? -slide * Math.cos(theta) : -slide * Math.sin(theta);
       const hingeSide = wallSideDot >= 0 ? 1 : -1;
-      // local X 上合頁位於 hingeSide * (doorW / 2)，門片中心偏離合頁 -hingeSide * (doorW / 2)
       const leafOffsetX = -hingeSide * (doorW * 0.5);
-      // 繞 Y 旋轉 -hingeSide * 95°：無論合頁在左或右，遠端門緣一律轉向 local -Z（教室內部）
       const openAngle = -hingeSide * (Math.PI * 0.53);
 
       const pivot = new THREE.Group();
+
+      // 深灰金屬門框（覆蓋門洞左右與頂緣）
+      const jL = new THREE.Mesh(jambGeo, metalFrameMat);
+      jL.position.set(-0.56, 1.07, 0);
+      const jR = new THREE.Mesh(jambGeo, metalFrameMat);
+      jR.position.set(0.56, 1.07, 0);
+      const hdr = new THREE.Mesh(headerGeo, metalFrameMat);
+      hdr.position.set(0, 2.13, 0);
+      pivot.add(jL, jR, hdr);
+
+      // 門頂獨立銀鋁框透明氣窗
+      const trFrame = new THREE.Mesh(transomFrameGeo, alumMat);
+      trFrame.position.set(0, 2.33, 0);
+      const trGlass = new THREE.Mesh(transomGlassGeo, transomGlassMat);
+      trGlass.position.set(0, 2.33, 0);
+      const trMid = new THREE.Mesh(transomBarGeo, alumMat);
+      trMid.position.set(0, 2.33, 0);
+      pivot.add(trFrame, trGlass, trMid);
+
       const hinge = new THREE.Group();
-      // 合頁軸置於門洞靠室內側門框內緣（local Z = -0.09），關門時門板收於牆體門洞內、開門往室內旋轉不擦牆
       hinge.position.set(hingeSide * (doorW * 0.5), 0, -0.09);
 
       const leaf = new THREE.Group();
       leaf.position.set(leafOffsetX, 0, 0);
 
-      // 門板構成（標準高度 0 .. 2.12m，再依 openH 精準縮放）
-      const bot = new THREE.Mesh(botPanelGeo, woodMat);
-      bot.position.set(0, 0.52, 0);
-      const top = new THREE.Mesh(topBarGeo, woodMat);
-      top.position.set(0, 2.01, 0);
-      const stL = new THREE.Mesh(stileGeo, woodMat);
-      stL.position.set(-(doorW * 0.5 - 0.105), 1.47, 0);
-      const stR = new THREE.Mesh(stileGeo, woodMat);
-      stR.position.set(doorW * 0.5 - 0.105, 1.47, 0);
-      const gl = new THREE.Mesh(glassGeo, glassMat);
-      gl.position.set(0, 1.47, 0);
+      // 淺原木平面實心門扇（無門扇玻璃）
+      const panel = new THREE.Mesh(panelGeo, woodMat);
+      panel.position.set(0, 1.05, 0);
 
-      // 門把置於遠離合頁的門緣（正反兩面皆可見）
-      const handleX = -hingeSide * (doorW * 0.5 - 0.095);
-      const latch = new THREE.Mesh(latchBaseGeo, handleMat);
-      latch.position.set(handleX, 1.0, 0);
+      // 銀色水平長條壓把（槓桿鎖）
+      const handleX = -hingeSide * (doorW * 0.5 - 0.09);
+      const latch = new THREE.Mesh(latchPlateGeo, handleMat);
+      latch.position.set(handleX, 0.99, 0);
       const lever = new THREE.Mesh(leverGeo, handleMat);
-      lever.position.set(handleX + hingeSide * 0.035, 1.0, 0);
+      lever.position.set(handleX + hingeSide * 0.045, 1.0, 0);
 
-      // 合頁鉸鏈（上下兩顆）
+      // 上下合頁鉸鏈
       const h1 = new THREE.Mesh(hingeGeo, hingeMat);
       h1.position.set(hingeSide * (doorW * 0.5 - 0.01), 0.38, -0.01);
       const h2 = new THREE.Mesh(hingeGeo, hingeMat);
       h2.position.set(hingeSide * (doorW * 0.5 - 0.01), 1.72, -0.01);
 
-      for (const m of [bot, top, stL, stR, gl, latch, lever, h1, h2]) {
+      for (const m of [panel, latch, lever, h1, h2]) {
         m.userData.doorIdx = idx;
         S.doorPickMeshes.push(m);
         leaf.add(m);
@@ -970,53 +1002,179 @@ export function createWalkMode(opts) {
     return door;
   }
 
-  // ---------- 全校 4 棟動態室內家具（黑板、講桌、課桌椅、書架、辦公室、視聽中心）----------
+  // ---------- 全校 4 棟動態室內家具（依 607 班實景：電子黑板、莫蘭迪綠窗簾、原木課桌椅、雙管吊燈、藍粉黃置物櫃）----------
   function buildInterior() {
-    const wood = new InstBox(0xc79a62, { roughness: 0.7 });
-    const metal = new InstBox(0x6b7280, { roughness: 0.5, metalness: 0.4 });
+    const wood = new InstBox(0xcfa56e, { roughness: 0.68 });
+    const woodDark = new InstBox(0xb88b52, { roughness: 0.74 });
+    const yellowPeg = new InstBox(0xfacc15, { roughness: 0.5 });
+    const hookGreen = new InstBox(0x22c55e, { roughness: 0.55 });
+    const metal = new InstBox(0x6b7280, { roughness: 0.48, metalness: 0.42 });
+    const silver = new InstBox(0xcfd6de, { roughness: 0.35, metalness: 0.55 });
+    const darkMetal = new InstBox(0x262c36, { roughness: 0.52, metalness: 0.35 });
     const chair = new InstBox(0x3b82f6, { roughness: 0.6 });
     const seatRed = new InstBox(0xb91c1c, { roughness: 0.75 });
-    const board = new InstBox(0x1f4d3a, { roughness: 0.9 });
-    const white = new InstBox(0xf1f5f9, { roughness: 0.6 });
-    const books = new InstBox(0xffffff, { perInstance: true, roughness: 0.8 });
-    const lamp = new InstBox(0xffffff, { emissive: 0xfff6dc, roughness: 0.4 });
+    const board = new InstBox(0x1e4a38, { roughness: 0.88 });
+    const bulletinGreen = new InstBox(0x2c6648, { roughness: 0.84 });
+    const white = new InstBox(0xf3f6fa, { roughness: 0.58 });
+    const concrete = new InstBox(0xc2c8ce, { roughness: 0.82 });
+    const curtainGreen = new InstBox(0x729484, { roughness: 0.88 });
+    const curtainTie = new InstBox(0x557566, { roughness: 0.84 });
+    const lockerBody = new InstBox(0xe6e8ec, { roughness: 0.72 });
+    const lockerDoors = new InstBox(0xffffff, { perInstance: true, roughness: 0.58 });
+    const lamp = new InstBox(0xffffff, { emissive: 0xf7fbff, roughness: 0.25 });
     const shelf = new InstBox(0xd9d2c3, { roughness: 0.7 });
+
+    // 共用智慧電子觸控大螢幕貼圖（白框內嵌教學大屏）
+    const smartScreenTex = (() => {
+      const c = document.createElement("canvas");
+      c.width = 512;
+      c.height = 320;
+      const ctx = c.getContext("2d");
+      // 白色外框＋細黑內邊
+      ctx.fillStyle = "#f1f5f9";
+      ctx.fillRect(0, 0, 512, 320);
+      ctx.fillStyle = "#1e293b";
+      ctx.fillRect(10, 10, 492, 286);
+      // 柔和教學簡報畫面底色
+      const bg = ctx.createLinearGradient(0, 16, 0, 290);
+      bg.addColorStop(0, "#7dd3fc");
+      bg.addColorStop(1, "#bae6fd");
+      ctx.fillStyle = bg;
+      ctx.fillRect(16, 16, 480, 260);
+      // 頂部課程標題列
+      ctx.fillStyle = "#0369a1";
+      ctx.fillRect(16, 16, 480, 34);
+      ctx.fillStyle = "#ffffff";
+      ctx.font = "700 18px 'Microsoft JhengHei', sans-serif";
+      ctx.fillText("重慶國小 智慧互動教室", 30, 39);
+      // 簡報卡片圖解（5 張彩色教學卡片）
+      const cards = ["#ef4444", "#f59e0b", "#10b981", "#3b82f6", "#8b5cf6"];
+      for (let i = 0; i < 5; i++) {
+        const cx0 = 42 + i * 86;
+        ctx.fillStyle = "#ffffff";
+        ctx.fillRect(cx0, 74, 72, 118);
+        ctx.fillStyle = cards[i];
+        ctx.fillRect(cx0 + 6, 80, 60, 52);
+        ctx.fillStyle = "#94a3b8";
+        ctx.fillRect(cx0 + 8, 142, 56, 8);
+        ctx.fillRect(cx0 + 8, 156, 42, 8);
+      }
+      // 左下浮動工具條＋底部 Windows 工作列
+      ctx.fillStyle = "#1d4ed8";
+      ctx.fillRect(24, 206, 48, 56);
+      ctx.fillStyle = "#0f172a";
+      ctx.fillRect(16, 276, 480, 14);
+      // 白色下緣觸控快捷鍵圓點
+      ctx.fillStyle = "#94a3b8";
+      for (let i = 0; i < 5; i++) ctx.fillRect(210 + i * 20, 303, 10, 5);
+      return makeCanvasTex(c);
+    })();
+    const smartScreenMat = new THREE.MeshStandardMaterial({
+      map: smartScreenTex,
+      roughness: 0.25,
+      emissive: new THREE.Color(0x60a5fa),
+      emissiveMap: smartScreenTex,
+      emissiveIntensity: 0.42,
+    });
+    const smartScreenGeo = new THREE.PlaneGeometry(1, 1);
 
     const rooms = getRooms ? getRooms() : [];
     const bySpecKey = new Map();
     for (const r of rooms) if (r.specKey) bySpecKey.set(r.specKey, r);
 
-    const palette = ["#ef4444", "#3b82f6", "#22c55e", "#f59e0b", "#a855f7", "#14b8a6", "#f43f5e", "#64748b"];
-    let pi = 0;
+    const lockerPalette = ["#fae17d", "#8ecae6", "#f7b2c4"]; // 鵝黃、粉藍、粉紅斜向循環
 
-    const addDesk = (x, y, z, yaw = 0) => {
+    // 全原木單人獨立課桌椅（還原 607 班實木桌面＋開放木抽屜＋3 根黃色擋書插梢＋原木條椅面與靠背）
+    const addWoodenDesk = (x, y, z, yaw = 0, door = null) => {
+      // 自動避開對內推開 95° 教室門扇之掃掠半徑，杜絕開門撞桌穿模
+      if (door) {
+        const [dnx, dny] = door.normal || [0, -1];
+        const swX = door.x - dnx * 0.65;
+        const swY = door.y - dny * 0.65;
+        if (Math.hypot(x - swX, y - swY) < 1.18) return;
+      }
       const c = Math.cos(yaw);
       const s = Math.sin(yaw);
       const rot = (dx, dy) => [x + dx * c - dy * s, y + dx * s + dy * c];
-      const [tx, ty] = rot(0, 0);
-      wood.add(tx, ty, z + 0.72, 0.46, 0.62, 0.035, yaw);
+      // 原木桌面
+      wood.add(x, y, z + 0.725, 0.48, 0.64, 0.032, yaw);
+      // 開放木抽屜箱（左右側板＋底板＋靠講台前擋板）
+      const [dbx, dby] = rot(0, 0);
+      woodDark.add(dbx, dby, z + 0.59, 0.42, 0.56, 0.022, yaw);
+      for (const sy of [-0.275, 0.275]) {
+        const [sx, spy] = rot(0, sy);
+        wood.add(sx, spy, z + 0.655, 0.42, 0.024, 0.115, yaw);
+      }
+      const [fx, fy] = rot(-0.2, 0);
+      wood.add(fx, fy, z + 0.655, 0.022, 0.54, 0.11, yaw);
+      // 抽屜口前緣 3 根亮黃色擋書圓柱插梢（607 班實景細節！）
+      for (const py of [-0.14, 0, 0.14]) {
+        const [px, ppy] = rot(0.2, py);
+        yellowPeg.add(px, ppy, z + 0.645, 0.018, 0.018, 0.095, yaw);
+      }
+      // 側邊綠色書包小掛鉤
+      const [hx, hy] = rot(0.02, 0.31);
+      hookGreen.add(hx, hy, z + 0.64, 0.022, 0.045, 0.022, yaw);
+      // 4 支方形原木桌腳＋下橫撐
       for (const [lx, ly] of [
-        [-0.2, -0.27],
-        [0.2, -0.27],
-        [-0.2, 0.27],
-        [0.2, 0.27],
+        [-0.21, -0.28],
+        [0.21, -0.28],
+        [-0.21, 0.28],
+        [0.21, 0.28],
       ]) {
         const [px, py] = rot(lx, ly);
-        metal.add(px, py, z + 0.355, 0.035, 0.035, 0.7, yaw);
+        woodDark.add(px, py, z + 0.355, 0.04, 0.04, 0.71, yaw);
       }
-      const [cx, cy] = rot(0.62, 0);
-      chair.add(cx, cy, z + 0.44, 0.4, 0.4, 0.04, yaw);
-      const [bx, by] = rot(0.8, 0);
-      chair.add(bx, by, z + 0.66, 0.04, 0.4, 0.4, yaw);
-      for (const [lx, ly] of [
-        [0.47, -0.17],
-        [0.77, -0.17],
-        [0.47, 0.17],
-        [0.77, 0.17],
+      for (const ly of [-0.28, 0.28]) {
+        const [px, py] = rot(0, ly);
+        woodDark.add(px, py, z + 0.14, 0.4, 0.028, 0.032, yaw);
+      }
+      // 全原木單人椅（橫木條椅面＋雙橫條鏤空手提孔椅背＋原木四腳）
+      const [cx, cy] = rot(0.6, 0);
+      wood.add(cx, cy, z + 0.43, 0.39, 0.39, 0.032, yaw);
+      // 上下雙橫木椅背（中間留長橢圓手提孔透空感）
+      const [b1x, b1y] = rot(0.775, 0);
+      wood.add(b1x, b1y, z + 0.74, 0.028, 0.38, 0.11, yaw);
+      wood.add(b1x, b1y, z + 0.59, 0.028, 0.38, 0.08, yaw);
+      for (const [lx, ly, hh] of [
+        [0.44, -0.17, 0.42],
+        [0.44, 0.17, 0.42],
+        [0.77, -0.17, 0.79],
+        [0.77, 0.17, 0.79],
       ]) {
         const [px, py] = rot(lx, ly);
-        metal.add(px, py, z + 0.21, 0.03, 0.03, 0.42, yaw);
+        woodDark.add(px, py, z + hh * 0.5, 0.034, 0.034, hh, yaw);
       }
+    };
+
+    // 雙管懸吊式銀鋁槽教室日光燈（每盞附 2 根金屬吊桿）
+    const addHangingLamp = (x, y, zc, yaw = 0, len = 1.24, drop = 0.44) => {
+      const c = Math.cos(yaw);
+      const s = Math.sin(yaw);
+      const zLamp = zc - drop;
+      silver.add(x, y, zLamp + 0.025, len, 0.18, 0.045, yaw);
+      lamp.add(x, y, zLamp - 0.004, len - 0.06, 0.12, 0.018, yaw);
+      for (const o of [-len * 0.36, len * 0.36]) {
+        silver.add(x + o * c, y + o * s, zc - drop * 0.5, 0.016, 0.016, drop, 0);
+      }
+    };
+
+    // 霧灰綠／莫蘭迪淺綠布質打褶對開窗簾（掛於窗間柱旁，避開門洞）
+    const addGreenCurtain = (x, y, zf, zc, alongXWall) => {
+      const topZ = zc - 0.16;
+      const botZ = zf + 0.54;
+      const midZ = zf + 1.28;
+      const hUp = Math.max(0.4, topZ - midZ);
+      const hDn = Math.max(0.35, midZ - botZ);
+      const sxU = alongXWall ? 0.34 : 0.12;
+      const syU = alongXWall ? 0.12 : 0.34;
+      const sxT = alongXWall ? 0.22 : 0.13;
+      const syT = alongXWall ? 0.13 : 0.22;
+      const sxD = alongXWall ? 0.38 : 0.13;
+      const syD = alongXWall ? 0.13 : 0.38;
+      curtainGreen.add(x, y, midZ + hUp * 0.5, sxU, syU, hUp);
+      curtainTie.add(x, y, midZ, sxT, syT, 0.08);
+      curtainGreen.add(x, y, botZ + hDn * 0.5, sxD, syD, hDn);
     };
 
     const group = new THREE.Group();
@@ -1033,6 +1191,7 @@ export function createWalkMode(opts) {
       if (wx < 1.8 || wy < 1.8) continue;
 
       const zf = rm.z_floor;
+      const zc = rm.z_ceil;
       const cx = 0.5 * (rm.x0 + rm.x1);
       const cy = 0.5 * (rm.y0 + rm.y1);
       const alongY = rm.bldg === "Bldg_Wuquan" || rm.bldg === "Bldg_Guanghe";
@@ -1059,12 +1218,13 @@ export function createWalkMode(opts) {
             seatRed.add(sx + 0.2, sy, zf + 0.72, 0.1, 0.5, 0.52);
           }
         }
+        lamp.add(cx, cy, zc - 0.05, Math.min(1.5, wx * 0.25), 0.28, 0.04);
       } else if (layout === "library") {
         // 交由專屬實景圖書館模組精細建置（音符矮書架、粉彩矮桌圓凳、悅讀重慶火車牆、雙白拱門與好書區）
         libRooms.push(rm);
         continue;
       } else if (layout === "office") {
-        // 行政處室／辦公室：依房間長寬自動排辦公桌＋螢幕＋檔案櫃
+        // 行政處室／辦公室：辦公桌＋螢幕＋檔案櫃＋懸吊日光燈
         const nX = Math.max(1, Math.min(3, Math.floor((wx - 1.4) / 2.6)));
         const nY = Math.max(1, Math.min(3, Math.floor((wy - 1.4) / 2.2)));
         for (let i = 0; i < nX; i++) {
@@ -1078,59 +1238,226 @@ export function createWalkMode(opts) {
           }
         }
         shelf.add(rm.x0 + 0.35, cy, zf + 0.95, 0.4, Math.min(4.2, wy * 0.55), 1.9);
+        addHangingLamp(cx, cy, zc, alongY ? Math.PI / 2 : 0, Math.min(1.4, (alongY ? wy : wx) * 0.35), 0.36);
       } else if (!alongY) {
-        // 沿 X 軸教室（和平樓、重慶樓）：黑板掛西側隔間牆，課桌面向西（yaw = 0）
-        const bw = Math.min(4.4, wy * 0.55);
-        board.add(rm.x0 + 0.14, cy, zf + 1.6, 0.03, bw, 1.15);
-        wood.add(rm.x0 + 0.13, cy, zf + 1.6, 0.025, bw + 0.14, 1.29);
-        wood.add(rm.x0 + 0.2, cy, zf + 0.98, 0.14, bw, 0.04);
+        // ===== 沿 X 軸教室（和平樓、重慶樓）：西牆前電子黑板、東牆藍粉黃置物櫃、南北窗莫蘭迪綠窗簾 =====
+        const bw = Math.min(4.9, wy * 0.66);
+        const scrW = Math.min(2.05, bw * 0.43);
+        const sideW = Math.max(0.5, (bw - scrW) * 0.5);
+        // 1) 電子黑板：左右深綠黑板＋霧面銀鋁外框＋銀鋁粉筆槽＋中央嵌入式觸控大屏＋3 盞黑板專用吊燈＋左右廣播喇叭
+        silver.add(rm.x0 + 0.125, cy, zf + 1.56, 0.035, bw + 0.12, 1.26);
+        board.add(rm.x0 + 0.148, cy - (scrW + sideW) * 0.5, zf + 1.56, 0.025, sideW, 1.16);
+        board.add(rm.x0 + 0.148, cy + (scrW + sideW) * 0.5, zf + 1.56, 0.025, sideW, 1.16);
+        silver.add(rm.x0 + 0.2, cy, zf + 0.94, 0.12, bw + 0.12, 0.045);
+        // 中央智慧電子螢幕（面向 +X）
+        const scr = new THREE.Mesh(smartScreenGeo, smartScreenMat);
+        scr.scale.set(scrW, 1.14, 1);
+        scr.rotation.y = Math.PI / 2;
+        scr.position.copy(b2t(rm.x0 + 0.17, cy, zf + 1.56));
+        group.add(scr);
+        // 黑板上方 3 盞灰銀色專用吊燈＋左右黑色教學廣播喇叭＋無線接收盒
+        for (const oy of [-bw * 0.32, 0, bw * 0.32]) {
+          addHangingLamp(rm.x0 + 0.68, cy + oy, zc, Math.PI / 2, Math.min(1.15, bw * 0.28), 0.48);
+        }
+        darkMetal.add(rm.x0 + 0.2, cy - bw * 0.52, zf + 2.42, 0.16, 0.2, 0.28);
+        darkMetal.add(rm.x0 + 0.2, cy + bw * 0.52, zf + 2.42, 0.16, 0.2, 0.28);
+        darkMetal.add(rm.x0 + 0.16, cy, zf + 2.26, 0.1, 0.28, 0.07);
+        // 右側深綠葉飾公佈欄
+        if (wy > bw + 1.4) {
+          bulletinGreen.add(rm.x0 + 0.135, rm.y1 - 0.55, zf + 1.58, 0.03, 0.85, 1.05);
+        }
+        // 淺灰磨石子墊高講台＋前右角教師電腦桌
+        concrete.add(rm.x0 + 0.58, cy, zf + 0.07, 0.96, Math.min(wy - 0.6, bw + 0.6), 0.14);
+
         if (layout === "classroom") {
-          wood.add(rm.x0 + 0.95, cy - 1.2, zf + 0.75, 0.6, 1.3, 0.05);
-          wood.add(rm.x0 + 0.95, cy - 1.2, zf + 0.37, 0.5, 1.2, 0.7);
-          const gx0 = rm.x0 + 2.3;
-          const gx1 = rm.x1 - 1.0;
-          const gy0 = rm.y0 + 0.95;
-          const gy1 = rm.y1 - 0.95;
-          const rows = Math.max(1, Math.min(4, Math.floor((gx1 - gx0) / 1.35) + 1));
-          const colsN = Math.max(1, Math.min(5, Math.floor((gy1 - gy0) / 1.4) + 1));
+          wood.add(rm.x0 + 1.18, rm.y1 - 0.9, zf + 0.76, 0.62, 1.15, 0.045);
+          metal.add(rm.x0 + 1.18, rm.y1 - 0.9, zf + 0.38, 0.54, 1.05, 0.72);
+          darkMetal.add(rm.x0 + 1.05, rm.y1 - 0.85, zf + 0.96, 0.04, 0.44, 0.3);
+
+          // 3) 全原木實木單人課桌椅（整齊獨立排布）
+          const gx0 = rm.x0 + 2.15;
+          const gx1 = rm.x1 - 1.15;
+          const gy0 = rm.y0 + 0.9;
+          const gy1 = rm.y1 - 0.9;
+          const rows = Math.max(1, Math.min(4, Math.floor((gx1 - gx0) / 1.32) + 1));
+          const colsN = Math.max(1, Math.min(5, Math.floor((gy1 - gy0) / 1.25) + 1));
           for (let i = 0; i < rows; i++) {
-            const x = rows === 1 ? 0.5 * (gx0 + gx1) : gx0 + (i * (gx1 - gx0 - 0.8)) / (rows - 1);
+            const x = rows === 1 ? 0.5 * (gx0 + gx1) : gx0 + (i * (gx1 - gx0 - 0.55)) / (rows - 1);
             for (let j = 0; j < colsN; j++) {
               const y = colsN === 1 ? cy : gy0 + (j * (gy1 - gy0)) / (colsN - 1);
-              addDesk(x, y, zf, 0);
+              addWoodenDesk(x, y, zf, 0, rm.door);
             }
           }
-          shelf.add(rm.x1 - 0.35, cy, zf + 0.5, 0.4, Math.min(5.2, wy * 0.65), 1.0);
+
+          // 6) 後牆（東牆）藍・粉・黃 3x12 錯落格學生置物櫃＋上方綠色後公佈欄
+          const lkCols = Math.max(6, Math.min(12, Math.floor((wy - 1.2) / 0.38)));
+          const lkW = lkCols * 0.38;
+          const lkX = rm.x1 - 0.31; // 避開東隔間牆 0.10m 厚
+          darkMetal.add(lkX, cy, zf + 0.04, 0.34, lkW, 0.08); // 黑色踢腳底座
+          lockerBody.add(lkX, cy, zf + 0.61, 0.38, lkW + 0.04, 1.06);
+          const cellW = lkW / lkCols;
+          for (let c = 0; c < lkCols; c++) {
+            const ly = cy - lkW * 0.5 + (c + 0.5) * cellW;
+            for (let r = 0; r < 3; r++) {
+              const lz = zf + 0.25 + r * 0.345;
+              const hex = lockerPalette[(c + r) % 3];
+              lockerDoors.add(lkX - 0.195, ly, lz, 0.018, cellW - 0.025, 0.315, 0, hex);
+              white.add(lkX - 0.208, ly, lz + 0.095, 0.008, 0.11, 0.042); // 白色號碼牌框
+              white.add(lkX - 0.208, ly - cellW * 0.32, lz - 0.02, 0.01, 0.036, 0.055); // 白色內嵌把槽
+            }
+          }
+          // 置物櫃上方綠色後公佈欄＋銀框
+          silver.add(rm.x1 - 0.125, cy, zf + 1.88, 0.025, Math.min(wy - 1.4, lkW * 0.86), 1.04);
+          bulletinGreen.add(rm.x1 - 0.14, cy, zf + 1.88, 0.02, Math.min(wy - 1.5, lkW * 0.84), 0.98);
+        }
+
+        // 2) 南北兩側窗戶之莫蘭迪霧灰綠布質打褶對開窗簾（自動避開門洞）＋外窗上冷氣機
+        const drX = rm.door?.x ?? -999;
+        const nCurt = Math.max(2, Math.floor(wx / 2.9));
+        for (let k = 0; k <= nCurt; k++) {
+          const cxK = rm.x0 + 0.45 + k * ((wx - 0.9) / nCurt);
+          addGreenCurtain(cxK, rm.y1 - 0.08, zf, zc, true);
+          if (Math.abs(cxK - drX) > 1.15) addGreenCurtain(cxK, rm.y0 + 0.08, zf, zc, true);
+        }
+        for (const acX of [rm.x0 + wx * 0.32, rm.x0 + wx * 0.68]) {
+          white.add(acX, rm.y1 - 0.14, zc - 0.34, 0.95, 0.22, 0.28);
+        }
+
+        // 4) 天花板雙管懸吊式銀鋁槽日光燈（3 排 × 2~3 列）＋黑色圓網吸頂旋轉循環扇
+        const nLx = Math.max(2, Math.min(3, Math.floor(wx / 2.4)));
+        const nLy = Math.max(2, Math.min(3, Math.floor(wy / 2.2)));
+        for (let ix = 0; ix < nLx; ix++) {
+          const lx = rm.x0 + 1.5 + ix * ((wx - 2.6) / Math.max(1, nLx - 1));
+          for (let iy = 0; iy < nLy; iy++) {
+            const ly = rm.y0 + 1.25 + iy * ((wy - 2.5) / Math.max(1, nLy - 1));
+            addHangingLamp(lx, ly, zc, 0, 1.18, 0.44);
+          }
+        }
+        for (const fx of [rm.x0 + wx * 0.38, rm.x0 + wx * 0.7]) {
+          for (const fy of [cy - wy * 0.2, cy + wy * 0.2]) {
+            darkMetal.add(fx, fy, zc - 0.14, 0.44, 0.44, 0.08);
+          }
         }
       } else {
-        // 沿 Y 軸教室（五權樓、廣和樓）：黑板掛北側隔間牆，課桌面向北（yaw = -PI/2）
-        const bw = Math.min(4.4, wx * 0.55);
-        board.add(cx, rm.y1 - 0.14, zf + 1.6, bw, 0.03, 1.15);
-        wood.add(cx, rm.y1 - 0.13, zf + 1.6, bw + 0.14, 0.025, 1.29);
-        wood.add(cx, rm.y1 - 0.2, zf + 0.98, bw, 0.14, 0.04);
+        // ===== 沿 Y 軸教室（五權樓、廣和樓）：北牆前電子黑板、南牆藍粉黃置物櫃、東西窗莫蘭迪綠窗簾 =====
+        const bw = Math.min(4.9, wx * 0.66);
+        const scrW = Math.min(2.05, bw * 0.43);
+        const sideW = Math.max(0.5, (bw - scrW) * 0.5);
+        // 1) 電子黑板（掛北牆面向 -Y）
+        silver.add(cx, rm.y1 - 0.125, zf + 1.56, bw + 0.12, 0.035, 1.26);
+        board.add(cx - (scrW + sideW) * 0.5, rm.y1 - 0.148, zf + 1.56, sideW, 0.025, 1.16);
+        board.add(cx + (scrW + sideW) * 0.5, rm.y1 - 0.148, zf + 1.56, sideW, 0.025, 1.16);
+        silver.add(cx, rm.y1 - 0.2, zf + 0.94, bw + 0.12, 0.12, 0.045);
+        const scr = new THREE.Mesh(smartScreenGeo, smartScreenMat);
+        scr.scale.set(scrW, 1.14, 1);
+        scr.rotation.y = 0; // PlaneGeometry 預設面向 Three.js +Z = Blender -Y（室內方向）
+        scr.position.copy(b2t(cx, rm.y1 - 0.17, zf + 1.56));
+        group.add(scr);
+        for (const ox of [-bw * 0.32, 0, bw * 0.32]) {
+          addHangingLamp(cx + ox, rm.y1 - 0.68, zc, 0, Math.min(1.15, bw * 0.28), 0.48);
+        }
+        darkMetal.add(cx - bw * 0.52, rm.y1 - 0.2, zf + 2.42, 0.2, 0.16, 0.28);
+        darkMetal.add(cx + bw * 0.52, rm.y1 - 0.2, zf + 2.42, 0.2, 0.16, 0.28);
+        darkMetal.add(cx, rm.y1 - 0.16, zf + 2.26, 0.28, 0.1, 0.07);
+        if (wx > bw + 1.4) {
+          bulletinGreen.add(rm.x1 - 0.55, rm.y1 - 0.135, zf + 1.58, 0.85, 0.03, 1.05);
+        }
+        concrete.add(cx, rm.y1 - 0.58, zf + 0.07, Math.min(wx - 0.6, bw + 0.6), 0.96, 0.14);
+
         if (layout === "classroom") {
-          wood.add(cx - 1.2, rm.y1 - 0.95, zf + 0.75, 1.3, 0.6, 0.05);
-          wood.add(cx - 1.2, rm.y1 - 0.95, zf + 0.37, 1.2, 0.5, 0.7);
-          const gy1 = rm.y1 - 2.3;
-          const gy0 = rm.y0 + 1.0;
-          const gx0 = rm.x0 + 0.95;
-          const gx1 = rm.x1 - 0.95;
-          const rows = Math.max(1, Math.min(4, Math.floor((gy1 - gy0) / 1.35) + 1));
-          const colsN = Math.max(1, Math.min(5, Math.floor((gx1 - gx0) / 1.4) + 1));
+          wood.add(rm.x1 - 0.9, rm.y1 - 1.18, zf + 0.76, 1.15, 0.62, 0.045);
+          metal.add(rm.x1 - 0.9, rm.y1 - 1.18, zf + 0.38, 1.05, 0.54, 0.72);
+          darkMetal.add(rm.x1 - 0.85, rm.y1 - 1.05, zf + 0.96, 0.44, 0.04, 0.3);
+
+          // 3) 全原木實木單人課桌椅（面向北 yaw = -PI/2）
+          const gy1 = rm.y1 - 2.15;
+          const gy0 = rm.y0 + 1.15;
+          const gx0 = rm.x0 + 0.9;
+          const gx1 = rm.x1 - 0.9;
+          const rows = Math.max(1, Math.min(4, Math.floor((gy1 - gy0) / 1.32) + 1));
+          const colsN = Math.max(1, Math.min(5, Math.floor((gx1 - gx0) / 1.25) + 1));
           for (let i = 0; i < rows; i++) {
-            const y = rows === 1 ? 0.5 * (gy0 + gy1) : gy1 - (i * (gy1 - gy0 - 0.8)) / (rows - 1);
+            const y = rows === 1 ? 0.5 * (gy0 + gy1) : gy1 - (i * (gy1 - gy0 - 0.55)) / (rows - 1);
             for (let j = 0; j < colsN; j++) {
               const x = colsN === 1 ? cx : gx0 + (j * (gx1 - gx0)) / (colsN - 1);
-              addDesk(x, y, zf, -Math.PI / 2);
+              addWoodenDesk(x, y, zf, -Math.PI / 2, rm.door);
             }
           }
-          shelf.add(cx, rm.y0 + 0.35, zf + 0.5, Math.min(5.2, wx * 0.65), 0.4, 1.0);
+
+          // 6) 後牆（南牆）藍・粉・黃 3x12 錯落格學生置物櫃＋上方綠色後公佈欄
+          const lkCols = Math.max(6, Math.min(12, Math.floor((wx - 1.2) / 0.38)));
+          const lkW = lkCols * 0.38;
+          const lkY = rm.y0 + 0.31;
+          darkMetal.add(cx, lkY, zf + 0.04, lkW, 0.34, 0.08);
+          lockerBody.add(cx, lkY, zf + 0.61, lkW + 0.04, 0.38, 1.06);
+          const cellW = lkW / lkCols;
+          for (let c = 0; c < lkCols; c++) {
+            const lx = cx - lkW * 0.5 + (c + 0.5) * cellW;
+            for (let r = 0; r < 3; r++) {
+              const lz = zf + 0.25 + r * 0.345;
+              const hex = lockerPalette[(c + r) % 3];
+              lockerDoors.add(lx, lkY + 0.195, lz, cellW - 0.025, 0.018, 0.315, 0, hex);
+              white.add(lx, lkY + 0.208, lz + 0.095, 0.11, 0.008, 0.042);
+              white.add(lx - cellW * 0.32, lkY + 0.208, lz - 0.02, 0.036, 0.01, 0.055);
+            }
+          }
+          silver.add(cx, rm.y0 + 0.125, zf + 1.88, Math.min(wx - 1.4, lkW * 0.86), 0.025, 1.04);
+          bulletinGreen.add(cx, rm.y0 + 0.14, zf + 1.88, Math.min(wx - 1.5, lkW * 0.84), 0.02, 0.98);
+        }
+
+        // 2) 東西兩側窗戶莫蘭迪綠打褶窗簾（自動避開門洞）＋冷氣機
+        const drY = rm.door?.y ?? -999;
+        const drOnEast = (rm.door?.normal?.[0] ?? 0) > 0;
+        const nCurt = Math.max(2, Math.floor(wy / 2.9));
+        for (let k = 0; k <= nCurt; k++) {
+          const cyK = rm.y0 + 0.45 + k * ((wy - 0.9) / nCurt);
+          if (!drOnEast || Math.abs(cyK - drY) > 1.15) addGreenCurtain(rm.x1 - 0.08, cyK, zf, zc, false);
+          if (drOnEast || Math.abs(cyK - drY) > 1.15) addGreenCurtain(rm.x0 + 0.08, cyK, zf, zc, false);
+        }
+        const acXWall = drOnEast ? rm.x0 + 0.14 : rm.x1 - 0.14;
+        for (const acY of [rm.y0 + wy * 0.32, rm.y0 + wy * 0.68]) {
+          white.add(acXWall, acY, zc - 0.34, 0.22, 0.95, 0.28);
+        }
+
+        // 4) 天花板雙管懸吊式銀鋁槽日光燈＋黑色圓網吸頂旋轉循環扇
+        const nLy = Math.max(2, Math.min(3, Math.floor(wy / 2.4)));
+        const nLx = Math.max(2, Math.min(3, Math.floor(wx / 2.2)));
+        for (let iy = 0; iy < nLy; iy++) {
+          const ly = rm.y0 + 1.5 + iy * ((wy - 2.6) / Math.max(1, nLy - 1));
+          for (let ix = 0; ix < nLx; ix++) {
+            const lx = rm.x0 + 1.25 + ix * ((wx - 2.5) / Math.max(1, nLx - 1));
+            addHangingLamp(lx, ly, zc, Math.PI / 2, 1.18, 0.44);
+          }
+        }
+        for (const fy of [rm.y0 + wy * 0.38, rm.y0 + wy * 0.7]) {
+          for (const fx of [cx - wx * 0.2, cx + wx * 0.2]) {
+            darkMetal.add(fx, fy, zc - 0.14, 0.44, 0.44, 0.08);
+          }
         }
       }
-      lamp.add(cx, cy, rm.z_ceil - 0.05, Math.min(1.5, wx * 0.25), 0.28, 0.04);
     }
 
-    for (const b of [wood, metal, chair, seatRed, board, white, books, lamp, shelf]) {
+    for (const b of [
+      wood,
+      woodDark,
+      yellowPeg,
+      hookGreen,
+      metal,
+      silver,
+      darkMetal,
+      chair,
+      seatRed,
+      board,
+      bulletinGreen,
+      white,
+      concrete,
+      curtainGreen,
+      curtainTie,
+      lockerBody,
+      lockerDoors,
+      lamp,
+      shelf,
+    ]) {
       const m = b.build();
       if (m) group.add(m);
     }
